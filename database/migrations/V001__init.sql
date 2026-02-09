@@ -1,0 +1,2 @@
+-- Initial schema placeholder
+-- Tables for change requests, approvals, schedules, templates, and audit history
