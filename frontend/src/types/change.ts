@@ -20,8 +20,6 @@ export type DashboardStats = {
   pendingApprovals: number;
   scheduledThisWeek: number;
   completedThisMonth: number;
-  inImplementation: number;
-  emergencyChanges: number;
 };
 
 export type ChangeCreateDto = {

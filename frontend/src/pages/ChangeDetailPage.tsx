@@ -1,117 +1,118 @@
-import ArrowBackOutlinedIcon from "@mui/icons-material/ArrowBackOutlined";
-import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
-import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
-import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  Stack,
-  TextField,
-  Typography
-} from "@mui/material";
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
-import { Link as RouterLink, useParams } from "react-router-dom";
-import ChangeDetail from "../components/ChangeDetail";
-import ChangeForm from "../components/ChangeForm";
-import { sampleApprovals, sampleChanges } from "../data/sampleData";
+import { useEffect, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
+import { useParams } from "react-router-dom";
 import { apiClient } from "../services/apiClient";
 import type { Approval, ApprovalStatus, ChangeCreateDto, ChangeRequest, ChangeUpdateDto } from "../types/change";
 
-const defaultForm: ChangeCreateDto = {
+type ChangeFormState = {
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  riskLevel: string;
+  plannedStart: string;
+  plannedEnd: string;
+};
+
+const emptyForm: ChangeFormState = {
   title: "",
   description: "",
-  priority: "P3",
-  riskLevel: "Low",
+  status: "Draft",
+  priority: "",
+  riskLevel: "",
   plannedStart: "",
   plannedEnd: ""
 };
 
 const ChangeDetailPage = () => {
-  const { id } = useParams();
-  const isNew = id === "new" || !id;
-  const [change, setChange] = useState<ChangeRequest | null>(isNew ? null : sampleChanges[0]);
-  const [approvals, setApprovals] = useState<Approval[]>(sampleApprovals.filter((item) => item.changeRequestId === id));
-  const [formData, setFormData] = useState<ChangeCreateDto>(defaultForm);
-  const [decisionComment, setDecisionComment] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
+  const [change, setChange] = useState<ChangeRequest | null>(null);
+  const [approvals, setApprovals] = useState<Approval[]>([]);
+  const [formState, setFormState] = useState<ChangeFormState>(emptyForm);
+  const [error, setError] = useState<string | null>(null);
+  const [decisionComments, setDecisionComments] = useState<Record<string, string>>({});
+  const { id } = useParams<{ id: string }>();
+  const isNew = id === "new";
+
+  const loadApprovals = async (changeId: string) => {
+    const data = await apiClient.getApprovals(changeId);
+    setApprovals(data);
+  };
+
+  const loadChange = async (changeId: string) => {
+    const detail = await apiClient.getChangeById(changeId);
+    setChange(detail);
+    setFormState({
+      title: detail.title,
+      description: detail.description,
+      status: detail.status,
+      priority: detail.priority ?? "",
+      riskLevel: detail.riskLevel ?? "",
+      plannedStart: detail.plannedStart ?? "",
+      plannedEnd: detail.plannedEnd ?? ""
+    });
+    await loadApprovals(changeId);
+  };
 
   useEffect(() => {
-    if (isNew || !id) {
+    if (!id) {
+      setError("No change selected.");
       return;
     }
 
-    apiClient
-      .getChangeById(id)
-      .then((data) => {
-        setChange(data);
-        setFormData({
-          title: data.title,
-          description: data.description,
-          priority: data.priority,
-          riskLevel: data.riskLevel,
-          plannedStart: data.plannedStart,
-          plannedEnd: data.plannedEnd
-        });
-      })
-      .catch(() => {
-        const fallback = sampleChanges.find((item) => item.id === id) ?? sampleChanges[0];
-        setChange(fallback);
-        setFormData({
-          title: fallback.title,
-          description: fallback.description,
-          priority: fallback.priority,
-          riskLevel: fallback.riskLevel,
-          plannedStart: fallback.plannedStart,
-          plannedEnd: fallback.plannedEnd
-        });
-      });
+    if (isNew) {
+      setChange(null);
+      setApprovals([]);
+      setFormState(emptyForm);
+      return;
+    }
 
-    apiClient
-      .getApprovals(id)
-      .then((data) => setApprovals(data))
-      .catch(() => setApprovals(sampleApprovals.filter((item) => item.changeRequestId === id)));
+    loadChange(id).catch((err: Error) => setError(err.message));
   }, [id, isNew]);
 
-  const canTakeDecision = useMemo(() => change?.status === "PendingApproval", [change?.status]);
-
-  const handleFormChange = (field: keyof ChangeCreateDto, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  const handleChange =
+    (field: keyof ChangeFormState) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormState((prev) => ({ ...prev, [field]: event.target.value }));
   };
 
-  const handleSave = async () => {
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError(null);
+
     try {
       if (isNew) {
-        const created = await apiClient.createChange(formData);
+        const payload: ChangeCreateDto = {
+          title: formState.title,
+          description: formState.description,
+          priority: formState.priority || undefined,
+          riskLevel: formState.riskLevel || undefined,
+          plannedStart: formState.plannedStart || undefined,
+          plannedEnd: formState.plannedEnd || undefined
+        };
+        const created = await apiClient.createChange(payload);
         console.log("Created change", created);
-        setMessage("Change request created successfully.");
-      } else if (id && change) {
+        setChange(created);
+      } else if (id) {
         const payload: ChangeUpdateDto = {
-          ...formData,
-          status: change.status
+          title: formState.title,
+          description: formState.description,
+          status: formState.status,
+          priority: formState.priority || undefined,
+          riskLevel: formState.riskLevel || undefined,
+          plannedStart: formState.plannedStart || undefined,
+          plannedEnd: formState.plannedEnd || undefined
         };
         const updated = await apiClient.updateChange(id, payload);
         console.log("Updated change", updated);
         setChange(updated);
-        setMessage("Change request updated successfully.");
       }
-    } catch {
-      setMessage("Action completed in demo mode with sample data.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Request failed.";
+      setError(message);
     }
   };
 
-  const handleSubmitForApproval = async () => {
-    if (!id) {
-      return;
-    }
-    try {
-      const updated = await apiClient.submitChange(id);
-      console.log("Submitted for approval", updated);
-      setChange(updated);
-    } catch {
-      setChange((prev) => (prev ? { ...prev, status: "PendingApproval" } : prev));
-    }
+  const handleDecisionComment = (approvalId: string) => (event: ChangeEvent<HTMLTextAreaElement>) => {
+    setDecisionComments((prev) => ({ ...prev, [approvalId]: event.target.value }));
   };
 
   const handleDecision = async (approvalId: string, status: ApprovalStatus) => {
@@ -120,82 +121,122 @@ const ChangeDetailPage = () => {
     }
 
     try {
-      const updated = await apiClient.decideApproval(id, approvalId, { status, comment: decisionComment });
-      console.log("Approval decision", updated);
-      setApprovals((prev) => prev.map((item) => (item.id === approvalId ? updated : item)));
-    } catch {
-      setApprovals((prev) =>
-        prev.map((item) =>
-          item.id === approvalId ? { ...item, status, comment: decisionComment, decisionAt: new Date().toISOString() } : item
-        )
-      );
+      const comment = decisionComments[approvalId];
+      const updated = await apiClient.decideApproval(id, approvalId, { status, comment });
+      console.log("Updated approval", updated);
+      await loadChange(id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Request failed.";
+      setError(message);
+    }
+  };
+
+  const handleSubmitForApproval = async () => {
+    if (!id) {
+      return;
+    }
+
+    try {
+      const updated = await apiClient.submitChange(id);
+      console.log("Submitted change", updated);
+      await loadChange(id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Request failed.";
+      setError(message);
     }
   };
 
   return (
-    <Stack spacing={2}>
-      <Button component={RouterLink} to="/changes" startIcon={<ArrowBackOutlinedIcon />} sx={{ alignSelf: "flex-start" }}>
-        Back to list
-      </Button>
-      <Typography variant="h4">{isNew ? "New Change Request" : "Change Detail"}</Typography>
-      {message ? <Alert severity="success">{message}</Alert> : null}
-
-      <ChangeForm value={formData} onChange={handleFormChange} onSubmit={handleSave} submitLabel={isNew ? "Submit for Approval" : "Save Changes"} />
-
-      {!isNew && change ? (
-        <>
-          {change.status === "Draft" ? (
-            <Button variant="contained" startIcon={<SendOutlinedIcon />} onClick={handleSubmitForApproval} sx={{ alignSelf: "flex-start" }}>
-              Submit for approval
-            </Button>
+    <section>
+      <h2>{isNew ? "New Change" : "Change Detail"}</h2>
+      {error ? <p>{error}</p> : null}
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label htmlFor="title">Title</label>
+          <input id="title" value={formState.title} onChange={handleChange("title")} />
+        </div>
+        <div>
+          <label htmlFor="description">Description</label>
+          <textarea id="description" value={formState.description} onChange={handleChange("description")} />
+        </div>
+        {!isNew ? (
+          <div>
+            <label htmlFor="status">Status</label>
+            <input id="status" value={formState.status} onChange={handleChange("status")} />
+          </div>
+        ) : null}
+        <div>
+          <label htmlFor="priority">Priority</label>
+          <input id="priority" value={formState.priority} onChange={handleChange("priority")} />
+        </div>
+        <div>
+          <label htmlFor="riskLevel">Risk Level</label>
+          <input id="riskLevel" value={formState.riskLevel} onChange={handleChange("riskLevel")} />
+        </div>
+        <div>
+          <label htmlFor="plannedStart">Planned Start</label>
+          <input id="plannedStart" value={formState.plannedStart} onChange={handleChange("plannedStart")} />
+        </div>
+        <div>
+          <label htmlFor="plannedEnd">Planned End</label>
+          <input id="plannedEnd" value={formState.plannedEnd} onChange={handleChange("plannedEnd")} />
+        </div>
+        <button type="submit">{isNew ? "Create Change" : "Update Change"}</button>
+      </form>
+      {change && !isNew ? (
+        <div>
+          <p>Loaded change: {change.title}</p>
+          {change.status === "Approved" || change.status === "Rejected" ? (
+            <p>Final status: {change.status}</p>
           ) : null}
-
-          <ChangeDetail
-            change={change}
-            approvals={approvals}
-            actions={
-              change.status === "Approved" || change.status === "Rejected" ? (
-                <Chip label={`Final state: ${change.status}`} color={change.status === "Approved" ? "success" : "error"} />
-              ) : null
-            }
-          />
-
-          <Box>
-            <Typography variant="h6" gutterBottom>
-              Approval Actions
-            </Typography>
-            <TextField
-              label="Approval comment"
-              multiline
-              fullWidth
-              minRows={2}
-              value={decisionComment}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setDecisionComment(event.target.value)}
-            />
-            <Stack direction="row" spacing={1} mt={1}>
-              <Button
-                variant="contained"
-                color="success"
-                startIcon={<CheckCircleOutlineIcon />}
-                disabled={!canTakeDecision || approvals.length === 0}
-                onClick={() => approvals[0] && handleDecision(approvals[0].id, "Approved")}
-              >
-                Approve
-              </Button>
-              <Button
-                variant="outlined"
-                color="error"
-                startIcon={<CloseOutlinedIcon />}
-                disabled={!canTakeDecision || approvals.length === 0}
-                onClick={() => approvals[0] && handleDecision(approvals[0].id, "Rejected")}
-              >
-                Reject
-              </Button>
-            </Stack>
-          </Box>
-        </>
+          {change.status === "Draft" ? (
+            <button type="button" onClick={handleSubmitForApproval}>
+              Submit for approval
+            </button>
+          ) : null}
+        </div>
       ) : null}
-    </Stack>
+      {!isNew ? (
+        <section>
+          <h3>Approvals</h3>
+          {change && change.status === "PendingApproval" ? (
+            <div>
+              <p>Total: {change.approvalsTotal}</p>
+              <p>Approved: {change.approvalsApproved}</p>
+              <p>Rejected: {change.approvalsRejected}</p>
+              <p>Pending: {change.approvalsPending}</p>
+            </div>
+          ) : null}
+          {approvals.length === 0 ? <p>No approvals yet.</p> : null}
+          <ul>
+            {approvals.map((approval) => (
+              <li key={approval.id}>
+                <p>Approver: {approval.approver}</p>
+                <p>Status: {approval.status}</p>
+                {approval.comment ? <p>Comment: {approval.comment}</p> : null}
+                {approval.status === "Pending" && change?.status === "PendingApproval" ? (
+                  <div>
+                    <textarea
+                      value={decisionComments[approval.id] ?? ""}
+                      onChange={handleDecisionComment(approval.id)}
+                      placeholder="Add a comment"
+                    />
+                    <div>
+                      <button type="button" onClick={() => handleDecision(approval.id, "Approved")}>
+                        Approve
+                      </button>
+                      <button type="button" onClick={() => handleDecision(approval.id, "Rejected")}>
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </section>
   );
 };
 
