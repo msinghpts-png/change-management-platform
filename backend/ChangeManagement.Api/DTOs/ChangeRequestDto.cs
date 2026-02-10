@@ -12,4 +12,8 @@ public class ChangeRequestDto
     public DateTime? PlannedEnd { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public int ApprovalsTotal { get; set; }
+    public int ApprovalsApproved { get; set; }
+    public int ApprovalsRejected { get; set; }
+    public int ApprovalsPending { get; set; }
 }

@@ -10,11 +10,15 @@ namespace ChangeManagement.Api.Controllers;
 [Route("api/changes")]
 public class ChangesController : ControllerBase
 {
+    private readonly IApprovalService _approvalService;
     private readonly IChangeService _changeService;
+    private readonly IChangeStatusValidator _statusValidator;
 
-    public ChangesController(IChangeService changeService)
+    public ChangesController(IChangeService changeService, IApprovalService approvalService, IChangeStatusValidator statusValidator)
     {
         _changeService = changeService;
+        _approvalService = approvalService;
+        _statusValidator = statusValidator;
     }
 
     [HttpGet]
@@ -22,7 +26,13 @@ public class ChangesController : ControllerBase
     {
         var changes = _changeService.GetAll();
 
-        return Ok(changes.Select(MapToDto));
+        var results = changes.Select(change =>
+        {
+            var approvals = _approvalService.GetApprovalsForChange(change.Id).ToList();
+            return MapToDto(change, approvals);
+        });
+
+        return Ok(results);
     }
 
     [HttpGet("{id:guid}")]
@@ -34,7 +44,8 @@ public class ChangesController : ControllerBase
             return NotFound();
         }
 
-        return Ok(MapToDto(change));
+        var approvals = _approvalService.GetApprovalsForChange(change.Id).ToList();
+        return Ok(MapToDto(change, approvals));
     }
 
     [HttpPost]
@@ -60,7 +71,7 @@ public class ChangesController : ControllerBase
 
         var stored = _changeService.Create(created);
 
-        return CreatedAtAction(nameof(GetChangeById), new { id = stored.Id }, MapToDto(stored));
+        return CreatedAtAction(nameof(GetChangeById), new { id = stored.Id }, MapToDto(stored, new List<ChangeApproval>()));
     }
 
     [HttpPut("{id:guid}")]
@@ -93,11 +104,43 @@ public class ChangesController : ControllerBase
             return NotFound();
         }
 
-        return Ok(MapToDto(stored));
+        var approvals = _approvalService.GetApprovalsForChange(stored.Id).ToList();
+        return Ok(MapToDto(stored, approvals));
     }
 
-    private static ChangeRequestDto MapToDto(ChangeRequest change)
+    [HttpPost("{id:guid}/submit")]
+    public ActionResult<ChangeRequestDto> SubmitForApproval(Guid id)
     {
+        var change = _changeService.GetById(id);
+        if (change is null)
+        {
+            return NotFound();
+        }
+
+        if (!_statusValidator.CanTransition(change.Status, ChangeStatus.PendingApproval))
+        {
+            return BadRequest("Invalid status transition.");
+        }
+
+        change.Status = ChangeStatus.PendingApproval;
+        change.UpdatedAt = DateTime.UtcNow;
+        var updated = _changeService.Update(change);
+
+        if (updated is null)
+        {
+            return NotFound();
+        }
+
+        var approvals = _approvalService.GetApprovalsForChange(updated.Id).ToList();
+        return Ok(MapToDto(updated, approvals));
+    }
+
+    private static ChangeRequestDto MapToDto(ChangeRequest change, IReadOnlyCollection<ChangeApproval> approvals)
+    {
+        var approvedCount = approvals.Count(approval => approval.Status == ApprovalStatus.Approved);
+        var rejectedCount = approvals.Count(approval => approval.Status == ApprovalStatus.Rejected);
+        var pendingCount = approvals.Count(approval => approval.Status == ApprovalStatus.Pending);
+
         return new ChangeRequestDto
         {
             Id = change.Id,
@@ -109,7 +152,11 @@ public class ChangesController : ControllerBase
             PlannedStart = change.PlannedStart,
             PlannedEnd = change.PlannedEnd,
             CreatedAt = change.CreatedAt,
-            UpdatedAt = change.UpdatedAt
+            UpdatedAt = change.UpdatedAt,
+            ApprovalsTotal = approvals.Count,
+            ApprovalsApproved = approvedCount,
+            ApprovalsRejected = rejectedCount,
+            ApprovalsPending = pendingCount
         };
     }
 }

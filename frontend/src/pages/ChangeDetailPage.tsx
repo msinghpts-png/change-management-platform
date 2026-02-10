@@ -38,6 +38,21 @@ const ChangeDetailPage = () => {
     setApprovals(data);
   };
 
+  const loadChange = async (changeId: string) => {
+    const detail = await apiClient.getChangeById(changeId);
+    setChange(detail);
+    setFormState({
+      title: detail.title,
+      description: detail.description,
+      status: detail.status,
+      priority: detail.priority ?? "",
+      riskLevel: detail.riskLevel ?? "",
+      plannedStart: detail.plannedStart ?? "",
+      plannedEnd: detail.plannedEnd ?? ""
+    });
+    await loadApprovals(changeId);
+  };
+
   useEffect(() => {
     if (!id) {
       setError("No change selected.");
@@ -51,22 +66,7 @@ const ChangeDetailPage = () => {
       return;
     }
 
-    apiClient
-      .getChangeById(id)
-      .then((detail) => {
-        setChange(detail);
-        setFormState({
-          title: detail.title,
-          description: detail.description,
-          status: detail.status,
-          priority: detail.priority ?? "",
-          riskLevel: detail.riskLevel ?? "",
-          plannedStart: detail.plannedStart ?? "",
-          plannedEnd: detail.plannedEnd ?? ""
-        });
-        return loadApprovals(id);
-      })
-      .catch((err: Error) => setError(err.message));
+    loadChange(id).catch((err: Error) => setError(err.message));
   }, [id, isNew]);
 
   const handleChange =
@@ -120,10 +120,30 @@ const ChangeDetailPage = () => {
       return;
     }
 
-    const comment = decisionComments[approvalId];
-    const updated = await apiClient.decideApproval(id, approvalId, { status, comment });
-    console.log("Updated approval", updated);
-    await loadApprovals(id);
+    try {
+      const comment = decisionComments[approvalId];
+      const updated = await apiClient.decideApproval(id, approvalId, { status, comment });
+      console.log("Updated approval", updated);
+      await loadChange(id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Request failed.";
+      setError(message);
+    }
+  };
+
+  const handleSubmitForApproval = async () => {
+    if (!id) {
+      return;
+    }
+
+    try {
+      const updated = await apiClient.submitChange(id);
+      console.log("Submitted change", updated);
+      await loadChange(id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Request failed.";
+      setError(message);
+    }
   };
 
   return (
@@ -166,11 +186,27 @@ const ChangeDetailPage = () => {
       {change && !isNew ? (
         <div>
           <p>Loaded change: {change.title}</p>
+          {change.status === "Approved" || change.status === "Rejected" ? (
+            <p>Final status: {change.status}</p>
+          ) : null}
+          {change.status === "Draft" ? (
+            <button type="button" onClick={handleSubmitForApproval}>
+              Submit for approval
+            </button>
+          ) : null}
         </div>
       ) : null}
       {!isNew ? (
         <section>
           <h3>Approvals</h3>
+          {change && change.status === "PendingApproval" ? (
+            <div>
+              <p>Total: {change.approvalsTotal}</p>
+              <p>Approved: {change.approvalsApproved}</p>
+              <p>Rejected: {change.approvalsRejected}</p>
+              <p>Pending: {change.approvalsPending}</p>
+            </div>
+          ) : null}
           {approvals.length === 0 ? <p>No approvals yet.</p> : null}
           <ul>
             {approvals.map((approval) => (
@@ -178,7 +214,7 @@ const ChangeDetailPage = () => {
                 <p>Approver: {approval.approver}</p>
                 <p>Status: {approval.status}</p>
                 {approval.comment ? <p>Comment: {approval.comment}</p> : null}
-                {approval.status === "Pending" ? (
+                {approval.status === "Pending" && change?.status === "PendingApproval" ? (
                   <div>
                     <textarea
                       value={decisionComments[approval.id] ?? ""}

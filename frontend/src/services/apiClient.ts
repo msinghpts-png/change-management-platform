@@ -7,11 +7,10 @@ import type {
   DashboardStats
 } from "../types/change";
 
-const API_BASE_URL = "/api";
+const API_BASE_URL = "http://localhost:8080";
 
 const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
   const response = await fetch(`${API_BASE_URL}${path}`, options);
-
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status}`);
   }
@@ -20,45 +19,37 @@ const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
 };
 
 export const apiClient = {
-  getChanges: () => request<ChangeRequest[]>("/changes"),
-  getChangeById: (id: string) => request<ChangeRequest>(`/changes/${id}`),
+  getChanges: () => request<ChangeRequest[]>("/api/changes"),
+  getChangeById: (id: string) => request<ChangeRequest>(`/api/changes/${id}`),
   getApprovals: (changeId: string) =>
-    request<Approval[]>(`/changes/${changeId}/approvals`),
-
+    request<Approval[]>(`/api/changes/${changeId}/approvals`),
   createChange: (payload: ChangeCreateDto) =>
-    request<ChangeRequest>("/changes", {
+    request<ChangeRequest>("/api/changes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     }),
-
   createApproval: (changeId: string, payload: { approver: string; comment?: string }) =>
-    request<Approval>(`/changes/${changeId}/approvals`, {
+    request<Approval>(`/api/changes/${changeId}/approvals`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     }),
-
+  submitChange: (changeId: string) =>
+    request<ChangeRequest>(`/api/changes/${changeId}/submit`, {
+      method: "POST"
+    }),
   updateChange: (id: string, payload: ChangeUpdateDto) =>
-    request<ChangeRequest>(`/changes/${id}`, {
+    request<ChangeRequest>(`/api/changes/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     }),
-
-  decideApproval: (
-    changeId: string,
-    approvalId: string,
-    payload: { status: ApprovalStatus; comment?: string }
-  ) =>
-    request<Approval>(
-      `/changes/${changeId}/approvals/${approvalId}/decision`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      }
-    ),
-
-  getDashboardStats: () => request<DashboardStats>("/dashboard")
+  decideApproval: (changeId: string, approvalId: string, payload: { status: ApprovalStatus; comment?: string }) =>
+    request<Approval>(`/api/changes/${changeId}/approvals/${approvalId}/decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }),
+  getDashboardStats: () => request<DashboardStats>("/api/dashboard")
 };

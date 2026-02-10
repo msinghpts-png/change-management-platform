@@ -9,6 +9,10 @@ export type ChangeRequest = {
   plannedEnd?: string;
   createdAt: string;
   updatedAt?: string;
+  approvalsTotal: number;
+  approvalsApproved: number;
+  approvalsRejected: number;
+  approvalsPending: number;
 };
 
 export type DashboardStats = {

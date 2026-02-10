@@ -18,9 +18,14 @@ public class ApprovalRepository : IApprovalRepository
         return _approvals.Where(approval => approval.ChangeRequestId == changeRequestId);
     }
 
+    public ChangeApproval? GetById(Guid approvalId)
+    {
+        return _approvals.FirstOrDefault(item => item.Id == approvalId);
+    }
+
     public ChangeApproval? UpdateDecision(Guid approvalId, ApprovalStatus status, string? comment, DateTime decidedAt)
     {
-        var approval = _approvals.FirstOrDefault(item => item.Id == approvalId);
+        var approval = GetById(approvalId);
         if (approval is null)
         {
             return null;

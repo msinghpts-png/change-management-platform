@@ -3,6 +3,7 @@ using ChangeManagement.Api.Domain.Enums;
 using ChangeManagement.Api.DTOs;
 using ChangeManagement.Api.Services;
 using Microsoft.AspNetCore.Mvc;
+using System;
 
 namespace ChangeManagement.Api.Controllers;
 
@@ -48,12 +49,18 @@ public class ApprovalsController : ControllerBase
     [HttpPost("{approvalId:guid}/decision")]
     public ActionResult<ChangeApproval> DecideApproval(Guid changeId, Guid approvalId, [FromBody] ApprovalDecisionDto request)
     {
-        var updated = _approvalService.RecordDecision(approvalId, request.Status, request.Comment, DateTime.UtcNow);
-        if (updated is null)
+        var result = _approvalService.RecordDecision(approvalId, request.Status, request.Comment, DateTime.UtcNow);
+        if (result.Approval is null)
         {
-            return NotFound();
+            if (string.Equals(result.Error, "Approval not found.", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(result.Error, "Change request not found.", StringComparison.OrdinalIgnoreCase))
+            {
+                return NotFound(result.Error);
+            }
+
+            return BadRequest(result.Error);
         }
 
-        return Ok(updated);
+        return Ok(result.Approval);
     }
 }
