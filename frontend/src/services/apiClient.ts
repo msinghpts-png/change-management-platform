@@ -39,6 +39,11 @@ export const apiClient = {
       body: JSON.stringify(payload)
     }),
 
+  submitChange: (changeId: string) =>
+    request<ChangeRequest>(`/changes/${changeId}/submit`, {
+      method: "POST"
+    }),
+
   updateChange: (id: string, payload: ChangeUpdateDto) =>
     request<ChangeRequest>(`/changes/${id}`, {
       method: "PUT",

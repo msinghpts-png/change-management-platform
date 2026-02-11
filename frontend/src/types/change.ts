@@ -20,21 +20,13 @@ export type DashboardStats = {
   pendingApprovals: number;
   scheduledThisWeek: number;
   completedThisMonth: number;
+  inImplementation: number;
+  emergencyChanges: number;
 };
 
 export type ChangeCreateDto = {
   title: string;
   description: string;
-  priority?: string;
-  riskLevel?: string;
-  plannedStart?: string;
-  plannedEnd?: string;
-};
-
-export type ChangeUpdateDto = {
-  title: string;
-  description: string;
-  status: string;
   priority?: string;
   riskLevel?: string;
   plannedStart?: string;
