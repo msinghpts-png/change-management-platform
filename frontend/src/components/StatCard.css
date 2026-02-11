@@ -1,0 +1,20 @@
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.stat-card-title {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.stat-card-value {
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.stat-card-description {
+  color: var(--color-text-secondary);
+  font-size: var(--font-small);
+}
