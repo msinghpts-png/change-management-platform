@@ -1,94 +1,133 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import ApprovalDecisionForm from "../components/ApprovalDecisionForm";
-import ApprovalList from "../components/ApprovalList";
-import StatusBadge from "../components/StatusBadge";
-import { sampleApprovals, sampleChanges } from "../data/sampleData";
+import type { ChangeEvent, FormEvent } from "react";
+import { useParams } from "react-router-dom";
 import { apiClient } from "../services/apiClient";
 import type { Approval, ApprovalStatus, ChangeCreateDto, ChangeRequest, ChangeUpdateDto } from "../types/change";
-import "./ChangeDetailPage.css";
 
-const defaultForm: ChangeCreateDto = {
+type ChangeFormState = {
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  riskLevel: string;
+  plannedStart: string;
+  plannedEnd: string;
+};
+
+const emptyForm: ChangeFormState = {
   title: "",
   description: "",
-  priority: "P3",
-  riskLevel: "Low",
+  status: "Draft",
+  priority: "",
+  riskLevel: "",
   plannedStart: "",
   plannedEnd: ""
 };
 
 const ChangeDetailPage = () => {
-  const { id } = useParams();
-  const isNew = !id || id === "new";
-  const [activeSection, setActiveSection] = useState<"overview" | "approvals">("overview");
-  const [change, setChange] = useState<ChangeRequest | null>(isNew ? null : sampleChanges[0]);
+  const [change, setChange] = useState<ChangeRequest | null>(null);
   const [approvals, setApprovals] = useState<Approval[]>([]);
-  const [message, setMessage] = useState("");
-  const [decisionComment, setDecisionComment] = useState("");
-  const [formData, setFormData] = useState<ChangeCreateDto>(defaultForm);
+  const [formState, setFormState] = useState<ChangeFormState>(emptyForm);
+  const [error, setError] = useState<string | null>(null);
+  const [decisionComments, setDecisionComments] = useState<Record<string, string>>({});
+  const { id } = useParams<{ id: string }>();
+  const isNew = id === "new";
+
+  const loadApprovals = async (changeId: string) => {
+    const data = await apiClient.getApprovals(changeId);
+    setApprovals(data);
+  };
+
+  const loadChange = async (changeId: string) => {
+    const detail = await apiClient.getChangeById(changeId);
+    setChange(detail);
+    setFormState({
+      title: detail.title,
+      description: detail.description,
+      status: detail.status,
+      priority: detail.priority ?? "",
+      riskLevel: detail.riskLevel ?? "",
+      plannedStart: detail.plannedStart ?? "",
+      plannedEnd: detail.plannedEnd ?? ""
+    });
+    await loadApprovals(changeId);
+  };
 
   useEffect(() => {
-    if (isNew || !id) {
+    if (!id) {
+      setError("No change selected.");
       return;
     }
 
-    apiClient
-      .getChangeById(id)
-      .then((loaded) => {
-        setChange(loaded);
-        setFormData({
-          title: loaded.title,
-          description: loaded.description,
-          priority: loaded.priority,
-          riskLevel: loaded.riskLevel,
-          plannedStart: loaded.plannedStart,
-          plannedEnd: loaded.plannedEnd
-        });
-      })
-      .catch(() => {
-        const fallback = sampleChanges.find((item) => item.id === id) ?? sampleChanges[0];
-        setChange(fallback);
-        setFormData({
-          title: fallback.title,
-          description: fallback.description,
-          priority: fallback.priority,
-          riskLevel: fallback.riskLevel,
-          plannedStart: fallback.plannedStart,
-          plannedEnd: fallback.plannedEnd
-        });
-      });
+    if (isNew) {
+      setChange(null);
+      setApprovals([]);
+      setFormState(emptyForm);
+      return;
+    }
 
-    apiClient
-      .getApprovals(id)
-      .then(setApprovals)
-      .catch(() => setApprovals(sampleApprovals.filter((approval) => approval.changeRequestId === id)));
+    loadChange(id).catch((err: Error) => setError(err.message));
   }, [id, isNew]);
 
-  const handleFieldChange = (field: keyof ChangeCreateDto, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  const handleChange =
+    (field: keyof ChangeFormState) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormState((prev) => ({ ...prev, [field]: event.target.value }));
   };
 
-  const handleSave = async () => {
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError(null);
+
     try {
       if (isNew) {
-        await apiClient.createChange(formData);
-        setMessage("Change request created successfully.");
-        return;
+        const payload: ChangeCreateDto = {
+          title: formState.title,
+          description: formState.description,
+          priority: formState.priority || undefined,
+          riskLevel: formState.riskLevel || undefined,
+          plannedStart: formState.plannedStart || undefined,
+          plannedEnd: formState.plannedEnd || undefined
+        };
+        const created = await apiClient.createChange(payload);
+        console.log("Created change", created);
+        setChange(created);
+      } else if (id) {
+        const payload: ChangeUpdateDto = {
+          title: formState.title,
+          description: formState.description,
+          status: formState.status,
+          priority: formState.priority || undefined,
+          riskLevel: formState.riskLevel || undefined,
+          plannedStart: formState.plannedStart || undefined,
+          plannedEnd: formState.plannedEnd || undefined
+        };
+        const updated = await apiClient.updateChange(id, payload);
+        console.log("Updated change", updated);
+        setChange(updated);
       }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Request failed.";
+      setError(message);
+    }
+  };
 
-      if (!id || !change) {
-        return;
-      }
+  const handleDecisionComment = (approvalId: string) => (event: ChangeEvent<HTMLTextAreaElement>) => {
+    setDecisionComments((prev) => ({ ...prev, [approvalId]: event.target.value }));
+  };
 
-      const payload: ChangeUpdateDto = {
-        ...formData,
-        status: change.status
-      };
-      const updated = await apiClient.updateChange(id, payload);
-      setChange(updated);
-      setMessage("Change request updated successfully.");
-    } catch {
-      setMessage("Changes were captured in local mode.");
+  const handleDecision = async (approvalId: string, status: ApprovalStatus) => {
+    if (!id) {
+      return;
+    }
+
+    try {
+      const comment = decisionComments[approvalId];
+      const updated = await apiClient.decideApproval(id, approvalId, { status, comment });
+      console.log("Updated approval", updated);
+      await loadChange(id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Request failed.";
+      setError(message);
     }
   };
 
@@ -99,157 +138,102 @@ const ChangeDetailPage = () => {
 
     try {
       const updated = await apiClient.submitChange(id);
-      setChange(updated);
-    } catch {
-      setChange((prev) => (prev ? { ...prev, status: "PendingApproval" } : prev));
-    }
-  };
-
-  const handleDecision = async (status: ApprovalStatus) => {
-    if (!id || approvals.length === 0) {
-      return;
-    }
-
-    const target = approvals[0];
-
-    try {
-      const updated = await apiClient.decideApproval(id, target.id, { status, comment: decisionComment });
-      setApprovals((prev) => prev.map((approval) => (approval.id === target.id ? updated : approval)));
-    } catch {
-      setApprovals((prev) =>
-        prev.map((approval) =>
-          approval.id === target.id
-            ? { ...approval, status, comment: decisionComment, decisionAt: new Date().toISOString() }
-            : approval
-        )
-      );
+      console.log("Submitted change", updated);
+      await loadChange(id);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Request failed.";
+      setError(message);
     }
   };
 
   return (
     <section>
-      <div className="page-header">
+      <h2>{isNew ? "New Change" : "Change Detail"}</h2>
+      {error ? <p>{error}</p> : null}
+      <form onSubmit={handleSubmit}>
         <div>
-          <h2 className="page-title">{isNew ? "New Change Request" : "Change Detail"}</h2>
-          <p className="page-subtitle">Track implementation readiness and approvals</p>
+          <label htmlFor="title">Title</label>
+          <input id="title" value={formState.title} onChange={handleChange("title")} />
         </div>
-        <Link className="btn btn-secondary" to="/changes">
-          Back to list
-        </Link>
-      </div>
-
-      {message ? <div className="change-detail-message">{message}</div> : null}
-
-      <section className="card change-form-grid">
-        <label>
-          Title
-          <input className="input" value={formData.title} onChange={(event) => handleFieldChange("title", event.target.value)} />
-        </label>
-        <label>
-          Priority
-          <select className="select" value={formData.priority ?? ""} onChange={(event) => handleFieldChange("priority", event.target.value)}>
-            <option value="P1">P1</option>
-            <option value="P2">P2</option>
-            <option value="P3">P3</option>
-            <option value="P4">P4</option>
-          </select>
-        </label>
-        <label>
-          Description
-          <textarea
-            className="textarea"
-            value={formData.description}
-            onChange={(event) => handleFieldChange("description", event.target.value)}
-          />
-        </label>
-        <label>
-          Risk Level
-          <select className="select" value={formData.riskLevel ?? ""} onChange={(event) => handleFieldChange("riskLevel", event.target.value)}>
-            <option value="Low">Low</option>
-            <option value="Medium">Medium</option>
-            <option value="High">High</option>
-          </select>
-        </label>
-        <label>
-          Planned Start
-          <input
-            className="input"
-            type="datetime-local"
-            value={formData.plannedStart ?? ""}
-            onChange={(event) => handleFieldChange("plannedStart", event.target.value)}
-          />
-        </label>
-        <label>
-          Planned End
-          <input
-            className="input"
-            type="datetime-local"
-            value={formData.plannedEnd ?? ""}
-            onChange={(event) => handleFieldChange("plannedEnd", event.target.value)}
-          />
-        </label>
-      </section>
-
-      <div className="change-detail-actions">
-        <button type="button" className="btn btn-primary" onClick={handleSave}>
-          {isNew ? "Create Change" : "Save Changes"}
-        </button>
-        {!isNew && change?.status === "Draft" ? (
-          <button type="button" className="btn btn-secondary" onClick={handleSubmitForApproval}>
-            Submit for approval
-          </button>
-        ) : null}
-      </div>
-
-      {!isNew && change ? (
-        <section className="change-detail-body">
-          <header className="card change-detail-meta">
-            <div>
-              <p className="change-detail-id">{change.id}</p>
-              <h3 className="change-detail-name">{change.title}</h3>
-            </div>
-            <StatusBadge status={change.status} />
-          </header>
-
-          <div className="change-detail-tabs">
-            <button
-              type="button"
-              className={`change-detail-tab ${activeSection === "overview" ? "active" : ""}`}
-              onClick={() => setActiveSection("overview")}
-            >
-              Overview
-            </button>
-            <button
-              type="button"
-              className={`change-detail-tab ${activeSection === "approvals" ? "active" : ""}`}
-              onClick={() => setActiveSection("approvals")}
-            >
-              Approvals
-            </button>
+        <div>
+          <label htmlFor="description">Description</label>
+          <textarea id="description" value={formState.description} onChange={handleChange("description")} />
+        </div>
+        {!isNew ? (
+          <div>
+            <label htmlFor="status">Status</label>
+            <input id="status" value={formState.status} onChange={handleChange("status")} />
           </div>
-
-          {activeSection === "overview" ? (
-            <article className="card">
-              <h4 className="section-title">Change Description</h4>
-              <p className="section-text">{change.description}</p>
-            </article>
+        ) : null}
+        <div>
+          <label htmlFor="priority">Priority</label>
+          <input id="priority" value={formState.priority} onChange={handleChange("priority")} />
+        </div>
+        <div>
+          <label htmlFor="riskLevel">Risk Level</label>
+          <input id="riskLevel" value={formState.riskLevel} onChange={handleChange("riskLevel")} />
+        </div>
+        <div>
+          <label htmlFor="plannedStart">Planned Start</label>
+          <input id="plannedStart" value={formState.plannedStart} onChange={handleChange("plannedStart")} />
+        </div>
+        <div>
+          <label htmlFor="plannedEnd">Planned End</label>
+          <input id="plannedEnd" value={formState.plannedEnd} onChange={handleChange("plannedEnd")} />
+        </div>
+        <button type="submit">{isNew ? "Create Change" : "Update Change"}</button>
+      </form>
+      {change && !isNew ? (
+        <div>
+          <p>Loaded change: {change.title}</p>
+          {change.status === "Approved" || change.status === "Rejected" ? (
+            <p>Final status: {change.status}</p>
           ) : null}
-
-          {activeSection === "approvals" ? (
-            <div className="grid-2">
-              <section className="card">
-                <h4 className="section-title">Approval Records</h4>
-                <ApprovalList approvals={approvals} />
-              </section>
-              <ApprovalDecisionForm
-                comment={decisionComment}
-                canAct={change.status === "PendingApproval" && approvals.length > 0}
-                onCommentChange={setDecisionComment}
-                onApprove={() => handleDecision("Approved")}
-                onReject={() => handleDecision("Rejected")}
-              />
+          {change.status === "Draft" ? (
+            <button type="button" onClick={handleSubmitForApproval}>
+              Submit for approval
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {!isNew ? (
+        <section>
+          <h3>Approvals</h3>
+          {change && change.status === "PendingApproval" ? (
+            <div>
+              <p>Total: {change.approvalsTotal}</p>
+              <p>Approved: {change.approvalsApproved}</p>
+              <p>Rejected: {change.approvalsRejected}</p>
+              <p>Pending: {change.approvalsPending}</p>
             </div>
           ) : null}
+          {approvals.length === 0 ? <p>No approvals yet.</p> : null}
+          <ul>
+            {approvals.map((approval) => (
+              <li key={approval.id}>
+                <p>Approver: {approval.approver}</p>
+                <p>Status: {approval.status}</p>
+                {approval.comment ? <p>Comment: {approval.comment}</p> : null}
+                {approval.status === "Pending" && change?.status === "PendingApproval" ? (
+                  <div>
+                    <textarea
+                      value={decisionComments[approval.id] ?? ""}
+                      onChange={handleDecisionComment(approval.id)}
+                      placeholder="Add a comment"
+                    />
+                    <div>
+                      <button type="button" onClick={() => handleDecision(approval.id, "Approved")}>
+                        Approve
+                      </button>
+                      <button type="button" onClick={() => handleDecision(approval.id, "Rejected")}>
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
         </section>
       ) : null}
     </section>

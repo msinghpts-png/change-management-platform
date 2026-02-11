@@ -33,16 +33,6 @@ export type ChangeCreateDto = {
   plannedEnd?: string;
 };
 
-export type ChangeUpdateDto = {
-  title: string;
-  description: string;
-  status: string;
-  priority?: string;
-  riskLevel?: string;
-  plannedStart?: string;
-  plannedEnd?: string;
-};
-
 export type ApprovalStatus = "Pending" | "Approved" | "Rejected";
 
 export type Approval = {
