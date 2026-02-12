@@ -1,33 +1,43 @@
 import { useEffect, useState } from "react";
 import { apiClient } from "../services/apiClient";
 import type { DashboardStats } from "../types/change";
+import "./dashboard.css";
 
 const DashboardPage = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiClient
-      .getDashboardStats()
-      .then((data) => setStats(data))
-      .catch((err: Error) => setError(err.message));
+    apiClient.getDashboardStats().then(setStats);
   }, []);
 
+  if (!stats) return <p>Loading dashboard...</p>;
+
   return (
-    <section>
-      <h2>Dashboard</h2>
-      {error ? <p>{error}</p> : null}
-      {stats ? (
-        <ul>
-          <li>Total changes: {stats.totalChanges}</li>
-          <li>Pending approvals: {stats.pendingApprovals}</li>
-          <li>Scheduled this week: {stats.scheduledThisWeek}</li>
-          <li>Completed this month: {stats.completedThisMonth}</li>
-        </ul>
-      ) : (
-        <p>Loading dashboard stats...</p>
-      )}
-    </section>
+    <div>
+      <h2 className="page-title">Dashboard Overview</h2>
+
+      <div className="card-grid">
+        <div className="stat-card">
+          <h3>Total Changes</h3>
+          <p>{stats.totalChanges}</p>
+        </div>
+
+        <div className="stat-card">
+          <h3>Pending Approvals</h3>
+          <p>{stats.pendingApprovals}</p>
+        </div>
+
+        <div className="stat-card">
+          <h3>Scheduled This Week</h3>
+          <p>{stats.scheduledThisWeek}</p>
+        </div>
+
+        <div className="stat-card">
+          <h3>Completed This Month</h3>
+          <p>{stats.completedThisMonth}</p>
+        </div>
+      </div>
+    </div>
   );
 };
 
