@@ -78,7 +78,6 @@ const ChangeDetailPage = () => {
   const [approverEmail, setApproverEmail] = useState("");
   const [approvalComment, setApprovalComment] = useState("");
   const [decisionComment, setDecisionComment] = useState("");
-  const [draggingAttachment, setDraggingAttachment] = useState(false);
 
   // Form fields (kept in UI; backend DTO is smaller)
   const [title, setTitle] = useState("");
@@ -263,24 +262,6 @@ const ChangeDetailPage = () => {
       await apiClient.uploadAttachment(id, event.target.files[0]);
       await refreshRelatedData(id);
       event.target.value = "";
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-  const onDropAttachment = async (event: any) => {
-    event.preventDefault();
-    setDraggingAttachment(false);
-    if (!id || !event.dataTransfer?.files?.[0]) return;
-
-    setLoading(true);
-    setError(null);
-    try {
-      await apiClient.uploadAttachment(id, event.dataTransfer.files[0]);
-      await refreshRelatedData(id);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -633,16 +614,7 @@ const ChangeDetailPage = () => {
         <div className="card card-pad">
           <div className="h3">Attachments</div>
           <div className="small">Allowed: pdf, doc(x), xls(x), png, jpg. Max 10 MB.</div>
-          <div
-            className="card card-pad"
-            style={{ marginTop: 8, borderStyle: "dashed", background: draggingAttachment ? "rgba(59,130,246,.12)" : undefined }}
-            onDragOver={(event) => { event.preventDefault(); setDraggingAttachment(true); }}
-            onDragLeave={() => setDraggingAttachment(false)}
-            onDrop={onDropAttachment}
-          >
-            Drag & drop a file here or choose below.
-            <input className="input" style={{ marginTop: 8 }} type="file" onChange={uploadAttachment} />
-          </div>
+          <input className="input" style={{ marginTop: 8 }} type="file" onChange={uploadAttachment} />
           <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
             {attachments.map((attachment) => (
               <div key={attachment.id} className="row">
@@ -650,7 +622,7 @@ const ChangeDetailPage = () => {
                   <div className="h3">{attachment.fileName}</div>
                   <div className="small">{Math.round(attachment.sizeBytes / 1024)} KB</div>
                 </div>
-                <a className="btn" href={`/api/changes/${id}/attachments/${attachment.id}`}>Download</a>
+                <a className="btn" href={`/api/changes/${id}/attachments/${attachment.id}/download`}>Download</a>
               </div>
             ))}
             {!attachments.length ? <div className="empty">No attachments uploaded.</div> : null}

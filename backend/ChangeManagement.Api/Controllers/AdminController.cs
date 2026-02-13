@@ -70,6 +70,7 @@ public class AdminController : ControllerBase
                     FileName = attachment.FileName,
                     ContentType = attachment.ContentType,
                     SizeBytes = attachment.SizeBytes,
+                    FileSize = attachment.FileSize,
                     StoragePath = attachment.StoragePath,
                     UploadedAt = attachment.UploadedAt,
                     ContentBase64 = System.IO.File.Exists(attachment.StoragePath)
@@ -117,6 +118,7 @@ public class AdminController : ControllerBase
                 FileName = item.FileName,
                 ContentType = item.ContentType,
                 SizeBytes = item.SizeBytes,
+                FileSize = item.FileSize,
                 StoragePath = storedPath,
                 UploadedAt = item.UploadedAt
             });

@@ -27,21 +27,6 @@ export type DashboardStats = {
   emergencyChanges?: number;
 };
 
-export type DatabaseStatus = {
-  databaseName: string;
-  totalChanges: number;
-  totalApprovals: number;
-  totalAttachments: number;
-  hasPendingMigrations: boolean;
-  pendingMigrations: string[];
-};
-
-export type DatabaseBackup = {
-  changeRequests: ChangeRequest[];
-  changeApprovals: Approval[];
-  changeAttachments: Array<Attachment & { storagePath: string; contentBase64?: string }>;
-};
-
 export type ChangeRequestStatus =
   | "Draft"
   | "PendingApproval"
