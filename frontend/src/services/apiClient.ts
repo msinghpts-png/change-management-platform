@@ -87,25 +87,5 @@ export const apiClient = {
     }
   },
 
-  getDatabaseStatus: () => request<DatabaseStatus>("/admin/database/status"),
-  runMigrations: () => request<{ message: string }>("/admin/database/migrate", { method: "POST" }),
-  seedDatabase: () => request<{ seeded: boolean; message: string }>("/admin/database/seed", { method: "POST" }),
-
-  exportDatabase: async (): Promise<Blob> => {
-    const response = await fetch(`${API_BASE_URL}/admin/database/export`);
-    if (!response.ok) {
-      throw new Error(`Request failed: ${response.status}`);
-    }
-
-    return response.blob();
-  },
-
-  importDatabase: (payload: DatabaseBackup) =>
-    request<{ message: string }>("/admin/database/import", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    }),
-
   getDashboardStats: () => request<DashboardStats>("/dashboard")
 };

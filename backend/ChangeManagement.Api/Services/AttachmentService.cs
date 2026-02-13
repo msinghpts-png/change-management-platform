@@ -22,14 +22,16 @@ public class AttachmentService : IAttachmentService
 
     private readonly IChangeAttachmentRepository _attachmentRepository;
     private readonly IChangeRepository _changeRepository;
-    private const string UploadRoot = "/app/uploads";
+    private readonly IWebHostEnvironment _environment;
 
     public AttachmentService(
         IChangeAttachmentRepository attachmentRepository,
-        IChangeRepository changeRepository)
+        IChangeRepository changeRepository,
+        IWebHostEnvironment environment)
     {
         _attachmentRepository = attachmentRepository;
         _changeRepository = changeRepository;
+        _environment = environment;
     }
 
     public IEnumerable<ChangeAttachment> GetForChange(Guid changeId) => _attachmentRepository.GetByChangeId(changeId);
@@ -59,7 +61,7 @@ public class AttachmentService : IAttachmentService
             return (null, "Attachment type is not allowed.");
         }
 
-        var rootPath = Path.Combine(UploadRoot, changeId.ToString("N"));
+        var rootPath = Path.Combine(_environment.ContentRootPath, "App_Data", "attachments", changeId.ToString("N"));
         Directory.CreateDirectory(rootPath);
 
         var fileId = Guid.NewGuid();
@@ -77,7 +79,7 @@ public class AttachmentService : IAttachmentService
             ChangeRequestId = changeId,
             FileName = Path.GetFileName(file.FileName),
             ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
-            FileSize = file.Length,
+            SizeBytes = file.Length,
             StoragePath = storedPath,
             UploadedAt = DateTime.UtcNow
         };

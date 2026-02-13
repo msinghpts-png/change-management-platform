@@ -19,22 +19,13 @@ builder.Services.AddScoped<IApprovalRepository, ApprovalRepository>();
 builder.Services.AddScoped<IApprovalService, ApprovalService>();
 builder.Services.AddScoped<IChangeAttachmentRepository, ChangeAttachmentRepository>();
 builder.Services.AddScoped<IAttachmentService, AttachmentService>();
-builder.Services.AddScoped<IDatabaseInitializer, DatabaseInitializer>();
 
 var app = builder.Build();
 
-Directory.CreateDirectory("/app/uploads");
-
 using (var scope = app.Services.CreateScope())
 {
-    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
-    var initializer = scope.ServiceProvider.GetRequiredService<IDatabaseInitializer>();
-    var result = await initializer.InitializeAsync();
-
-    logger.LogInformation(
-        "Database startup completed. DatabaseExisted={DatabaseExisted}, Seeded={Seeded}",
-        result.DatabaseExisted,
-        result.Seeded);
+    var dbContext = scope.ServiceProvider.GetRequiredService<ChangeManagementDbContext>();
+    dbContext.Database.Migrate();
 }
 
 app.MapControllers();
