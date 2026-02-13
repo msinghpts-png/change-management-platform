@@ -11,15 +11,22 @@ namespace ChangeManagement.Api.Controllers;
 public class ApprovalsController : ControllerBase
 {
     private readonly IApprovalService _approvalService;
+    private readonly IChangeService _changeService;
 
-    public ApprovalsController(IApprovalService approvalService)
+    public ApprovalsController(IApprovalService approvalService, IChangeService changeService)
     {
         _approvalService = approvalService;
+        _changeService = changeService;
     }
 
     [HttpGet]
     public ActionResult<IEnumerable<ChangeApproval>> GetApprovals(Guid changeId)
     {
+        if (_changeService.GetById(changeId) is null)
+        {
+            return NotFound("Change request not found.");
+        }
+
         var approvals = _approvalService.GetApprovalsForChange(changeId);
         return Ok(approvals);
     }
@@ -27,6 +34,11 @@ public class ApprovalsController : ControllerBase
     [HttpPost]
     public ActionResult<ChangeApproval> CreateApproval(Guid changeId, [FromBody] ApprovalCreateDto request)
     {
+        if (_changeService.GetById(changeId) is null)
+        {
+            return NotFound("Change request not found.");
+        }
+
         if (string.IsNullOrWhiteSpace(request.Approver))
         {
             return BadRequest("Approver is required.");
@@ -48,7 +60,12 @@ public class ApprovalsController : ControllerBase
     [HttpPost("{approvalId:guid}/decision")]
     public ActionResult<ChangeApproval> DecideApproval(Guid changeId, Guid approvalId, [FromBody] ApprovalDecisionDto request)
     {
-        var result = _approvalService.RecordDecision(approvalId, request.Status, request.Comment, DateTime.UtcNow);
+        if (request.Status == ApprovalStatus.Pending)
+        {
+            return BadRequest("Decision status must be Approved or Rejected.");
+        }
+
+        var result = _approvalService.RecordDecision(changeId, approvalId, request.Status, request.Comment, DateTime.UtcNow);
         if (result.Approval is null)
         {
             if (string.Equals(result.Error, "Approval not found.", StringComparison.OrdinalIgnoreCase) ||

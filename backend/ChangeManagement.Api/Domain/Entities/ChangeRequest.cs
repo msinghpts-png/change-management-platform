@@ -15,4 +15,5 @@ public class ChangeRequest
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public ICollection<ChangeApproval> Approvals { get; set; } = new List<ChangeApproval>();
+    public ICollection<ChangeAttachment> Attachments { get; set; } = new List<ChangeAttachment>();
 }

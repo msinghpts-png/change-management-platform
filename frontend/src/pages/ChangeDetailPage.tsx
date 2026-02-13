@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiClient } from "../services/apiClient";
-import type { ChangeCreateDto, ChangeRequest, ChangeUpdateDto } from "../types/change";
+import type { Approval, ApprovalStatus, Attachment, ChangeCreateDto, ChangeRequest, ChangeUpdateDto } from "../types/change";
 
 type ViewTab = "Overview" | "Approvals" | "Tasks" | "Attachments";
 type FormTab = "Basic Info" | "Schedule" | "Plans" | "Risk & Impact";
@@ -45,7 +45,7 @@ const templates = [
     id: "tpl-firewall",
     name: "Network Firewall Rule Change",
     category: "Network",
-    riskLevel: "Medium",
+    risk: "Medium",
     description: "Modify firewall rules on [FIREWALL_NAME] to allow/block traffic for [SERVICE/APPLICATION].",
     steps: "1. Export current config\n2. Apply rule changes\n3. Validate connectivity\n4. Monitor logs"
   },
@@ -73,6 +73,12 @@ const ChangeDetailPage = () => {
 
   const [item, setItem] = useState<ChangeRequest | null>(null);
 
+  const [approvals, setApprovals] = useState<Approval[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [approverEmail, setApproverEmail] = useState("");
+  const [approvalComment, setApprovalComment] = useState("");
+  const [decisionComment, setDecisionComment] = useState("");
+
   // Form fields (kept in UI; backend DTO is smaller)
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Application");
@@ -93,6 +99,17 @@ const ChangeDetailPage = () => {
 
   const [templateId, setTemplateId] = useState("");
 
+
+  const refreshRelatedData = async (changeId: string) => {
+    const [nextApprovals, nextAttachments] = await Promise.all([
+      apiClient.getApprovals(changeId),
+      apiClient.getAttachments(changeId)
+    ]);
+
+    setApprovals(nextApprovals ?? []);
+    setAttachments(nextAttachments ?? []);
+  };
+
   useEffect(() => {
     if (!id) return;
 
@@ -108,10 +125,12 @@ const ChangeDetailPage = () => {
         setImpactLevel(data.impactLevel ?? "Medium");
         setPlannedStart(data.plannedStart ? data.plannedStart.slice(0, 16) : "");
         setPlannedEnd(data.plannedEnd ? data.plannedEnd.slice(0, 16) : "");
+        refreshRelatedData(id).catch(() => void 0);
         setLoading(false);
       })
       .catch((err: Error) => {
         setError(err.message);
+        refreshRelatedData(id).catch(() => void 0);
         setLoading(false);
       });
   }, [id]);
@@ -171,6 +190,7 @@ const ChangeDetailPage = () => {
         };
         const updated = await apiClient.updateChange(id, payload);
         setItem(updated);
+        await refreshRelatedData(id);
       }
     } catch (e) {
       setError((e as Error).message);
@@ -192,7 +212,56 @@ const ChangeDetailPage = () => {
       await apiClient.submitChange(id);
       const refreshed = await apiClient.getChangeById(id);
       setItem(refreshed);
+      await refreshRelatedData(id);
       alert("Submitted for approval.");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitApproval = async () => {
+    if (!id || !approverEmail.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await apiClient.createApproval(id, { approver: approverEmail.trim(), comment: approvalComment.trim() || undefined });
+      setApproverEmail("");
+      setApprovalComment("");
+      await refreshRelatedData(id);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const decideApproval = async (approvalId: string, status: ApprovalStatus) => {
+    if (!id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await apiClient.decideApproval(id, approvalId, { status, comment: decisionComment.trim() || undefined });
+      const refreshed = await apiClient.getChangeById(id);
+      setItem(refreshed);
+      setDecisionComment("");
+      await refreshRelatedData(id);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const uploadAttachment = async (event: any) => {
+    if (!id || !event.target.files?.[0]) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await apiClient.uploadAttachment(id, event.target.files[0]);
+      await refreshRelatedData(id);
+      event.target.value = "";
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -506,9 +575,64 @@ const ChangeDetailPage = () => {
         </div>
       ) : null}
 
-      {tab !== "Overview" ? (
+      {tab === "Approvals" ? (
+        <div className="grid" style={{ gap: 12 }}>
+          <div className="card card-pad">
+            <div className="h3">Submit approval request</div>
+            <div className="form-grid" style={{ marginTop: 8 }}>
+              <div><input className="input" placeholder="Approver email" value={approverEmail} onChange={(e) => setApproverEmail(e.target.value)} /></div>
+              <div><input className="input" placeholder="Comment" value={approvalComment} onChange={(e) => setApprovalComment(e.target.value)} /></div>
+            </div>
+            <div style={{ marginTop: 8 }}><button className="btn btn-primary" disabled={!approverEmail.trim() || loading} onClick={submitApproval}>Add Approval</button></div>
+          </div>
+          <div className="card card-pad">
+            <div className="h3">Approval history</div>
+            <input className="input" style={{ marginTop: 8 }} placeholder="Decision comment" value={decisionComment} onChange={(e) => setDecisionComment(e.target.value)} />
+            <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+              {approvals.map((approval) => (
+                <div key={approval.id} className="row">
+                  <div className="row-left">
+                    <div className="h3">{approval.approver}</div>
+                    <div className="small">{approval.comment ?? "No comment"}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <span className={pillForStatus(approval.status)}>{approval.status}</span>
+                    {approval.status === "Pending" ? (<>
+                      <button className="btn" onClick={() => decideApproval(approval.id, "Approved")}>Approve</button>
+                      <button className="btn" onClick={() => decideApproval(approval.id, "Rejected")}>Reject</button>
+                    </>) : null}
+                  </div>
+                </div>
+              ))}
+              {!approvals.length ? <div className="empty">No approvals yet.</div> : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {tab === "Attachments" ? (
+        <div className="card card-pad">
+          <div className="h3">Attachments</div>
+          <div className="small">Allowed: pdf, doc(x), xls(x), png, jpg. Max 10 MB.</div>
+          <input className="input" style={{ marginTop: 8 }} type="file" onChange={uploadAttachment} />
+          <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+            {attachments.map((attachment) => (
+              <div key={attachment.id} className="row">
+                <div className="row-left">
+                  <div className="h3">{attachment.fileName}</div>
+                  <div className="small">{Math.round(attachment.sizeBytes / 1024)} KB</div>
+                </div>
+                <a className="btn" href={`/api/changes/${id}/attachments/${attachment.id}/download`}>Download</a>
+              </div>
+            ))}
+            {!attachments.length ? <div className="empty">No attachments uploaded.</div> : null}
+          </div>
+        </div>
+      ) : null}
+
+      {tab === "Tasks" ? (
         <div className="card">
-          <div className="empty">{tab} UI can be wired next (API + components) once backend endpoints are confirmed.</div>
+          <div className="empty">Tasks workflow can be wired next.</div>
         </div>
       ) : null}
     </div>
