@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "lMvQnGAy1hQBCDTTWnRrMaOIqhUUahIBJeApVzNgyVY=",
+  "Source": "ChangeManagement.Api",
+  "BasePath": "_content/ChangeManagement.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

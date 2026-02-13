@@ -1,17 +1,23 @@
+using ChangeManagement.Api.Data;
 using ChangeManagement.Api.Repositories;
 using ChangeManagement.Api.Services;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Add DbContext with SQL Server
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "Server=localhost;Database=ChangeManagementDB;Trusted_Connection=true;TrustServerCertificate=true;";
+builder.Services.AddDbContext<ChangeManagementDbContext>(options =>
+    options.UseSqlServer(connectionString)
+);
+
 builder.Services.AddControllers();
-builder.Services.AddSingleton<IChangeStatusValidator, ChangeStatusValidator>();
-builder.Services.AddSingleton<IChangeRepository, ChangeRepository>();
-builder.Services.AddSingleton<IChangeService, ChangeService>();
-builder.Services.AddSingleton<IApprovalRepository, ApprovalRepository>();
-builder.Services.AddSingleton<IApprovalService, ApprovalService>();
+builder.Services.AddScoped<IChangeStatusValidator, ChangeStatusValidator>();
+builder.Services.AddScoped<IChangeRepository, ChangeRepository>();
+builder.Services.AddScoped<IChangeService, ChangeService>();
+builder.Services.AddScoped<IApprovalRepository, ApprovalRepository>();
+builder.Services.AddScoped<IApprovalService, ApprovalService>();
 
 var app = builder.Build();
 

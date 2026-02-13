@@ -9,8 +9,8 @@ services:
       SA_PASSWORD: "P@ssw0rd123!"
     ports:
       - "1433:1433"
-     volumes:
-      - sql_data:/var/opt/mssql   # 🔥 PERSIST DATA    
+    volumes:
+      - sql_data:/var/opt/mssql   # Persist SQL data
     healthcheck:
       test:
         [
@@ -21,9 +21,7 @@ services:
       timeout: 5s
       retries: 10
       start_period: 60s
-    volumes:
-        sql_data:
-        
+
   api:
     build:
       context: ./backend/ChangeManagement.Api
@@ -45,3 +43,6 @@ services:
       - "5173:5173"
     depends_on:
       - api
+
+volumes:
+  sql_data:

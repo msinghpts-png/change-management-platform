@@ -1,24 +1,32 @@
+using ChangeManagement.Api.Data;
 using ChangeManagement.Api.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace ChangeManagement.Api.Repositories;
 
 public class ChangeRepository : IChangeRepository
 {
-    private readonly List<ChangeRequest> _changes = new();
+    private readonly ChangeManagementDbContext _dbContext;
+
+    public ChangeRepository(ChangeManagementDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
 
     public IEnumerable<ChangeRequest> GetAll()
     {
-        return _changes;
+        return _dbContext.ChangeRequests.Include(c => c.Approvals).ToList();
     }
 
     public ChangeRequest? GetById(Guid id)
     {
-        return _changes.FirstOrDefault(change => change.Id == id);
+        return _dbContext.ChangeRequests.Include(c => c.Approvals).FirstOrDefault(change => change.Id == id);
     }
 
     public ChangeRequest Create(ChangeRequest changeRequest)
     {
-        _changes.Add(changeRequest);
+        _dbContext.ChangeRequests.Add(changeRequest);
+        _dbContext.SaveChanges();
         return changeRequest;
     }
 
@@ -39,6 +47,8 @@ public class ChangeRepository : IChangeRepository
         existing.PlannedEnd = changeRequest.PlannedEnd;
         existing.UpdatedAt = changeRequest.UpdatedAt;
 
+        _dbContext.ChangeRequests.Update(existing);
+        _dbContext.SaveChanges();
         return existing;
     }
 }
