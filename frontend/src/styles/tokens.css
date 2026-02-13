@@ -1,0 +1,23 @@
+:root{
+  --bg: #f6f8fb;
+  --surface: #ffffff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #e5e7eb;
+  --shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.06);
+  --radius: 14px;
+
+  --primary: #2563eb;
+  --primary-600: #1d4ed8;
+  --primary-50: #eff6ff;
+
+  --green-50:#ecfdf5; --green-600:#16a34a; --green-700:#15803d;
+  --amber-50:#fffbeb; --amber-600:#d97706; --amber-700:#b45309;
+  --red-50:#fef2f2; --red-600:#dc2626; --red-700:#b91c1c;
+  --slate-50:#f8fafc;
+  --cyan-50:#ecfeff; --cyan-600:#0891b2;
+
+  --focus: 0 0 0 4px rgba(37,99,235,.18);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+}
