@@ -54,7 +54,7 @@ public class ChangeManagementDbContext : DbContext
             entity.Property(e => e.ChangeRequestId).IsRequired();
             entity.Property(e => e.FileName).IsRequired().HasMaxLength(260);
             entity.Property(e => e.ContentType).IsRequired().HasMaxLength(128);
-            entity.Property(e => e.FileSize).IsRequired();
+            entity.Property(e => e.SizeBytes).IsRequired();
             entity.Property(e => e.StoragePath).IsRequired().HasMaxLength(1024);
             entity.Property(e => e.UploadedAt).IsRequired();
             entity.HasIndex(e => new { e.ChangeRequestId, e.FileName, e.UploadedAt });

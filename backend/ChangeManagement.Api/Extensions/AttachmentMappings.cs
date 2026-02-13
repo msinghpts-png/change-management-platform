@@ -13,7 +13,7 @@ public static class AttachmentMappings
             ChangeRequestId = attachment.ChangeRequestId,
             FileName = attachment.FileName,
             ContentType = attachment.ContentType,
-            FileSize = attachment.FileSize,
+            SizeBytes = attachment.SizeBytes,
             UploadedAt = attachment.UploadedAt
         };
     }

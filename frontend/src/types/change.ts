@@ -14,7 +14,7 @@ export type Attachment = {
   changeRequestId: string;
   fileName: string;
   contentType: string;
-  fileSize: number;
+  sizeBytes: number;
   uploadedAt: string;
 };
 
@@ -25,21 +25,6 @@ export type DashboardStats = {
   completedThisMonth: number;
   inImplementation?: number;
   emergencyChanges?: number;
-};
-
-export type DatabaseStatus = {
-  databaseName: string;
-  totalChanges: number;
-  totalApprovals: number;
-  totalAttachments: number;
-  hasPendingMigrations: boolean;
-  pendingMigrations: string[];
-};
-
-export type DatabaseBackup = {
-  changeRequests: ChangeRequest[];
-  changeApprovals: Approval[];
-  changeAttachments: Array<Attachment & { storagePath: string; contentBase64?: string }>;
 };
 
 export type ChangeRequestStatus =

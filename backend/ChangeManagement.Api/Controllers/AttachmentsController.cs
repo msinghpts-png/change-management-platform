@@ -46,7 +46,6 @@ public class AttachmentsController : ControllerBase
         return CreatedAtAction(nameof(List), new { changeId }, result.Attachment.ToDto());
     }
 
-    [HttpGet("{attachmentId:guid}")]
     [HttpGet("{attachmentId:guid}/download")]
     public async Task<IActionResult> Download(Guid changeId, Guid attachmentId, CancellationToken cancellationToken)
     {

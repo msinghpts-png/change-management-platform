@@ -70,7 +70,7 @@ namespace ChangeManagement.Api.Migrations
                         .HasMaxLength(260)
                         .HasColumnType("nvarchar(260)");
 
-                    b.Property<long>("FileSize")
+                    b.Property<long>("SizeBytes")
                         .HasColumnType("bigint");
 
                     b.Property<string>("StoragePath")
