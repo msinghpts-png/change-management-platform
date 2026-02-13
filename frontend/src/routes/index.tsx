@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import AdminDatabasePage from "../pages/AdminDatabasePage";
 import CalendarPage from "../pages/CalendarPage";
 import ChangeDetailPage from "../pages/ChangeDetailPage";
 import ChangeListPage from "../pages/ChangeListPage";
@@ -11,7 +12,8 @@ export const routes = [
   { path: "/changes/new", label: "New Change" },
   { path: "/changes/:id", label: "Change Detail" },
   { path: "/calendar", label: "Calendar" },
-  { path: "/templates", label: "Templates" }
+  { path: "/templates", label: "Templates" },
+  { path: "/admin/database", label: "Admin" }
 ];
 
 export const AppRoutes = () => {
@@ -24,6 +26,7 @@ export const AppRoutes = () => {
       <Route path="/changes/:id" element={<ChangeDetailPage />} />
       <Route path="/calendar" element={<CalendarPage />} />
       <Route path="/templates" element={<TemplatesPage />} />
+      <Route path="/admin/database" element={<AdminDatabasePage />} />
     </Routes>
   );
 };
