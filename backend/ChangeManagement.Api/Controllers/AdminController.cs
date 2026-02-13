@@ -69,6 +69,7 @@ public class AdminController : ControllerBase
                     ChangeRequestId = attachment.ChangeRequestId,
                     FileName = attachment.FileName,
                     ContentType = attachment.ContentType,
+                    SizeBytes = attachment.SizeBytes,
                     FileSize = attachment.FileSize,
                     StoragePath = attachment.StoragePath,
                     UploadedAt = attachment.UploadedAt,
@@ -116,6 +117,7 @@ public class AdminController : ControllerBase
                 ChangeRequestId = item.ChangeRequestId,
                 FileName = item.FileName,
                 ContentType = item.ContentType,
+                SizeBytes = item.SizeBytes,
                 FileSize = item.FileSize,
                 StoragePath = storedPath,
                 UploadedAt = item.UploadedAt
