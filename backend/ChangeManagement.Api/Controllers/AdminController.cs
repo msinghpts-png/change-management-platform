@@ -69,7 +69,7 @@ public class AdminController : ControllerBase
                     ChangeRequestId = attachment.ChangeRequestId,
                     FileName = attachment.FileName,
                     ContentType = attachment.ContentType,
-                    FileSize = attachment.FileSize,
+                    SizeBytes = attachment.SizeBytes,
                     StoragePath = attachment.StoragePath,
                     UploadedAt = attachment.UploadedAt,
                     ContentBase64 = System.IO.File.Exists(attachment.StoragePath)
@@ -116,7 +116,7 @@ public class AdminController : ControllerBase
                 ChangeRequestId = item.ChangeRequestId,
                 FileName = item.FileName,
                 ContentType = item.ContentType,
-                FileSize = item.FileSize,
+                SizeBytes = item.SizeBytes,
                 StoragePath = storedPath,
                 UploadedAt = item.UploadedAt
             });
