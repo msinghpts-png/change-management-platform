@@ -10,7 +10,7 @@ services:
     ports:
       - "1433:1433"
     volumes:
-      - sql_data:/var/opt/mssql   # Persist SQL data
+      - sql_data:/var/opt/mssql
     healthcheck:
       test:
         [
@@ -28,9 +28,11 @@ services:
     container_name: change-mgmt-api
     environment:
       ASPNETCORE_URLS: "http://0.0.0.0:8080"
-      ConnectionStrings__Default: "Server=sqlserver,1433;Database=ChangeManagementDB;User Id=sa;Password=P@ssw0rd123!;TrustServerCertificate=True"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=ChangeManagementDB;User Id=sa;Password=P@ssw0rd123!;TrustServerCertificate=True"
     ports:
       - "8080:8080"
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       sqlserver:
         condition: service_healthy
@@ -46,3 +48,4 @@ services:
 
 volumes:
   sql_data:
+  uploads_data:
