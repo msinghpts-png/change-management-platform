@@ -5,7 +5,9 @@ import type {
   ChangeCreateDto,
   ChangeRequest,
   ChangeUpdateDto,
-  DashboardStats
+  DashboardStats,
+  DatabaseBackup,
+  DatabaseStatus
 } from "../types/change";
 
 const API_BASE_URL = "/api";
