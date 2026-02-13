@@ -9,7 +9,7 @@ public interface IApprovalService
 {
     ChangeApproval CreateApproval(ChangeApproval approval);
     IEnumerable<ChangeApproval> GetApprovalsForChange(Guid changeRequestId);
-    ApprovalDecisionResult RecordDecision(Guid approvalId, ApprovalStatus status, string? comment, DateTime decidedAt);
+    ApprovalDecisionResult RecordDecision(Guid changeId, Guid approvalId, ApprovalStatus status, string? comment, DateTime decidedAt);
 }
 
 public class ApprovalService : IApprovalService
@@ -35,12 +35,17 @@ public class ApprovalService : IApprovalService
         return _repository.GetApprovalsForChange(changeRequestId);
     }
 
-    public ApprovalDecisionResult RecordDecision(Guid approvalId, ApprovalStatus status, string? comment, DateTime decidedAt)
+    public ApprovalDecisionResult RecordDecision(Guid changeId, Guid approvalId, ApprovalStatus status, string? comment, DateTime decidedAt)
     {
         var existingApproval = _repository.GetById(approvalId);
         if (existingApproval is null)
         {
             return ApprovalDecisionResult.Failure("Approval not found.");
+        }
+
+        if (existingApproval.ChangeRequestId != changeId)
+        {
+            return ApprovalDecisionResult.Failure("Approval does not belong to this change request.");
         }
 
         var change = _changeRepository.GetById(existingApproval.ChangeRequestId);
