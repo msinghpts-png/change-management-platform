@@ -4,8 +4,8 @@ namespace ChangeManagement.Api.Repositories;
 
 public interface IChangeRepository
 {
-    IEnumerable<ChangeRequest> GetAll();
-    ChangeRequest? GetById(Guid id);
-    ChangeRequest Create(ChangeRequest changeRequest);
-    ChangeRequest? Update(ChangeRequest changeRequest);
+    Task<List<ChangeRequest>> GetAllAsync(CancellationToken cancellationToken);
+    Task<ChangeRequest?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+    Task<ChangeRequest> CreateAsync(ChangeRequest changeRequest, CancellationToken cancellationToken);
+    Task<ChangeRequest?> UpdateAsync(ChangeRequest changeRequest, CancellationToken cancellationToken);
 }

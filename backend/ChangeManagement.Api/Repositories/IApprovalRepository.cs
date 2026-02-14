@@ -1,12 +1,11 @@
 using ChangeManagement.Api.Domain.Entities;
-using ChangeManagement.Api.Domain.Enums;
 
 namespace ChangeManagement.Api.Repositories;
 
 public interface IApprovalRepository
 {
-    ChangeApproval AddApproval(ChangeApproval approval);
-    IEnumerable<ChangeApproval> GetApprovalsForChange(Guid changeRequestId);
-    ChangeApproval? GetById(Guid approvalId);
-    ChangeApproval? UpdateDecision(Guid approvalId, ApprovalStatus status, string? comment, DateTime decidedAt);
+    Task<ChangeApproval> CreateAsync(ChangeApproval approval, CancellationToken cancellationToken);
+    Task<List<ChangeApproval>> GetByChangeAsync(Guid changeRequestId, CancellationToken cancellationToken);
+    Task<ChangeApproval?> GetByIdAsync(Guid approvalId, CancellationToken cancellationToken);
+    Task SaveAsync(CancellationToken cancellationToken);
 }
