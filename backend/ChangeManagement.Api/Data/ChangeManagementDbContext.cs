@@ -33,8 +33,6 @@ public class ChangeManagementDbContext : DbContext
             modelBuilder.HasSequence<int>("ChangeNumberSeq", "cm").StartsAt(1000).IncrementsBy(1);
         }
 
-        modelBuilder.HasSequence<int>("ChangeNumberSeq", "cm").StartsAt(1000).IncrementsBy(1);
-
         modelBuilder.Entity<ChangeRequest>(entity =>
         {
             entity.ToTable("ChangeRequest", "cm");

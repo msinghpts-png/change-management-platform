@@ -1,7 +1,9 @@
+using ChangeManagement.Api.Data;
 using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.DTOs;
 using ChangeManagement.Api.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace ChangeManagement.Api.Controllers;
 
@@ -11,11 +13,13 @@ public class ChangesController : ControllerBase
 {
     private readonly IChangeService _changeService;
     private readonly IAuditService _audit;
+    private readonly ChangeManagementDbContext _dbContext;
 
-    public ChangesController(IChangeService changeService, IAuditService audit)
+    public ChangesController(IChangeService changeService, IAuditService audit, ChangeManagementDbContext dbContext)
     {
         _changeService = changeService;
         _audit = audit;
+        _dbContext = dbContext;
     }
 
     [HttpGet]
@@ -35,6 +39,22 @@ public class ChangesController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ChangeRequestDto>> CreateChange([FromBody] ChangeCreateDto request, CancellationToken cancellationToken)
     {
+        if (request.RequestedByUserId == Guid.Empty)
+        {
+            return BadRequest("RequestedByUserId is required.");
+        }
+
+        if (!await _dbContext.Users.AnyAsync(user => user.UserId == request.RequestedByUserId, cancellationToken))
+        {
+            return BadRequest($"RequestedByUserId '{request.RequestedByUserId}' does not exist in cm.User.");
+        }
+
+        if (request.AssignedToUserId.HasValue &&
+            !await _dbContext.Users.AnyAsync(user => user.UserId == request.AssignedToUserId.Value, cancellationToken))
+        {
+            return BadRequest($"AssignedToUserId '{request.AssignedToUserId.Value}' does not exist in cm.User.");
+        }
+
         var entity = new ChangeRequest
         {
             ChangeRequestId = Guid.NewGuid(),
@@ -83,6 +103,12 @@ public class ChangesController : ControllerBase
     [HttpPost("{id:guid}/submit")]
     public async Task<ActionResult<ChangeRequestDto>> SubmitForApproval(Guid id, [FromQuery] Guid actorUserId, CancellationToken cancellationToken)
     {
+        if (actorUserId != Guid.Empty &&
+            !await _dbContext.Users.AnyAsync(user => user.UserId == actorUserId, cancellationToken))
+        {
+            return BadRequest($"actorUserId '{actorUserId}' does not exist in cm.User.");
+        }
+
         var existing = await _changeService.GetByIdAsync(id, cancellationToken);
         if (existing is null) return NotFound();
 

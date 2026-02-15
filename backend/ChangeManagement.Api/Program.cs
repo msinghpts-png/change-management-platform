@@ -25,6 +25,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ChangeManagementDbContext>();
+    var isSqlite = dbContext.Database.IsSqlite();
 
     var discoveredMigrations = dbContext.Database.GetMigrations().ToList();
     if (discoveredMigrations.Count == 0)
@@ -32,9 +33,27 @@ using (var scope = app.Services.CreateScope())
         throw new InvalidOperationException("No EF Core migrations were discovered. Ensure migration attributes and assembly scanning are configured correctly.");
     }
 
-    dbContext.Database.Migrate();
+    if (isSqlite)
+    {
+        dbContext.Database.EnsureCreated();
+    }
+    else
+    {
+        dbContext.Database.Migrate();
+    }
 
-    var missingTables = dbContext.Database.SqlQueryRaw<string>(@"
+    var missingTables = isSqlite
+        ? dbContext.Database.SqlQueryRaw<string>(@"
+SELECT required.TableName
+FROM (VALUES
+('ChangeRequest'),('ChangeTask'),('ChangeApproval'),('ChangeAttachment'),('[User]'),
+('Event'),('EventType'),
+('ChangeType'),('ChangePriority'),('ChangeStatus'),('RiskLevel'),('ApprovalStatus')
+) AS required(TableName)
+WHERE NOT EXISTS (
+    SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = REPLACE(REPLACE(required.TableName, '[', ''), ']', '')
+);").ToList()
+        : dbContext.Database.SqlQueryRaw<string>(@"
 SELECT required.TableName
 FROM (VALUES
 ('cm.ChangeRequest'),('cm.ChangeTask'),('cm.ChangeApproval'),('cm.ChangeAttachment'),('cm.[User]'),
