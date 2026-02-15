@@ -1,5 +1,4 @@
 using ChangeManagement.Api.Domain.Entities;
-using ChangeManagement.Api.Domain.Enums;
 using ChangeManagement.Api.DTOs;
 using ChangeManagement.Api.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -10,153 +9,101 @@ namespace ChangeManagement.Api.Controllers;
 [Route("api/changes")]
 public class ChangesController : ControllerBase
 {
-    private readonly IApprovalService _approvalService;
     private readonly IChangeService _changeService;
-    private readonly IChangeStatusValidator _statusValidator;
+    private readonly IAuditService _audit;
 
-    public ChangesController(IChangeService changeService, IApprovalService approvalService, IChangeStatusValidator statusValidator)
+    public ChangesController(IChangeService changeService, IAuditService audit)
     {
         _changeService = changeService;
-        _approvalService = approvalService;
-        _statusValidator = statusValidator;
+        _audit = audit;
     }
 
     [HttpGet]
-    public ActionResult<IEnumerable<ChangeRequestDto>> GetChanges()
+    public async Task<ActionResult<IEnumerable<ChangeRequestDto>>> GetChanges(CancellationToken cancellationToken)
     {
-        var changes = _changeService.GetAll();
-
-        var results = changes.Select(change =>
-        {
-            var approvals = _approvalService.GetApprovalsForChange(change.Id).ToList();
-            return MapToDto(change, approvals);
-        });
-
-        return Ok(results);
+        var items = await _changeService.GetAllAsync(cancellationToken);
+        return Ok(items.Select(ToDto));
     }
 
     [HttpGet("{id:guid}")]
-    public ActionResult<ChangeRequestDto> GetChangeById(Guid id)
+    public async Task<ActionResult<ChangeRequestDto>> GetChangeById(Guid id, CancellationToken cancellationToken)
     {
-        var change = _changeService.GetById(id);
-        if (change is null)
-        {
-            return NotFound();
-        }
-
-        var approvals = _approvalService.GetApprovalsForChange(change.Id).ToList();
-        return Ok(MapToDto(change, approvals));
+        var change = await _changeService.GetByIdAsync(id, cancellationToken);
+        return change is null ? NotFound() : Ok(ToDto(change));
     }
 
     [HttpPost]
-    public ActionResult<ChangeRequestDto> CreateChange([FromBody] ChangeCreateDto request)
+    public async Task<ActionResult<ChangeRequestDto>> CreateChange([FromBody] ChangeCreateDto request, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Title))
+        var entity = new ChangeRequest
         {
-            return BadRequest("Title is required.");
-        }
-
-        var created = new ChangeRequest
-        {
-            Id = Guid.NewGuid(),
+            ChangeRequestId = Guid.NewGuid(),
             Title = request.Title,
             Description = request.Description,
-            Status = ChangeStatus.Draft,
-            Priority = request.Priority,
-            RiskLevel = request.RiskLevel,
+            ChangeTypeId = request.ChangeTypeId,
+            PriorityId = request.PriorityId,
+            StatusId = 1,
+            RiskLevelId = request.RiskLevelId,
+            RequestedByUserId = request.RequestedByUserId,
+            AssignedToUserId = request.AssignedToUserId,
             PlannedStart = request.PlannedStart,
             PlannedEnd = request.PlannedEnd,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = request.RequestedByUserId
         };
 
-        var stored = _changeService.Create(created);
-
-        return CreatedAtAction(nameof(GetChangeById), new { id = stored.Id }, MapToDto(stored, new List<ChangeApproval>()));
+        var created = await _changeService.CreateAsync(entity, cancellationToken);
+        return CreatedAtAction(nameof(GetChangeById), new { id = created.ChangeRequestId }, ToDto(created));
     }
 
     [HttpPut("{id:guid}")]
-    public ActionResult<ChangeRequestDto> UpdateChange(Guid id, [FromBody] ChangeUpdateDto request)
+    public async Task<ActionResult<ChangeRequestDto>> UpdateChange(Guid id, [FromBody] ChangeUpdateDto request, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Title))
-        {
-            return BadRequest("Title is required.");
-        }
+        var existing = await _changeService.GetByIdAsync(id, cancellationToken);
+        if (existing is null) return NotFound();
 
-        var updated = new ChangeRequest
-        {
-            Id = id,
-            Title = request.Title,
-            Description = request.Description,
-            Status = Enum.TryParse<ChangeStatus>(request.Status, true, out var status)
-                ? status
-                : ChangeStatus.Draft,
-            Priority = request.Priority,
-            RiskLevel = request.RiskLevel,
-            PlannedStart = request.PlannedStart,
-            PlannedEnd = request.PlannedEnd,
-            CreatedAt = DateTime.UtcNow.AddDays(-2),
-            UpdatedAt = DateTime.UtcNow
-        };
+        existing.Title = request.Title;
+        existing.Description = request.Description;
+        existing.ChangeTypeId = request.ChangeTypeId;
+        existing.PriorityId = request.PriorityId;
+        existing.StatusId = request.StatusId;
+        existing.RiskLevelId = request.RiskLevelId;
+        existing.AssignedToUserId = request.AssignedToUserId;
+        existing.PlannedStart = request.PlannedStart;
+        existing.PlannedEnd = request.PlannedEnd;
+        existing.ActualStart = request.ActualStart;
+        existing.ActualEnd = request.ActualEnd;
+        existing.UpdatedAt = DateTime.UtcNow;
+        existing.UpdatedBy = request.UpdatedBy;
 
-        var stored = _changeService.Update(updated);
-        if (stored is null)
-        {
-            return NotFound();
-        }
-
-        var approvals = _approvalService.GetApprovalsForChange(stored.Id).ToList();
-        return Ok(MapToDto(stored, approvals));
+        var updated = await _changeService.UpdateAsync(existing, cancellationToken);
+        return Ok(ToDto(updated!));
     }
 
     [HttpPost("{id:guid}/submit")]
-    public ActionResult<ChangeRequestDto> SubmitForApproval(Guid id)
+    public async Task<ActionResult<ChangeRequestDto>> SubmitForApproval(Guid id, [FromQuery] Guid actorUserId, CancellationToken cancellationToken)
     {
-        var change = _changeService.GetById(id);
-        if (change is null)
-        {
-            return NotFound();
-        }
+        var existing = await _changeService.GetByIdAsync(id, cancellationToken);
+        if (existing is null) return NotFound();
 
-        if (!_statusValidator.CanTransition(change.Status, ChangeStatus.PendingApproval))
-        {
-            return BadRequest("Invalid status transition.");
-        }
+        existing.StatusId = 2;
+        existing.UpdatedAt = DateTime.UtcNow;
+        existing.UpdatedBy = actorUserId;
 
-        change.Status = ChangeStatus.PendingApproval;
-        change.UpdatedAt = DateTime.UtcNow;
-        var updated = _changeService.Update(change);
-
-        if (updated is null)
-        {
-            return NotFound();
-        }
-
-        var approvals = _approvalService.GetApprovalsForChange(updated.Id).ToList();
-        return Ok(MapToDto(updated, approvals));
+        var updated = await _changeService.UpdateAsync(existing, cancellationToken);
+        await _audit.LogAsync(3, actorUserId, "system@local", "cm", "ChangeRequest", existing.ChangeRequestId, existing.ChangeNumber.ToString(), "Submit", "Submitted for approval", cancellationToken);
+        return Ok(ToDto(updated!));
     }
 
-    private static ChangeRequestDto MapToDto(ChangeRequest change, IReadOnlyCollection<ChangeApproval> approvals)
+    private static ChangeRequestDto ToDto(ChangeRequest change) => new()
     {
-        var approvedCount = approvals.Count(approval => approval.Status == ApprovalStatus.Approved);
-        var rejectedCount = approvals.Count(approval => approval.Status == ApprovalStatus.Rejected);
-        var pendingCount = approvals.Count(approval => approval.Status == ApprovalStatus.Pending);
-
-        return new ChangeRequestDto
-        {
-            Id = change.Id,
-            Title = change.Title,
-            Description = change.Description,
-            Status = change.Status.ToString(),
-            Priority = change.Priority,
-            RiskLevel = change.RiskLevel,
-            PlannedStart = change.PlannedStart,
-            PlannedEnd = change.PlannedEnd,
-            CreatedAt = change.CreatedAt,
-            UpdatedAt = change.UpdatedAt,
-            ApprovalsTotal = approvals.Count,
-            ApprovalsApproved = approvedCount,
-            ApprovalsRejected = rejectedCount,
-            ApprovalsPending = pendingCount
-        };
-    }
+        ChangeRequestId = change.ChangeRequestId,
+        ChangeNumber = change.ChangeNumber,
+        Title = change.Title,
+        Description = change.Description,
+        ChangeTypeId = change.ChangeTypeId,
+        PriorityId = change.PriorityId,
+        StatusId = change.StatusId,
+        RiskLevelId = change.RiskLevelId
+    };
 }

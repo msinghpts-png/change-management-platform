@@ -1,5 +1,4 @@
 using ChangeManagement.Api.Data;
-using ChangeManagement.Api.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,10 +10,7 @@ public class DashboardController : ControllerBase
 {
     private readonly ChangeManagementDbContext _dbContext;
 
-    public DashboardController(ChangeManagementDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
+    public DashboardController(ChangeManagementDbContext dbContext) => _dbContext = dbContext;
 
     [HttpGet]
     public async Task<IActionResult> GetDashboard()
@@ -26,9 +22,9 @@ public class DashboardController : ControllerBase
         var response = new
         {
             totalChanges = await _dbContext.ChangeRequests.CountAsync(),
-            pendingApprovals = await _dbContext.ChangeRequests.CountAsync(change => change.Status == ChangeStatus.PendingApproval),
+            submittedChanges = await _dbContext.ChangeRequests.CountAsync(change => change.StatusId == 2),
             scheduledThisWeek = await _dbContext.ChangeRequests.CountAsync(change => change.PlannedStart >= startOfWeek && change.PlannedStart <= now.AddDays(7)),
-            completedThisMonth = await _dbContext.ChangeRequests.CountAsync(change => change.Status == ChangeStatus.Completed && change.UpdatedAt >= startOfMonth)
+            completedThisMonth = await _dbContext.ChangeRequests.CountAsync(change => change.StatusId == 5 && change.UpdatedAt >= startOfMonth)
         };
 
         return Ok(response);
