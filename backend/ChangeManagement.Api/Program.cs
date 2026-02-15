@@ -25,7 +25,28 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ChangeManagementDbContext>();
+
+    var discoveredMigrations = dbContext.Database.GetMigrations().ToList();
+    if (discoveredMigrations.Count == 0)
+    {
+        throw new InvalidOperationException("No EF Core migrations were discovered. Ensure migration attributes and assembly scanning are configured correctly.");
+    }
+
     dbContext.Database.Migrate();
+
+    var missingTables = dbContext.Database.SqlQueryRaw<string>(@"
+SELECT required.TableName
+FROM (VALUES
+('cm.ChangeRequest'),('cm.ChangeTask'),('cm.ChangeApproval'),('cm.ChangeAttachment'),('cm.[User]'),
+('audit.Event'),('audit.EventType'),
+('ref.ChangeType'),('ref.ChangePriority'),('ref.ChangeStatus'),('ref.RiskLevel'),('ref.ApprovalStatus')
+) AS required(TableName)
+WHERE OBJECT_ID(required.TableName, 'U') IS NULL;").ToList();
+
+    if (missingTables.Count > 0)
+    {
+        throw new InvalidOperationException($"Database validation failed. Missing required tables: {string.Join(", ", missingTables)}");
+    }
 }
 
 app.MapControllers();

@@ -1,10 +1,14 @@
 using System;
+using ChangeManagement.Api.Data;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace ChangeManagement.Api.Migrations
 {
+    [DbContext(typeof(ChangeManagementDbContext))]
+    [Migration("20260216000000_DbmlAlignedSchema")]
     public partial class DbmlAlignedSchema : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
