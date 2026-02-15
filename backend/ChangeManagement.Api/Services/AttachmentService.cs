@@ -5,113 +5,69 @@ namespace ChangeManagement.Api.Services;
 
 public interface IAttachmentService
 {
-    IEnumerable<ChangeAttachment> GetForChange(Guid changeId);
-    ChangeAttachment? Get(Guid attachmentId);
-    Task<(ChangeAttachment? Attachment, string? Error)> UploadAsync(Guid changeId, IFormFile file, CancellationToken cancellationToken);
+    Task<List<ChangeAttachment>> GetForChangeAsync(Guid changeId, CancellationToken cancellationToken);
+    Task<ChangeAttachment?> GetAsync(Guid attachmentId, CancellationToken cancellationToken);
+    Task<(ChangeAttachment? Attachment, string? Error)> UploadAsync(Guid changeId, IFormFile file, Guid uploadedBy, CancellationToken cancellationToken);
     Task<bool> DeleteAsync(Guid attachmentId, CancellationToken cancellationToken);
     Task<byte[]?> ReadFileAsync(ChangeAttachment attachment, CancellationToken cancellationToken);
 }
 
 public class AttachmentService : IAttachmentService
 {
-    private const long MaxBytes = 10 * 1024 * 1024;
-    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".pdf", ".txt", ".doc", ".docx", ".xls", ".xlsx", ".png", ".jpg", ".jpeg"
-    };
-
     private readonly IChangeAttachmentRepository _attachmentRepository;
     private readonly IChangeRepository _changeRepository;
+    private readonly IAuditService _audit;
     private readonly IWebHostEnvironment _environment;
 
-    public AttachmentService(
-        IChangeAttachmentRepository attachmentRepository,
-        IChangeRepository changeRepository,
-        IWebHostEnvironment environment)
+    public AttachmentService(IChangeAttachmentRepository attachmentRepository, IChangeRepository changeRepository, IAuditService audit, IWebHostEnvironment environment)
     {
         _attachmentRepository = attachmentRepository;
         _changeRepository = changeRepository;
+        _audit = audit;
         _environment = environment;
     }
 
-    public IEnumerable<ChangeAttachment> GetForChange(Guid changeId) => _attachmentRepository.GetByChangeId(changeId);
+    public Task<List<ChangeAttachment>> GetForChangeAsync(Guid changeId, CancellationToken cancellationToken) => _attachmentRepository.GetByChangeIdAsync(changeId, cancellationToken);
+    public Task<ChangeAttachment?> GetAsync(Guid attachmentId, CancellationToken cancellationToken) => _attachmentRepository.GetByIdAsync(attachmentId, cancellationToken);
 
-    public ChangeAttachment? Get(Guid attachmentId) => _attachmentRepository.GetById(attachmentId);
-
-    public async Task<(ChangeAttachment? Attachment, string? Error)> UploadAsync(Guid changeId, IFormFile file, CancellationToken cancellationToken)
+    public async Task<(ChangeAttachment? Attachment, string? Error)> UploadAsync(Guid changeId, IFormFile file, Guid uploadedBy, CancellationToken cancellationToken)
     {
-        if (_changeRepository.GetById(changeId) is null)
+        var change = await _changeRepository.GetByIdAsync(changeId, cancellationToken);
+        if (change is null)
         {
             return (null, "Change request not found.");
-        }
-
-        if (file.Length <= 0)
-        {
-            return (null, "Attachment file is empty.");
-        }
-
-        if (file.Length > MaxBytes)
-        {
-            return (null, "Attachment exceeds maximum size of 10 MB.");
-        }
-
-        var extension = Path.GetExtension(file.FileName);
-        if (string.IsNullOrWhiteSpace(extension) || !AllowedExtensions.Contains(extension))
-        {
-            return (null, "Attachment type is not allowed.");
         }
 
         var rootPath = Path.Combine(_environment.ContentRootPath, "App_Data", "attachments", changeId.ToString("N"));
         Directory.CreateDirectory(rootPath);
 
         var fileId = Guid.NewGuid();
-        var storedFileName = $"{fileId:N}{extension}";
-        var storedPath = Path.Combine(rootPath, storedFileName);
+        var extension = Path.GetExtension(file.FileName);
+        var storedPath = Path.Combine(rootPath, $"{fileId:N}{extension}");
 
-        await using (var stream = File.Create(storedPath))
-        {
-            await file.CopyToAsync(stream, cancellationToken);
-        }
+        await using var stream = File.Create(storedPath);
+        await file.CopyToAsync(stream, cancellationToken);
 
         var entity = new ChangeAttachment
         {
-            Id = fileId,
+            ChangeAttachmentId = fileId,
             ChangeRequestId = changeId,
             FileName = Path.GetFileName(file.FileName),
-            ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
-            SizeBytes = file.Length,
-            StoragePath = storedPath,
-            UploadedAt = DateTime.UtcNow
+            FileUrl = storedPath,
+            UploadedAt = DateTime.UtcNow,
+            UploadedBy = uploadedBy
         };
 
-        var stored = _attachmentRepository.Create(entity);
-        return (stored, null);
+        var created = await _attachmentRepository.CreateAsync(entity, cancellationToken);
+        await _audit.LogAsync(5, uploadedBy, "system@local", "cm", "ChangeAttachment", created.ChangeAttachmentId, change.ChangeNumber.ToString(), "Upload", created.FileName, cancellationToken);
+        return (created, null);
     }
 
-    public async Task<bool> DeleteAsync(Guid attachmentId, CancellationToken cancellationToken)
-    {
-        var attachment = _attachmentRepository.GetById(attachmentId);
-        if (attachment is null)
-        {
-            return false;
-        }
-
-        _attachmentRepository.Delete(attachment);
-        if (File.Exists(attachment.StoragePath))
-        {
-            await Task.Run(() => File.Delete(attachment.StoragePath), cancellationToken);
-        }
-
-        return true;
-    }
+    public Task<bool> DeleteAsync(Guid attachmentId, CancellationToken cancellationToken) => _attachmentRepository.DeleteAsync(attachmentId, cancellationToken);
 
     public async Task<byte[]?> ReadFileAsync(ChangeAttachment attachment, CancellationToken cancellationToken)
     {
-        if (!File.Exists(attachment.StoragePath))
-        {
-            return null;
-        }
-
-        return await File.ReadAllBytesAsync(attachment.StoragePath, cancellationToken);
+        if (!File.Exists(attachment.FileUrl)) return null;
+        return await File.ReadAllBytesAsync(attachment.FileUrl, cancellationToken);
     }
 }
