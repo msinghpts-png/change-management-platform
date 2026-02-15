@@ -1,5 +1,4 @@
 using ChangeManagement.Api.Domain.Entities;
-using ChangeManagement.Api.Domain.Enums;
 using ChangeManagement.Api.DTOs;
 using ChangeManagement.Api.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -11,72 +10,33 @@ namespace ChangeManagement.Api.Controllers;
 public class ApprovalsController : ControllerBase
 {
     private readonly IApprovalService _approvalService;
-    private readonly IChangeService _changeService;
 
-    public ApprovalsController(IApprovalService approvalService, IChangeService changeService)
-    {
-        _approvalService = approvalService;
-        _changeService = changeService;
-    }
+    public ApprovalsController(IApprovalService approvalService) => _approvalService = approvalService;
 
     [HttpGet]
-    public ActionResult<IEnumerable<ChangeApproval>> GetApprovals(Guid changeId)
-    {
-        if (_changeService.GetById(changeId) is null)
-        {
-            return NotFound("Change request not found.");
-        }
-
-        var approvals = _approvalService.GetApprovalsForChange(changeId);
-        return Ok(approvals);
-    }
+    public async Task<ActionResult<IEnumerable<ChangeApproval>>> GetApprovals(Guid changeId, CancellationToken cancellationToken)
+        => Ok(await _approvalService.GetApprovalsForChangeAsync(changeId, cancellationToken));
 
     [HttpPost]
-    public ActionResult<ChangeApproval> CreateApproval(Guid changeId, [FromBody] ApprovalCreateDto request)
+    public async Task<ActionResult<ChangeApproval>> CreateApproval(Guid changeId, [FromBody] ApprovalCreateDto request, CancellationToken cancellationToken)
     {
-        if (_changeService.GetById(changeId) is null)
-        {
-            return NotFound("Change request not found.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Approver))
-        {
-            return BadRequest("Approver is required.");
-        }
-
         var approval = new ChangeApproval
         {
-            Id = Guid.NewGuid(),
+            ChangeApprovalId = Guid.NewGuid(),
             ChangeRequestId = changeId,
-            Approver = request.Approver,
-            Status = ApprovalStatus.Pending,
-            Comment = request.Comment
+            ApproverUserId = request.ApproverUserId,
+            ApprovalStatusId = 1,
+            Comments = request.Comments
         };
 
-        var created = _approvalService.CreateApproval(approval);
+        var created = await _approvalService.CreateApprovalAsync(approval, cancellationToken);
         return CreatedAtAction(nameof(GetApprovals), new { changeId }, created);
     }
 
     [HttpPost("{approvalId:guid}/decision")]
-    public ActionResult<ChangeApproval> DecideApproval(Guid changeId, Guid approvalId, [FromBody] ApprovalDecisionDto request)
+    public async Task<ActionResult<ChangeApproval>> DecideApproval(Guid changeId, Guid approvalId, [FromBody] ApprovalDecisionDto request, CancellationToken cancellationToken)
     {
-        if (request.Status == ApprovalStatus.Pending)
-        {
-            return BadRequest("Decision status must be Approved or Rejected.");
-        }
-
-        var result = _approvalService.RecordDecision(changeId, approvalId, request.Status, request.Comment, DateTime.UtcNow);
-        if (result.Approval is null)
-        {
-            if (string.Equals(result.Error, "Approval not found.", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(result.Error, "Change request not found.", StringComparison.OrdinalIgnoreCase))
-            {
-                return NotFound(result.Error);
-            }
-
-            return BadRequest(result.Error);
-        }
-
-        return Ok(result.Approval);
+        var approval = await _approvalService.RecordDecisionAsync(changeId, approvalId, request.ApprovalStatusId, request.Comments, cancellationToken);
+        return approval is null ? NotFound() : Ok(approval);
     }
 }

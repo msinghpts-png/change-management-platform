@@ -1,40 +1,33 @@
 using ChangeManagement.Api.Data;
 using ChangeManagement.Api.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace ChangeManagement.Api.Repositories;
 
 public class ChangeAttachmentRepository : IChangeAttachmentRepository
 {
     private readonly ChangeManagementDbContext _dbContext;
+    public ChangeAttachmentRepository(ChangeManagementDbContext dbContext) => _dbContext = dbContext;
 
-    public ChangeAttachmentRepository(ChangeManagementDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
+    public Task<List<ChangeAttachment>> GetByChangeIdAsync(Guid changeRequestId, CancellationToken cancellationToken) =>
+        _dbContext.ChangeAttachments.Where(a => a.ChangeRequestId == changeRequestId).ToListAsync(cancellationToken);
 
-    public IEnumerable<ChangeAttachment> GetByChangeId(Guid changeRequestId)
-    {
-        return _dbContext.ChangeAttachments
-            .Where(attachment => attachment.ChangeRequestId == changeRequestId)
-            .OrderByDescending(attachment => attachment.UploadedAt)
-            .ToList();
-    }
+    public Task<ChangeAttachment?> GetByIdAsync(Guid attachmentId, CancellationToken cancellationToken) =>
+        _dbContext.ChangeAttachments.FirstOrDefaultAsync(a => a.ChangeAttachmentId == attachmentId, cancellationToken);
 
-    public ChangeAttachment? GetById(Guid attachmentId)
-    {
-        return _dbContext.ChangeAttachments.FirstOrDefault(attachment => attachment.Id == attachmentId);
-    }
-
-    public ChangeAttachment Create(ChangeAttachment attachment)
+    public async Task<ChangeAttachment> CreateAsync(ChangeAttachment attachment, CancellationToken cancellationToken)
     {
         _dbContext.ChangeAttachments.Add(attachment);
-        _dbContext.SaveChanges();
+        await _dbContext.SaveChangesAsync(cancellationToken);
         return attachment;
     }
 
-    public void Delete(ChangeAttachment attachment)
+    public async Task<bool> DeleteAsync(Guid attachmentId, CancellationToken cancellationToken)
     {
-        _dbContext.ChangeAttachments.Remove(attachment);
-        _dbContext.SaveChanges();
+        var entity = await GetByIdAsync(attachmentId, cancellationToken);
+        if (entity is null) return false;
+        _dbContext.ChangeAttachments.Remove(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
     }
 }
