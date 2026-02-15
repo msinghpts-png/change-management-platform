@@ -1,19 +1,34 @@
-using ChangeManagement.Api.Domain.Enums;
-
 namespace ChangeManagement.Api.Domain.Entities;
 
 public class ChangeRequest
 {
-    public Guid Id { get; set; }
+    public Guid ChangeRequestId { get; set; }
+    public int ChangeNumber { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
-    public ChangeStatus Status { get; set; }
-    public string? Priority { get; set; }
-    public string? RiskLevel { get; set; }
+    public int ChangeTypeId { get; set; }
+    public int PriorityId { get; set; }
+    public int StatusId { get; set; }
+    public int RiskLevelId { get; set; }
+    public Guid RequestedByUserId { get; set; }
+    public Guid? AssignedToUserId { get; set; }
     public DateTime? PlannedStart { get; set; }
     public DateTime? PlannedEnd { get; set; }
+    public DateTime? ActualStart { get; set; }
+    public DateTime? ActualEnd { get; set; }
     public DateTime CreatedAt { get; set; }
+    public Guid CreatedBy { get; set; }
     public DateTime? UpdatedAt { get; set; }
-    public ICollection<ChangeApproval> Approvals { get; set; } = new List<ChangeApproval>();
-    public ICollection<ChangeAttachment> Attachments { get; set; } = new List<ChangeAttachment>();
+    public Guid? UpdatedBy { get; set; }
+
+    public ChangeType? ChangeType { get; set; }
+    public ChangePriority? Priority { get; set; }
+    public ChangeStatus? Status { get; set; }
+    public RiskLevel? RiskLevel { get; set; }
+    public User? RequestedByUser { get; set; }
+    public User? AssignedToUser { get; set; }
+
+    public ICollection<ChangeTask> ChangeTasks { get; set; } = new List<ChangeTask>();
+    public ICollection<ChangeApproval> ChangeApprovals { get; set; } = new List<ChangeApproval>();
+    public ICollection<ChangeAttachment> ChangeAttachments { get; set; } = new List<ChangeAttachment>();
 }

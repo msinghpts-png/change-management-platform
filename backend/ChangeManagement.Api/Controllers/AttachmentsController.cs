@@ -11,69 +11,33 @@ public class AttachmentsController : ControllerBase
 {
     private readonly IAttachmentService _attachmentService;
 
-    public AttachmentsController(IAttachmentService attachmentService)
-    {
-        _attachmentService = attachmentService;
-    }
+    public AttachmentsController(IAttachmentService attachmentService) => _attachmentService = attachmentService;
 
     [HttpGet]
-    public ActionResult<IEnumerable<AttachmentDto>> List(Guid changeId)
+    public async Task<ActionResult<IEnumerable<AttachmentDto>>> List(Guid changeId, CancellationToken cancellationToken)
     {
-        var items = _attachmentService.GetForChange(changeId).Select(item => item.ToDto());
-        return Ok(items);
+        var items = await _attachmentService.GetForChangeAsync(changeId, cancellationToken);
+        return Ok(items.Select(i => i.ToDto()));
     }
 
     [HttpPost]
-    [RequestSizeLimit(10 * 1024 * 1024)]
-    public async Task<ActionResult<AttachmentDto>> Upload(Guid changeId, [FromForm] AttachmentUploadDto request, CancellationToken cancellationToken)
+    public async Task<ActionResult<AttachmentDto>> Upload(Guid changeId, [FromForm] AttachmentUploadDto request, [FromQuery] Guid uploadedBy, CancellationToken cancellationToken)
     {
-        if (request.File is null)
-        {
-            return BadRequest("File is required.");
-        }
-
-        var result = await _attachmentService.UploadAsync(changeId, request.File, cancellationToken);
-        if (result.Attachment is null)
-        {
-            if (string.Equals(result.Error, "Change request not found.", StringComparison.OrdinalIgnoreCase))
-            {
-                return NotFound(result.Error);
-            }
-
-            return BadRequest(result.Error);
-        }
-
-        return CreatedAtAction(nameof(List), new { changeId }, result.Attachment.ToDto());
+        var result = await _attachmentService.UploadAsync(changeId, request.File, uploadedBy, cancellationToken);
+        return result.Attachment is null ? BadRequest(result.Error) : CreatedAtAction(nameof(List), new { changeId }, result.Attachment.ToDto());
     }
 
     [HttpGet("{attachmentId:guid}/download")]
     public async Task<IActionResult> Download(Guid changeId, Guid attachmentId, CancellationToken cancellationToken)
     {
-        var attachment = _attachmentService.Get(attachmentId);
-        if (attachment is null || attachment.ChangeRequestId != changeId)
-        {
-            return NotFound();
-        }
+        var attachment = await _attachmentService.GetAsync(attachmentId, cancellationToken);
+        if (attachment is null || attachment.ChangeRequestId != changeId) return NotFound();
 
         var bytes = await _attachmentService.ReadFileAsync(attachment, cancellationToken);
-        if (bytes is null)
-        {
-            return NotFound();
-        }
-
-        return File(bytes, attachment.ContentType, attachment.FileName);
+        return bytes is null ? NotFound() : File(bytes, "application/octet-stream", attachment.FileName);
     }
 
     [HttpDelete("{attachmentId:guid}")]
-    public async Task<IActionResult> Delete(Guid changeId, Guid attachmentId, CancellationToken cancellationToken)
-    {
-        var attachment = _attachmentService.Get(attachmentId);
-        if (attachment is null || attachment.ChangeRequestId != changeId)
-        {
-            return NotFound();
-        }
-
-        await _attachmentService.DeleteAsync(attachmentId, cancellationToken);
-        return NoContent();
-    }
+    public async Task<IActionResult> Delete(Guid attachmentId, CancellationToken cancellationToken)
+        => await _attachmentService.DeleteAsync(attachmentId, cancellationToken) ? NoContent() : NotFound();
 }

@@ -9,11 +9,10 @@ public static class AttachmentMappings
     {
         return new AttachmentDto
         {
-            Id = attachment.Id,
+            ChangeAttachmentId = attachment.ChangeAttachmentId,
             ChangeRequestId = attachment.ChangeRequestId,
             FileName = attachment.FileName,
-            ContentType = attachment.ContentType,
-            SizeBytes = attachment.SizeBytes,
+            FileUrl = attachment.FileUrl,
             UploadedAt = attachment.UploadedAt
         };
     }

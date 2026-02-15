@@ -8,47 +8,27 @@ public class ChangeRepository : IChangeRepository
 {
     private readonly ChangeManagementDbContext _dbContext;
 
-    public ChangeRepository(ChangeManagementDbContext dbContext)
-    {
-        _dbContext = dbContext;
-    }
+    public ChangeRepository(ChangeManagementDbContext dbContext) => _dbContext = dbContext;
 
-    public IEnumerable<ChangeRequest> GetAll()
-    {
-        return _dbContext.ChangeRequests.Include(c => c.Approvals).ToList();
-    }
+    public Task<List<ChangeRequest>> GetAllAsync(CancellationToken cancellationToken) => _dbContext.ChangeRequests.AsNoTracking().ToListAsync(cancellationToken);
 
-    public ChangeRequest? GetById(Guid id)
-    {
-        return _dbContext.ChangeRequests.Include(c => c.Approvals).FirstOrDefault(change => change.Id == id);
-    }
+    public Task<ChangeRequest?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        _dbContext.ChangeRequests.FirstOrDefaultAsync(c => c.ChangeRequestId == id, cancellationToken);
 
-    public ChangeRequest Create(ChangeRequest changeRequest)
+    public async Task<ChangeRequest> CreateAsync(ChangeRequest changeRequest, CancellationToken cancellationToken)
     {
         _dbContext.ChangeRequests.Add(changeRequest);
-        _dbContext.SaveChanges();
+        await _dbContext.SaveChangesAsync(cancellationToken);
         return changeRequest;
     }
 
-    public ChangeRequest? Update(ChangeRequest changeRequest)
+    public async Task<ChangeRequest?> UpdateAsync(ChangeRequest changeRequest, CancellationToken cancellationToken)
     {
-        var existing = GetById(changeRequest.Id);
-        if (existing is null)
-        {
-            return null;
-        }
+        var existing = await _dbContext.ChangeRequests.FirstOrDefaultAsync(c => c.ChangeRequestId == changeRequest.ChangeRequestId, cancellationToken);
+        if (existing is null) return null;
 
-        existing.Title = changeRequest.Title;
-        existing.Description = changeRequest.Description;
-        existing.Status = changeRequest.Status;
-        existing.Priority = changeRequest.Priority;
-        existing.RiskLevel = changeRequest.RiskLevel;
-        existing.PlannedStart = changeRequest.PlannedStart;
-        existing.PlannedEnd = changeRequest.PlannedEnd;
-        existing.UpdatedAt = changeRequest.UpdatedAt;
-
-        _dbContext.ChangeRequests.Update(existing);
-        _dbContext.SaveChanges();
+        _dbContext.Entry(existing).CurrentValues.SetValues(changeRequest);
+        await _dbContext.SaveChangesAsync(cancellationToken);
         return existing;
     }
 }
