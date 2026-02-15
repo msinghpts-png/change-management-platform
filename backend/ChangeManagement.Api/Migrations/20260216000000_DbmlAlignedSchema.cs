@@ -218,54 +218,66 @@ namespace ChangeManagement.Api.Migrations
 
             migrationBuilder.CreateIndex(name: "IX_ChangeRequest_ChangeNumber", schema: "cm", table: "ChangeRequest", column: "ChangeNumber", unique: true);
 
-            migrationBuilder.InsertData(schema: "ref", table: "ChangeType", columns: new[] { "ChangeTypeId", "Name", "Description" }, values: new object[,]
-            {
-                { 1, "Standard", "Pre-approved repeatable change" },
-                { 2, "Normal", "Normal CAB-reviewed change" },
-                { 3, "Emergency", "Emergency expedited change" }
-            });
+            migrationBuilder.Sql(@"
+IF NOT EXISTS (SELECT 1 FROM [ref].[ChangeType])
+BEGIN
+    INSERT INTO [ref].[ChangeType] ([ChangeTypeId], [Name], [Description]) VALUES
+    (1, 'Standard', 'Pre-approved repeatable change'),
+    (2, 'Normal', 'Normal CAB-reviewed change'),
+    (3, 'Emergency', 'Emergency expedited change');
+END;");
 
-            migrationBuilder.InsertData(schema: "ref", table: "ChangePriority", columns: new[] { "PriorityId", "Name", "SortOrder" }, values: new object[,]
-            {
-                { 1, "Low", 1 },
-                { 2, "Medium", 2 },
-                { 3, "High", 3 },
-                { 4, "Critical", 4 }
-            });
+            migrationBuilder.Sql(@"
+IF NOT EXISTS (SELECT 1 FROM [ref].[ChangePriority])
+BEGIN
+    INSERT INTO [ref].[ChangePriority] ([PriorityId], [Name], [SortOrder]) VALUES
+    (1, 'Low', 1),
+    (2, 'Medium', 2),
+    (3, 'High', 3),
+    (4, 'Critical', 4);
+END;");
 
-            migrationBuilder.InsertData(schema: "ref", table: "ChangeStatus", columns: new[] { "StatusId", "Name", "IsTerminal" }, values: new object[,]
-            {
-                { 1, "Draft", false },
-                { 2, "Submitted", false },
-                { 3, "Approved", false },
-                { 4, "Rejected", true },
-                { 5, "Completed", true }
-            });
+            migrationBuilder.Sql(@"
+IF NOT EXISTS (SELECT 1 FROM [ref].[ChangeStatus])
+BEGIN
+    INSERT INTO [ref].[ChangeStatus] ([StatusId], [Name], [IsTerminal]) VALUES
+    (1, 'Draft', 0),
+    (2, 'Submitted', 0),
+    (3, 'Approved', 0),
+    (4, 'Rejected', 1),
+    (5, 'Completed', 1);
+END;");
 
-            migrationBuilder.InsertData(schema: "ref", table: "RiskLevel", columns: new[] { "RiskLevelId", "Name", "Score" }, values: new object[,]
-            {
-                { 1, "Low", 1 },
-                { 2, "Medium", 5 },
-                { 3, "High", 8 }
-            });
+            migrationBuilder.Sql(@"
+IF NOT EXISTS (SELECT 1 FROM [ref].[RiskLevel])
+BEGIN
+    INSERT INTO [ref].[RiskLevel] ([RiskLevelId], [Name], [Score]) VALUES
+    (1, 'Low', 1),
+    (2, 'Medium', 5),
+    (3, 'High', 8);
+END;");
 
-            migrationBuilder.InsertData(schema: "ref", table: "ApprovalStatus", columns: new[] { "ApprovalStatusId", "Name" }, values: new object[,]
-            {
-                { 1, "Pending" },
-                { 2, "Approved" },
-                { 3, "Rejected" }
-            });
+            migrationBuilder.Sql(@"
+IF NOT EXISTS (SELECT 1 FROM [ref].[ApprovalStatus])
+BEGIN
+    INSERT INTO [ref].[ApprovalStatus] ([ApprovalStatusId], [Name]) VALUES
+    (1, 'Pending'),
+    (2, 'Approved'),
+    (3, 'Rejected');
+END;");
 
-            migrationBuilder.InsertData(schema: "audit", table: "EventType", columns: new[] { "EventTypeId", "Name", "Description" }, values: new object[,]
-            {
-                { 1, "ChangeCreated", "Change request created" },
-                { 2, "ChangeUpdated", "Change request updated" },
-                { 3, "ChangeSubmitted", "Change submitted for approval" },
-                { 4, "ApprovalDecision", "Approval decision recorded" },
-                { 5, "AttachmentUploaded", "Attachment uploaded" },
-                { 6, "TemplateCreated", "Template created" },
-                { 7, "TemplateUpdated", "Template updated" }
-            });
+            migrationBuilder.Sql(@"
+IF NOT EXISTS (SELECT 1 FROM [audit].[EventType])
+BEGIN
+    INSERT INTO [audit].[EventType] ([EventTypeId], [Name], [Description]) VALUES
+    (1, 'ChangeCreated', 'Change request created'),
+    (2, 'ChangeUpdated', 'Change request updated'),
+    (3, 'ChangeSubmitted', 'Change submitted for approval'),
+    (4, 'ApprovalDecision', 'Approval decision recorded'),
+    (5, 'AttachmentUploaded', 'Attachment uploaded'),
+    (6, 'TemplateCreated', 'Template created'),
+    (7, 'TemplateUpdated', 'Template updated');
+END;");
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
