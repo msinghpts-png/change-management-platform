@@ -7,18 +7,18 @@ var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Server=localhost;Database=ChangeManagementDB;Trusted_Connection=true;TrustServerCertificate=true;";
-builder.Services.AddDbContext<ChangeManagementDbContext>(options =>
-    options.UseSqlServer(connectionString)
-);
+builder.Services.AddDbContext<ChangeManagementDbContext>(options => options.UseSqlServer(connectionString));
 
 builder.Services.AddControllers();
-builder.Services.AddScoped<IChangeStatusValidator, ChangeStatusValidator>();
 builder.Services.AddScoped<IChangeRepository, ChangeRepository>();
 builder.Services.AddScoped<IChangeService, ChangeService>();
 builder.Services.AddScoped<IApprovalRepository, ApprovalRepository>();
 builder.Services.AddScoped<IApprovalService, ApprovalService>();
 builder.Services.AddScoped<IChangeAttachmentRepository, ChangeAttachmentRepository>();
 builder.Services.AddScoped<IAttachmentService, AttachmentService>();
+builder.Services.AddScoped<IChangeTaskRepository, ChangeTaskRepository>();
+builder.Services.AddScoped<IChangeTaskService, ChangeTaskService>();
+builder.Services.AddScoped<IAuditService, AuditService>();
 
 var app = builder.Build();
 
@@ -29,9 +29,6 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.MapControllers();
-
 app.Run();
 
-public partial class Program
-{
-}
+public partial class Program;
