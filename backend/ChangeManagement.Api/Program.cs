@@ -25,7 +25,10 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ChangeManagementDbContext>();
-    var isSqlite = dbContext.Database.IsSqlite();
+    var isSqlite = string.Equals(
+        dbContext.Database.ProviderName,
+        "Microsoft.EntityFrameworkCore.Sqlite",
+        StringComparison.Ordinal);
 
     var discoveredMigrations = dbContext.Database.GetMigrations().ToList();
     if (discoveredMigrations.Count == 0)
