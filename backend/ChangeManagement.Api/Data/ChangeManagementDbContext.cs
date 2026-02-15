@@ -26,6 +26,12 @@ public class ChangeManagementDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        var isSqlite = Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite";
+
+        if (!isSqlite)
+        {
+            modelBuilder.HasSequence<int>("ChangeNumberSeq", "cm").StartsAt(1000).IncrementsBy(1);
+        }
 
         modelBuilder.HasSequence<int>("ChangeNumberSeq", "cm").StartsAt(1000).IncrementsBy(1);
 
@@ -33,7 +39,14 @@ public class ChangeManagementDbContext : DbContext
         {
             entity.ToTable("ChangeRequest", "cm");
             entity.HasKey(e => e.ChangeRequestId);
-            entity.Property(e => e.ChangeNumber).HasDefaultValueSql("NEXT VALUE FOR cm.ChangeNumberSeq");
+            if (!isSqlite)
+            {
+                entity.Property(e => e.ChangeNumber).HasDefaultValueSql("NEXT VALUE FOR cm.ChangeNumberSeq");
+            }
+            else
+            {
+                entity.Property(e => e.ChangeNumber).ValueGeneratedOnAdd();
+            }
             entity.HasIndex(e => e.ChangeNumber).IsUnique();
 
             entity.HasOne(e => e.ChangeType).WithMany(e => e.ChangeRequests).HasForeignKey(e => e.ChangeTypeId);
