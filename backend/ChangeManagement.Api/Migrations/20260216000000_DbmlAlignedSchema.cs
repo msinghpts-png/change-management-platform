@@ -113,7 +113,7 @@ namespace ChangeManagement.Api.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Event", x => x.AuditEventId);
-                    table.ForeignKey("FK_Event_EventType_EventTypeId", x => x.EventTypeId, "audit", "EventType", principalColumn: "EventTypeId", onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey("FK_Event_EventType_EventTypeId", x => x.EventTypeId, "audit", "EventType", "EventTypeId", onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -143,12 +143,12 @@ namespace ChangeManagement.Api.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ChangeRequest", x => x.ChangeRequestId);
-                    table.ForeignKey("FK_ChangeRequest_User_AssignedToUserId", x => x.AssignedToUserId, "cm", "User", principalColumn: "UserId", onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey("FK_ChangeRequest_User_RequestedByUserId", x => x.RequestedByUserId, "cm", "User", principalColumn: "UserId", onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey("FK_ChangeRequest_ChangeType_ChangeTypeId", x => x.ChangeTypeId, "ref", "ChangeType", principalColumn: "ChangeTypeId", onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey("FK_ChangeRequest_ChangePriority_PriorityId", x => x.PriorityId, "ref", "ChangePriority", principalColumn: "PriorityId", onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey("FK_ChangeRequest_ChangeStatus_StatusId", x => x.StatusId, "ref", "ChangeStatus", principalColumn: "StatusId", onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey("FK_ChangeRequest_RiskLevel_RiskLevelId", x => x.RiskLevelId, "ref", "RiskLevel", principalColumn: "RiskLevelId", onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey("FK_ChangeRequest_User_AssignedToUserId", x => x.AssignedToUserId, "cm", "User", "UserId", onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey("FK_ChangeRequest_User_RequestedByUserId", x => x.RequestedByUserId, "cm", "User", "UserId", onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey("FK_ChangeRequest_ChangeType_ChangeTypeId", x => x.ChangeTypeId, "ref", "ChangeType", "ChangeTypeId", onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey("FK_ChangeRequest_ChangePriority_PriorityId", x => x.PriorityId, "ref", "ChangePriority", "PriorityId", onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey("FK_ChangeRequest_ChangeStatus_StatusId", x => x.StatusId, "ref", "ChangeStatus", "StatusId", onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey("FK_ChangeRequest_RiskLevel_RiskLevelId", x => x.RiskLevelId, "ref", "RiskLevel", "RiskLevelId", onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -166,9 +166,9 @@ namespace ChangeManagement.Api.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ChangeApproval", x => x.ChangeApprovalId);
-                    table.ForeignKey("FK_ChangeApproval_ApprovalStatus_ApprovalStatusId", x => x.ApprovalStatusId, "ref", "ApprovalStatus", principalColumn: "ApprovalStatusId", onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey("FK_ChangeApproval_ChangeRequest_ChangeRequestId", x => x.ChangeRequestId, "cm", "ChangeRequest", principalColumn: "ChangeRequestId", onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey("FK_ChangeApproval_User_ApproverUserId", x => x.ApproverUserId, "cm", "User", principalColumn: "UserId", onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey("FK_ChangeApproval_ApprovalStatus_ApprovalStatusId", x => x.ApprovalStatusId, "ref", "ApprovalStatus", "ApprovalStatusId", onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey("FK_ChangeApproval_ChangeRequest_ChangeRequestId", x => x.ChangeRequestId, "cm", "ChangeRequest", "ChangeRequestId", onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey("FK_ChangeApproval_User_ApproverUserId", x => x.ApproverUserId, "cm", "User", "UserId", onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -186,8 +186,8 @@ namespace ChangeManagement.Api.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ChangeAttachment", x => x.ChangeAttachmentId);
-                    table.ForeignKey("FK_ChangeAttachment_ChangeRequest_ChangeRequestId", x => x.ChangeRequestId, "cm", "ChangeRequest", principalColumn: "ChangeRequestId", onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey("FK_ChangeAttachment_User_UploadedBy", x => x.UploadedBy, "cm", "User", principalColumn: "UserId", onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey("FK_ChangeAttachment_ChangeRequest_ChangeRequestId", x => x.ChangeRequestId, "cm", "ChangeRequest", "ChangeRequestId", onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey("FK_ChangeAttachment_User_UploadedBy", x => x.UploadedBy, "cm", "User", "UserId", onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -207,9 +207,9 @@ namespace ChangeManagement.Api.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ChangeTask", x => x.ChangeTaskId);
-                    table.ForeignKey("FK_ChangeTask_ChangeRequest_ChangeRequestId", x => x.ChangeRequestId, "cm", "ChangeRequest", principalColumn: "ChangeRequestId", onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey("FK_ChangeTask_ChangeStatus_StatusId", x => x.StatusId, "ref", "ChangeStatus", principalColumn: "StatusId", onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey("FK_ChangeTask_User_AssignedToUserId", x => x.AssignedToUserId, "cm", "User", principalColumn: "UserId", onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey("FK_ChangeTask_ChangeRequest_ChangeRequestId", x => x.ChangeRequestId, "cm", "ChangeRequest", "ChangeRequestId", onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey("FK_ChangeTask_ChangeStatus_StatusId", x => x.StatusId, "ref", "ChangeStatus", "StatusId", onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey("FK_ChangeTask_User_AssignedToUserId", x => x.AssignedToUserId, "cm", "User", "UserId", onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateIndex(name: "IX_ChangeRequest_ChangeNumber", schema: "cm", table: "ChangeRequest", column: "ChangeNumber", unique: true);
