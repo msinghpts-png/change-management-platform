@@ -4,8 +4,8 @@ namespace ChangeManagement.Api.Repositories;
 
 public interface IChangeAttachmentRepository
 {
-    IEnumerable<ChangeAttachment> GetByChangeId(Guid changeRequestId);
-    ChangeAttachment? GetById(Guid attachmentId);
-    ChangeAttachment Create(ChangeAttachment attachment);
-    void Delete(ChangeAttachment attachment);
+    Task<List<ChangeAttachment>> GetByChangeIdAsync(Guid changeRequestId, CancellationToken cancellationToken);
+    Task<ChangeAttachment?> GetByIdAsync(Guid attachmentId, CancellationToken cancellationToken);
+    Task<ChangeAttachment> CreateAsync(ChangeAttachment attachment, CancellationToken cancellationToken);
+    Task<bool> DeleteAsync(Guid attachmentId, CancellationToken cancellationToken);
 }
