@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiClient } from "../services/apiClient";
 import type { Approval, ApprovalStatus, Attachment, ChangeCreateDto, ChangeRequest, ChangeUpdateDto } from "../types/change";
@@ -39,7 +39,11 @@ const templates = [
     category: "Server",
     risk: "Low",
     description: "Deploy monthly Windows security patches to [SERVER_GROUP] as part of regular patch cycle.",
-    steps: "1. Take VM snapshots\n2. Disable servers in load balancer (rolling)\n3. Install patches via WSUS\n4. Reboot\n5. Validate services\n6. Re-enable in load balancer"
+    implementationSteps: "1. Take VM snapshots\n2. Disable servers in load balancer (rolling)\n3. Install patches via WSUS\n4. Reboot\n5. Validate services\n6. Re-enable in load balancer",
+    serviceSystem: "",
+    environment: "Non-Production",
+    businessJustification: "",
+    backoutPlan: ""
   },
   {
     id: "tpl-firewall",
@@ -47,7 +51,11 @@ const templates = [
     category: "Network",
     risk: "Medium",
     description: "Modify firewall rules on [FIREWALL_NAME] to allow/block traffic for [SERVICE/APPLICATION].",
-    steps: "1. Export current config\n2. Apply rule changes\n3. Validate connectivity\n4. Monitor logs"
+    implementationSteps: "1. Export current config\n2. Apply rule changes\n3. Validate connectivity\n4. Monitor logs",
+    serviceSystem: "",
+    environment: "Non-Production",
+    businessJustification: "",
+    backoutPlan: ""
   },
   {
     id: "tpl-db-maint",
@@ -55,9 +63,28 @@ const templates = [
     category: "Database",
     risk: "Low",
     description: "Perform scheduled database maintenance including index rebuild and statistics update on [DATABASE_NAME].",
-    steps: "1. Confirm maintenance window\n2. Run index/statistics jobs\n3. Validate performance\n4. Confirm backups"
+    implementationSteps: "1. Confirm maintenance window\n2. Run index/statistics jobs\n3. Validate performance\n4. Confirm backups",
+    serviceSystem: "",
+    environment: "Non-Production",
+    businessJustification: "",
+    backoutPlan: ""
   }
 ];
+
+const priorityToId = (priority: string) => {
+  const normalized = priority.trim().toUpperCase();
+  if (normalized === "P1") return 4;
+  if (normalized === "P2") return 3;
+  if (normalized === "P4") return 1;
+  return 2;
+};
+
+const riskToId = (risk: string) => {
+  const normalized = risk.trim().toLowerCase();
+  if (normalized === "low") return 1;
+  if (normalized === "high") return 3;
+  return 2;
+};
 
 const ChangeDetailPage = () => {
   const nav = useNavigate();
@@ -90,6 +117,7 @@ const ChangeDetailPage = () => {
   const [implementationSteps, setImplementationSteps] = useState("");
   const [backoutPlan, setBackoutPlan] = useState("");
 
+  const [changeType, setChangeType] = useState("Normal");
   const [priority, setPriority] = useState("P3");
   const [riskLevel, setRiskLevel] = useState("Medium");
   const [impactLevel, setImpactLevel] = useState("Medium");
@@ -100,6 +128,20 @@ const ChangeDetailPage = () => {
 
   const [templateId, setTemplateId] = useState("");
 
+  const changeTypeId = changeType === "Standard" ? 1 : changeType === "Emergency" ? 3 : 2;
+  const implementationDate = plannedStart;
+  const impactDescription = description;
+  const rollbackPlan = backoutPlan;
+
+  const isSubmitReady = Boolean(
+    title.trim() &&
+    changeTypeId &&
+    riskLevel &&
+    implementationDate &&
+    impactDescription.trim() &&
+    rollbackPlan.trim()
+  );
+  const isSubmitDisabled = loading || !isSubmitReady;
 
   const refreshRelatedData = async (changeId: string) => {
     if (!apiClient.isValidId(changeId)) return;
@@ -126,6 +168,14 @@ const ChangeDetailPage = () => {
         setItem(data);
         setTitle(data.title ?? "");
         setDescription(data.description ?? "");
+        setBusinessJustification(data.businessJustification ?? "");
+        setImplementationSteps(data.implementationSteps ?? "");
+        setBackoutPlan(data.backoutPlan ?? "");
+        setService(data.serviceSystem ?? data.service ?? "");
+        setCategory(data.category ?? "Application");
+        setEnvironment(data.environment ?? "Non-Production");
+        setDowntimeRequired(false);
+        setChangeType(data.changeTypeId === 1 ? "Standard" : data.changeTypeId === 3 ? "Emergency" : "Normal");
         setPriority(data.priority ?? "P3");
         setRiskLevel(data.riskLevel ?? "Medium");
         setImpactLevel(data.impactLevel ?? "Medium");
@@ -140,21 +190,25 @@ const ChangeDetailPage = () => {
       });
   }, [id]);
 
-  const compiledDescription = useMemo(() => {
-    // Keep it readable in the DB until backend supports first-class fields.
-    const parts = [
-      description?.trim() ? `Description:\n${description.trim()}` : "",
-      businessJustification?.trim() ? `\nBusiness Justification:\n${businessJustification.trim()}` : "",
-      implementationSteps?.trim() ? `\nImplementation Steps:\n${implementationSteps.trim()}` : "",
-      backoutPlan?.trim() ? `\nBackout Plan:\n${backoutPlan.trim()}` : "",
-      service?.trim() ? `\nService/System: ${service.trim()}` : "",
-      category ? `\nCategory: ${category}` : "",
-      environment ? `\nEnvironment: ${environment}` : "",
-      downtimeRequired ? `\nDowntime Required: Yes` : ""
-    ].filter(Boolean);
+  const isDirty = Boolean(
+    isNew ||
+    !item ||
+    title !== (item.title ?? "") ||
+    description !== (item.description ?? "") ||
+    implementationSteps !== (item.implementationSteps ?? "") ||
+    backoutPlan !== (item.backoutPlan ?? "") ||
+    service !== ((item.serviceSystem ?? item.service) ?? "") ||
+    category !== (item.category ?? "Application") ||
+    environment !== (item.environment ?? "Non-Production") ||
+    businessJustification !== (item.businessJustification ?? "") ||
+    changeTypeId !== (item.changeTypeId ?? 2) ||
+    priority !== (item.priority ?? "P3") ||
+    riskLevel !== (item.riskLevel ?? "Medium") ||
+    impactLevel !== (item.impactLevel ?? "Medium") ||
+    plannedStart !== (item.plannedStart ? item.plannedStart.slice(0, 16) : "") ||
+    plannedEnd !== (item.plannedEnd ? item.plannedEnd.slice(0, 16) : "")
+  );
 
-    return parts.join("\n");
-  }, [description, businessJustification, implementationSteps, backoutPlan, service, category, environment, downtimeRequired]);
 
   const applyTemplate = (tplId: string) => {
     setTemplateId(tplId);
@@ -163,32 +217,57 @@ const ChangeDetailPage = () => {
     setCategory(tpl.category);
     setRiskLevel(tpl.risk);
     if (!title) setTitle(tpl.name);
-    if (!description) setDescription(tpl.description);
-    if (!implementationSteps) setImplementationSteps(tpl.steps);
+    setDescription(tpl.description);
+    setImplementationSteps(tpl.implementationSteps ?? "");
+    setBackoutPlan(tpl.backoutPlan ?? "");
+    setService(tpl.serviceSystem ?? "");
+    setEnvironment(tpl.environment ?? "Non-Production");
+    setBusinessJustification(tpl.businessJustification ?? "");
   };
 
-  const saveDraft = async () => {
+  const saveDraft = async (options?: { navigateOnCreate?: boolean }) => {
     setError(null);
     setLoading(true);
     try {
       if (isNew) {
         const payload: ChangeCreateDto = {
           title,
-          description: compiledDescription,
+          description,
+          implementationSteps,
+          backoutPlan,
+          serviceSystem: service,
+          category,
+          environment,
+          businessJustification,
+          changeTypeId,
           priority,
+          priorityId: priorityToId(priority),
           riskLevel,
+          riskLevelId: riskToId(riskLevel),
           impactLevel,
           plannedStart: plannedStart ? new Date(plannedStart).toISOString() : undefined,
           plannedEnd: plannedEnd ? new Date(plannedEnd).toISOString() : undefined
         };
         const created = await apiClient.createChange(payload);
-        nav(`/changes/${created.id}`);
+        if (options?.navigateOnCreate ?? true) {
+          nav(`/changes/${created.id}`);
+        }
+        return created.id;
       } else if (apiClient.isValidId(id)) {
         const payload: ChangeUpdateDto = {
           title,
-          description: compiledDescription,
+          description,
+          implementationSteps,
+          backoutPlan,
+          serviceSystem: service,
+          category,
+          environment,
+          businessJustification,
+          changeTypeId,
           priority,
+          priorityId: priorityToId(priority),
           riskLevel,
+          riskLevelId: riskToId(riskLevel),
           impactLevel,
           plannedStart: plannedStart ? new Date(plannedStart).toISOString() : undefined,
           plannedEnd: plannedEnd ? new Date(plannedEnd).toISOString() : undefined
@@ -196,31 +275,43 @@ const ChangeDetailPage = () => {
         const updated = await apiClient.updateChange(id, payload);
         setItem(updated);
         await refreshRelatedData(id);
+        return id;
       }
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
+
+    return null;
   };
 
   const submitForApproval = async () => {
-    if (!apiClient.isValidId(id) && isNew) {
-      await saveDraft();
-      return;
+    setError(null);
+
+    let targetId = id;
+    if (isDirty) {
+      targetId = await saveDraft({ navigateOnCreate: false });
+      if (!apiClient.isValidId(targetId)) {
+        return;
+      }
     }
-    if (!apiClient.isValidId(id)) {
+
+    if (!apiClient.isValidId(targetId)) {
       setError("Invalid change request id.");
       return;
     }
 
-    setError(null);
     setLoading(true);
     try {
-      await apiClient.submitChange(id);
-      const refreshed = await apiClient.getChangeById(id);
+      const submitted = await apiClient.submitChange(targetId);
+      setItem(submitted);
+      const refreshed = await apiClient.getChangeById(targetId);
       setItem(refreshed);
-      await refreshRelatedData(id);
+      await refreshRelatedData(targetId);
+      if (isNew) {
+        nav(`/changes/${targetId}`);
+      }
       alert("Submitted for approval.");
     } catch (e) {
       setError((e as Error).message);
@@ -350,10 +441,10 @@ const ChangeDetailPage = () => {
 
                 <div>
                   <div className="label">Change Type *</div>
-                  <select className="select" value="Normal" onChange={() => void 0}>
-                    <option>Normal</option>
-                    <option>Standard</option>
-                    <option>Emergency</option>
+                  <select className="select" value={changeType} onChange={(e) => setChangeType(e.target.value)}>
+                    <option value="Normal">Normal</option>
+                    <option value="Standard">Standard</option>
+                    <option value="Emergency">Emergency</option>
                   </select>
                 </div>
 
@@ -462,7 +553,7 @@ const ChangeDetailPage = () => {
             <button className="btn" onClick={saveDraft} disabled={loading}>
               💾 Save Draft
             </button>
-            <button className="btn btn-primary" onClick={submitForApproval} disabled={loading || !title.trim()}>
+            <button type="button" className="btn btn-primary" onClick={submitForApproval} disabled={isSubmitDisabled}>
               ✈ Submit for Approval
             </button>
           </div>
@@ -527,7 +618,7 @@ const ChangeDetailPage = () => {
                 <div className="card-title">Implementation Steps</div>
               </div>
               <div className="card-body">
-                <div className="small">This section is currently stored in the description until backend fields are added.</div>
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit" }}>{item?.implementationSteps ?? "—"}</pre>
               </div>
             </div>
 
@@ -536,7 +627,7 @@ const ChangeDetailPage = () => {
                 <div className="card-title">Backout Plan</div>
               </div>
               <div className="card-body">
-                <div className="small">This section is currently stored in the description until backend fields are added.</div>
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit" }}>{item?.backoutPlan ?? "—"}</pre>
               </div>
             </div>
           </div>
@@ -554,7 +645,7 @@ const ChangeDetailPage = () => {
                 <div className="h3">{item?.environment ?? "—"}</div>
                 <div style={{ height: 10 }} />
                 <div className="small">Service</div>
-                <div className="h3">{item?.service ?? "—"}</div>
+                <div className="h3">{item?.serviceSystem ?? item?.service ?? "—"}</div>
               </div>
             </div>
 
