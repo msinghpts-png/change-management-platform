@@ -1,40 +1,34 @@
-using ChangeManagement.Api.Data;
 using ChangeManagement.Api.DTOs.Admin;
+using ChangeManagement.Api.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
 
 namespace ChangeManagement.Api.Controllers;
 
 [ApiController]
-[Route("api/admin/database")]
+[Authorize(Roles = "Admin")]
+[Route("api/admin")]
 public class AdminController : ControllerBase
 {
-    private readonly ChangeManagementDbContext _dbContext;
+    private readonly IAuditService _auditService;
 
-    public AdminController(ChangeManagementDbContext dbContext) => _dbContext = dbContext;
-
-    [HttpGet("status")]
-    public async Task<ActionResult<DatabaseStatusDto>> GetStatus(CancellationToken cancellationToken)
+    public AdminController(IAuditService auditService)
     {
-        var pending = (await _dbContext.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
-        var csb = new SqlConnectionStringBuilder(_dbContext.Database.GetConnectionString());
-
-        return Ok(new DatabaseStatusDto
-        {
-            DatabaseName = csb.InitialCatalog,
-            TotalChanges = await _dbContext.ChangeRequests.CountAsync(cancellationToken),
-            TotalApprovals = await _dbContext.ChangeApprovals.CountAsync(cancellationToken),
-            TotalAttachments = await _dbContext.ChangeAttachments.CountAsync(cancellationToken),
-            HasPendingMigrations = pending.Count > 0,
-            PendingMigrations = pending
-        });
+        _auditService = auditService;
     }
 
-    [HttpPost("migrate")]
-    public async Task<IActionResult> RunMigrations(CancellationToken cancellationToken)
+    [HttpGet("audit")]
+    public async Task<ActionResult<IEnumerable<AuditLogDto>>> GetAudit(CancellationToken cancellationToken)
     {
-        await _dbContext.Database.MigrateAsync(cancellationToken);
-        return Ok(new { message = "Migrations applied successfully." });
+        var logs = await _auditService.ListAsync(cancellationToken);
+        return Ok(logs.Select(x => new AuditLogDto
+        {
+            AuditLogId = x.AuditLogId,
+            ChangeId = x.ChangeId,
+            ActorUserId = x.ActorUserId,
+            Action = x.Action,
+            Details = x.Details,
+            CreatedAt = x.CreatedAt
+        }));
     }
 }

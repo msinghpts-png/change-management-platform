@@ -1,295 +1,175 @@
-using ChangeManagement.Api.Data;
+using System.Security.Claims;
 using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.DTOs;
 using ChangeManagement.Api.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace ChangeManagement.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/changes")]
 public class ChangesController : ControllerBase
 {
     private readonly IChangeService _changeService;
     private readonly IApprovalService _approvalService;
-    private readonly IAttachmentService _attachmentService;
     private readonly IChangeTaskService _taskService;
-    private readonly IAuditService _audit;
-    private readonly ChangeManagementDbContext _dbContext;
-    private readonly ILogger<ChangesController> _logger;
+    private readonly IAttachmentService _attachmentService;
 
-    public ChangesController(
-        IChangeService changeService,
-        IApprovalService approvalService,
-        IAttachmentService attachmentService,
-        IChangeTaskService taskService,
-        IAuditService audit,
-        ChangeManagementDbContext dbContext,
-        ILogger<ChangesController> logger)
+    public ChangesController(IChangeService changeService, IApprovalService approvalService, IChangeTaskService taskService, IAttachmentService attachmentService)
     {
         _changeService = changeService;
         _approvalService = approvalService;
-        _attachmentService = attachmentService;
         _taskService = taskService;
-        _audit = audit;
-        _dbContext = dbContext;
-        _logger = logger;
+        _attachmentService = attachmentService;
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<ChangeRequestDto>>> GetChanges(CancellationToken cancellationToken)
-    {
-        var items = await _changeService.GetAllAsync(cancellationToken);
-        return Ok(items.Select(ToDto));
-    }
+    public async Task<ActionResult<IEnumerable<ChangeRequestDto>>> GetAll(CancellationToken cancellationToken)
+        => Ok((await _changeService.GetAllAsync(cancellationToken)).Select(ToDto));
 
-    [HttpGet("{id}")]
-    public async Task<ActionResult<ChangeRequestDto>> GetChangeById(string id, CancellationToken cancellationToken)
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<ChangeRequestDto>> GetById(Guid id, CancellationToken cancellationToken)
     {
-        if (!TryParseId(id, out var guidResult, out var badRequest)) return badRequest;
-
-        var change = await _changeService.GetByIdAsync(guidResult, cancellationToken);
+        var change = await _changeService.GetByIdAsync(id, cancellationToken);
         return change is null ? NotFound() : Ok(ToDto(change));
     }
 
-    [HttpGet("{id}/approvals")]
-    public async Task<ActionResult<IEnumerable<object>>> GetApprovals(string id, CancellationToken cancellationToken)
-    {
-        if (!TryParseId(id, out var guidResult, out var badRequest)) return badRequest;
-
-        var approvals = await _approvalService.GetApprovalsForChangeAsync(guidResult, cancellationToken);
-        return Ok(approvals.Select(a => new
-        {
-            id = a.ChangeApprovalId,
-            changeRequestId = a.ChangeRequestId,
-            approver = a.ApproverUser?.Upn ?? string.Empty,
-            status = a.ApprovalStatus?.Name ?? "Pending",
-            comment = a.Comments,
-            decisionAt = a.ApprovedAt
-        }));
-    }
-
-    [HttpGet("{id}/attachments")]
-    public async Task<ActionResult<IEnumerable<object>>> GetAttachments(string id, CancellationToken cancellationToken)
-    {
-        if (!TryParseId(id, out var guidResult, out var badRequest)) return badRequest;
-
-        var attachments = await _attachmentService.GetForChangeAsync(guidResult, cancellationToken);
-        return Ok(attachments.Select(a => new
-        {
-            id = a.ChangeAttachmentId,
-            changeRequestId = a.ChangeRequestId,
-            fileName = a.FileName,
-            contentType = "application/octet-stream",
-            sizeBytes = 0,
-            uploadedAt = a.UploadedAt
-        }));
-    }
-
-    [HttpGet("{id}/tasks")]
-    public async Task<ActionResult<IEnumerable<object>>> GetTasks(string id, CancellationToken cancellationToken)
-    {
-        if (!TryParseId(id, out var guidResult, out var badRequest)) return badRequest;
-
-        var tasks = await _taskService.GetByChangeAsync(guidResult, cancellationToken);
-        return Ok(tasks.Select(t => new
-        {
-            id = t.ChangeTaskId,
-            changeRequestId = t.ChangeRequestId,
-            title = t.Title,
-            description = t.Description,
-            status = t.Status?.Name,
-            dueAt = t.DueAt,
-            completedAt = t.CompletedAt
-        }));
-    }
-
     [HttpPost]
-    public async Task<ActionResult<ChangeRequestDto>> CreateChange([FromBody] ChangeCreateDto request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ChangeRequestDto>> Create([FromBody] ChangeCreateDto request, CancellationToken cancellationToken)
     {
-        var changeTypeId = await ResolveChangeTypeIdAsync(request, cancellationToken);
-        var priorityId = await ResolvePriorityIdAsync(request, cancellationToken);
-        var riskLevelId = await ResolveRiskLevelIdAsync(request, cancellationToken);
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
 
-        var requestedByUserId = await ResolveRequestedByUserIdAsync(request, cancellationToken);
-        if (request.AssignedToUserId.HasValue &&
-            !await _dbContext.Users.AnyAsync(user => user.UserId == request.AssignedToUserId.Value, cancellationToken))
-        {
-            return BadRequest($"AssignedToUserId '{request.AssignedToUserId.Value}' does not exist in cm.User.");
-        }
+        var result = await _changeService.CreateAsync(request, userId.Value, cancellationToken);
+        if (result.Change is null) return BadRequest(result.Error);
 
-        var entity = new ChangeRequest
+        return CreatedAtAction(nameof(GetById), new { id = result.Change.ChangeId }, ToDto(result.Change));
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<ChangeRequestDto>> Update(Guid id, [FromBody] ChangeUpdateDto request, CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
+
+        var result = await _changeService.UpdateAsync(id, request, userId.Value, cancellationToken);
+        if (result.Change is null) return BadRequest(result.Error);
+
+        return Ok(ToDto(result.Change));
+    }
+
+    [HttpPost("{id:guid}/submit")]
+    public Task<ActionResult<ChangeRequestDto>> Submit(Guid id, CancellationToken cancellationToken) => Transition(id, ChangeStatus.Submitted, cancellationToken);
+
+    [HttpPost("{id:guid}/approve")]
+    [Authorize(Roles = "CAB")]
+    public async Task<ActionResult<ChangeRequestDto>> Approve(Guid id, CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
+
+        await _approvalService.CreateDecisionAsync(id, true, "Approved by CAB", userId.Value, cancellationToken);
+        return await Transition(id, ChangeStatus.Approved, cancellationToken);
+    }
+
+    [HttpPost("{id:guid}/reject")]
+    [Authorize(Roles = "CAB")]
+    public async Task<ActionResult<ChangeRequestDto>> Reject(Guid id, CancellationToken cancellationToken)
+    {
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
+
+        await _approvalService.CreateDecisionAsync(id, false, "Rejected by CAB", userId.Value, cancellationToken);
+        return await Transition(id, ChangeStatus.Rejected, cancellationToken);
+    }
+
+    [HttpPost("{id:guid}/start")]
+    public async Task<ActionResult<ChangeRequestDto>> Start(Guid id, CancellationToken cancellationToken)
+    {
+        var change = await _changeService.GetByIdAsync(id, cancellationToken);
+        var userId = GetUserId();
+        if (change is null) return NotFound();
+        if (userId is null) return Unauthorized();
+        if (change.AssignedToUserId != userId) return Forbid();
+
+        return await Transition(id, ChangeStatus.InImplementation, cancellationToken);
+    }
+
+    [HttpPost("{id:guid}/complete")]
+    public Task<ActionResult<ChangeRequestDto>> Complete(Guid id, CancellationToken cancellationToken) => Transition(id, ChangeStatus.Completed, cancellationToken);
+
+    [HttpPost("{id:guid}/tasks")]
+    public async Task<ActionResult<object>> AddTask(Guid id, [FromBody] ChangeTaskCreateDto request, CancellationToken cancellationToken)
+    {
+        var task = await _taskService.CreateAsync(new ChangeTask
         {
-            ChangeRequestId = Guid.NewGuid(),
+            ChangeTaskId = Guid.NewGuid(),
+            ChangeId = id,
             Title = request.Title,
             Description = request.Description,
-            ChangeTypeId = changeTypeId,
-            PriorityId = priorityId,
-            StatusId = 1,
-            RiskLevelId = riskLevelId,
-            RequestedByUserId = requestedByUserId,
             AssignedToUserId = request.AssignedToUserId,
-            PlannedStart = request.PlannedStart,
-            PlannedEnd = request.PlannedEnd,
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = requestedByUserId
-        };
+            DueDate = request.DueDate
+        }, cancellationToken);
 
-        var created = await _changeService.CreateAsync(entity, cancellationToken);
-        _logger.LogInformation("Created change {ChangeRequestId}", created.ChangeRequestId);
-        return CreatedAtAction(nameof(GetChangeById), new { id = created.ChangeRequestId }, ToDto(created));
+        return Ok(new { task.ChangeTaskId, task.ChangeId, task.Title, task.Description, task.AssignedToUserId, task.DueDate, task.CompletedDate });
     }
 
-    [HttpPut("{id}")]
-    public async Task<ActionResult<ChangeRequestDto>> UpdateChange(string id, [FromBody] ChangeUpdateDto request, CancellationToken cancellationToken)
+    [HttpPost("{id:guid}/attachments")]
+    public async Task<ActionResult<object>> AddAttachment(Guid id, [FromForm] AttachmentUploadDto request, CancellationToken cancellationToken)
     {
-        if (!TryParseId(id, out var guidResult, out var badRequest)) return badRequest;
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
 
-        var existing = await _changeService.GetByIdAsync(guidResult, cancellationToken);
-        if (existing is null) return NotFound();
+        var result = await _attachmentService.UploadAsync(id, request.File, userId.Value, cancellationToken);
+        if (result.Attachment is null) return BadRequest(result.Error);
 
-        existing.Title = string.IsNullOrWhiteSpace(request.Title) ? existing.Title : request.Title;
-        existing.Description = string.IsNullOrWhiteSpace(request.Description) ? existing.Description : request.Description;
-        existing.ChangeTypeId = request.ChangeTypeId > 0 ? request.ChangeTypeId : existing.ChangeTypeId;
-        existing.PriorityId = request.PriorityId > 0 ? request.PriorityId : existing.PriorityId;
-        existing.StatusId = request.StatusId > 0 ? request.StatusId : existing.StatusId;
-        existing.RiskLevelId = request.RiskLevelId > 0 ? request.RiskLevelId : existing.RiskLevelId;
-        existing.AssignedToUserId = request.AssignedToUserId;
-        existing.PlannedStart = request.PlannedStart;
-        existing.PlannedEnd = request.PlannedEnd;
-        existing.ActualStart = request.ActualStart;
-        existing.ActualEnd = request.ActualEnd;
-        existing.UpdatedAt = DateTime.UtcNow;
-        existing.UpdatedBy = request.UpdatedBy == Guid.Empty ? existing.UpdatedBy : request.UpdatedBy;
-
-        var updated = await _changeService.UpdateAsync(existing, cancellationToken);
-        _logger.LogInformation("Updated change {ChangeRequestId}", existing.ChangeRequestId);
-        return Ok(ToDto(updated!));
-    }
-
-    [HttpPost("{id}/submit")]
-    public async Task<ActionResult<ChangeRequestDto>> SubmitForApproval(string id, [FromQuery] Guid actorUserId, CancellationToken cancellationToken)
-    {
-        if (!TryParseId(id, out var guidResult, out var badRequest)) return badRequest;
-
-        if (actorUserId != Guid.Empty &&
-            !await _dbContext.Users.AnyAsync(user => user.UserId == actorUserId, cancellationToken))
+        return Ok(new
         {
-            return BadRequest($"actorUserId '{actorUserId}' does not exist in cm.User.");
-        }
-
-        var existing = await _changeService.GetByIdAsync(guidResult, cancellationToken);
-        if (existing is null) return NotFound();
-
-        existing.StatusId = 2;
-        existing.UpdatedAt = DateTime.UtcNow;
-        existing.UpdatedBy = actorUserId;
-
-        var updated = await _changeService.UpdateAsync(existing, cancellationToken);
-        await _audit.LogAsync(3, actorUserId, "system@local", "cm", "ChangeRequest", existing.ChangeRequestId, existing.ChangeNumber.ToString(), "Submit", "Submitted for approval", cancellationToken);
-        _logger.LogInformation("Submitted change {ChangeRequestId}", existing.ChangeRequestId);
-        return Ok(ToDto(updated!));
+            result.Attachment.ChangeAttachmentId,
+            result.Attachment.ChangeId,
+            result.Attachment.FileName,
+            result.Attachment.ContentType,
+            result.Attachment.FileSizeBytes,
+            result.Attachment.UploadedAt
+        });
     }
 
-    private bool TryParseId(string id, out Guid guidResult, out BadRequestObjectResult badRequest)
+    private async Task<ActionResult<ChangeRequestDto>> Transition(Guid id, ChangeStatus status, CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(id, out guidResult))
-        {
-            _logger.LogWarning("Invalid change id received: {Id}", id);
-            badRequest = BadRequest(new { message = "Invalid change request id." });
-            return false;
-        }
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
 
-        badRequest = null!;
-        return true;
+        var result = await _changeService.TransitionAsync(id, status, userId.Value, cancellationToken);
+        if (result.Change is null) return BadRequest(result.Error);
+        return Ok(ToDto(result.Change));
+    }
+
+    private Guid? GetUserId()
+    {
+        var raw = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(raw, out var userId) ? userId : null;
     }
 
     private static ChangeRequestDto ToDto(ChangeRequest change) => new()
     {
-        Id = change.ChangeRequestId,
-        ChangeRequestId = change.ChangeRequestId,
+        ChangeId = change.ChangeId,
         ChangeNumber = change.ChangeNumber,
         Title = change.Title,
         Description = change.Description,
-        ChangeTypeId = change.ChangeTypeId,
-        PriorityId = change.PriorityId,
-        StatusId = change.StatusId,
-        RiskLevelId = change.RiskLevelId,
-        Status = change.Status?.Name,
-        Priority = change.Priority?.Name,
-        RiskLevel = change.RiskLevel?.Name,
-        RequestedBy = change.RequestedByUser?.Upn,
-        PlannedStart = change.PlannedStart,
-        PlannedEnd = change.PlannedEnd,
+        ChangeType = change.ChangeType,
+        RiskLevel = change.RiskLevel,
+        Status = change.Status,
+        ImpactDescription = change.ImpactDescription,
+        RollbackPlan = change.RollbackPlan,
+        ImplementationDate = change.ImplementationDate,
+        ImplementationStartDate = change.ImplementationStartDate,
+        CompletedDate = change.CompletedDate,
+        CreatedByUserId = change.CreatedByUserId,
+        AssignedToUserId = change.AssignedToUserId,
+        ApprovedDate = change.ApprovedDate,
         CreatedAt = change.CreatedAt,
         UpdatedAt = change.UpdatedAt
     };
-
-    private async Task<int> ResolveChangeTypeIdAsync(ChangeCreateDto request, CancellationToken cancellationToken)
-    {
-        if (request.ChangeTypeId.HasValue && request.ChangeTypeId.Value > 0) return request.ChangeTypeId.Value;
-        if (!string.IsNullOrWhiteSpace(request.ChangeType))
-        {
-            var normalized = request.ChangeType.Trim().ToLowerInvariant();
-            var mapped = await _dbContext.ChangeTypes.Where(x => x.Name.ToLower() == normalized).Select(x => x.ChangeTypeId).FirstOrDefaultAsync(cancellationToken);
-            if (mapped > 0) return mapped;
-        }
-
-        return 2;
-    }
-
-    private async Task<int> ResolvePriorityIdAsync(ChangeCreateDto request, CancellationToken cancellationToken)
-    {
-        if (request.PriorityId.HasValue && request.PriorityId.Value > 0) return request.PriorityId.Value;
-        if (!string.IsNullOrWhiteSpace(request.Priority))
-        {
-            var normalized = request.Priority.Trim().ToLowerInvariant();
-            var mapped = await _dbContext.ChangePriorities
-                .Where(x => x.Name.ToLower() == normalized || (normalized == "p1" && x.Name == "Critical") || (normalized == "p2" && x.Name == "High") || (normalized == "p3" && x.Name == "Medium") || (normalized == "p4" && x.Name == "Low"))
-                .Select(x => x.PriorityId)
-                .FirstOrDefaultAsync(cancellationToken);
-            if (mapped > 0) return mapped;
-        }
-
-        return 2;
-    }
-
-    private async Task<int> ResolveRiskLevelIdAsync(ChangeCreateDto request, CancellationToken cancellationToken)
-    {
-        if (request.RiskLevelId.HasValue && request.RiskLevelId.Value > 0) return request.RiskLevelId.Value;
-        if (!string.IsNullOrWhiteSpace(request.RiskLevel))
-        {
-            var normalized = request.RiskLevel.Trim().ToLowerInvariant();
-            var mapped = await _dbContext.RiskLevels.Where(x => x.Name.ToLower() == normalized).Select(x => x.RiskLevelId).FirstOrDefaultAsync(cancellationToken);
-            if (mapped > 0) return mapped;
-        }
-
-        return 2;
-    }
-
-    private async Task<Guid> ResolveRequestedByUserIdAsync(ChangeCreateDto request, CancellationToken cancellationToken)
-    {
-        if (request.RequestedByUserId.HasValue && request.RequestedByUserId.Value != Guid.Empty)
-        {
-            var existing = await _dbContext.Users.AnyAsync(user => user.UserId == request.RequestedByUserId.Value, cancellationToken);
-            if (existing) return request.RequestedByUserId.Value;
-        }
-
-        if (!string.IsNullOrWhiteSpace(request.RequestedBy))
-        {
-            var existingByUpn = await _dbContext.Users.Where(user => user.Upn == request.RequestedBy).Select(user => user.UserId).FirstOrDefaultAsync(cancellationToken);
-            if (existingByUpn != Guid.Empty) return existingByUpn;
-        }
-
-        var fallbackId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-        var fallbackExists = await _dbContext.Users.AnyAsync(user => user.UserId == fallbackId, cancellationToken);
-        if (!fallbackExists)
-        {
-            _dbContext.Users.Add(new User { UserId = fallbackId, Upn = "system@local", DisplayName = "System User", Role = "Admin", IsActive = true, PasswordHash = string.Empty });
-            await _dbContext.SaveChangesAsync(cancellationToken);
-        }
-
-        return fallbackId;
-    }
 }

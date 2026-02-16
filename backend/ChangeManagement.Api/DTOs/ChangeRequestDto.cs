@@ -1,22 +1,24 @@
+using ChangeManagement.Api.Domain.Entities;
+
 namespace ChangeManagement.Api.DTOs;
 
 public class ChangeRequestDto
 {
-    public Guid Id { get; set; }
-    public Guid ChangeRequestId { get; set; }
+    public Guid ChangeId { get; set; }
     public int ChangeNumber { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
-    public int ChangeTypeId { get; set; }
-    public int PriorityId { get; set; }
-    public int StatusId { get; set; }
-    public int RiskLevelId { get; set; }
-    public string? Status { get; set; }
-    public string? Priority { get; set; }
-    public string? RiskLevel { get; set; }
-    public string? RequestedBy { get; set; }
-    public DateTime? PlannedStart { get; set; }
-    public DateTime? PlannedEnd { get; set; }
+    public ChangeType ChangeType { get; set; }
+    public RiskLevel RiskLevel { get; set; }
+    public ChangeStatus Status { get; set; }
+    public string ImpactDescription { get; set; } = string.Empty;
+    public string RollbackPlan { get; set; } = string.Empty;
+    public DateTime? ImplementationDate { get; set; }
+    public DateTime? ImplementationStartDate { get; set; }
+    public DateTime? CompletedDate { get; set; }
+    public Guid CreatedByUserId { get; set; }
+    public Guid? AssignedToUserId { get; set; }
+    public DateTime? ApprovedDate { get; set; }
     public DateTime CreatedAt { get; set; }
-    public DateTime? UpdatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }

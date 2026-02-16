@@ -7,17 +7,25 @@ public interface IChangeTaskService
 {
     Task<List<ChangeTask>> GetByChangeAsync(Guid changeId, CancellationToken cancellationToken);
     Task<ChangeTask> CreateAsync(ChangeTask task, CancellationToken cancellationToken);
-    Task<ChangeTask?> UpdateAsync(ChangeTask task, CancellationToken cancellationToken);
-    Task<bool> DeleteAsync(Guid taskId, CancellationToken cancellationToken);
 }
 
 public class ChangeTaskService : IChangeTaskService
 {
     private readonly IChangeTaskRepository _repository;
-    public ChangeTaskService(IChangeTaskRepository repository) => _repository = repository;
+    private readonly IAuditService _audit;
+
+    public ChangeTaskService(IChangeTaskRepository repository, IAuditService audit)
+    {
+        _repository = repository;
+        _audit = audit;
+    }
 
     public Task<List<ChangeTask>> GetByChangeAsync(Guid changeId, CancellationToken cancellationToken) => _repository.GetByChangeIdAsync(changeId, cancellationToken);
-    public Task<ChangeTask> CreateAsync(ChangeTask task, CancellationToken cancellationToken) => _repository.CreateAsync(task, cancellationToken);
-    public Task<ChangeTask?> UpdateAsync(ChangeTask task, CancellationToken cancellationToken) => _repository.UpdateAsync(task, cancellationToken);
-    public Task<bool> DeleteAsync(Guid taskId, CancellationToken cancellationToken) => _repository.DeleteAsync(taskId, cancellationToken);
+
+    public async Task<ChangeTask> CreateAsync(ChangeTask task, CancellationToken cancellationToken)
+    {
+        var created = await _repository.CreateAsync(task, cancellationToken);
+        await _audit.LogAsync(task.AssignedToUserId ?? Guid.Empty, "TaskCreated", task.Title, task.ChangeId, cancellationToken);
+        return created;
+    }
 }

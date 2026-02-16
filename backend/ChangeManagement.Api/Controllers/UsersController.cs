@@ -21,14 +21,7 @@ public class UsersController : ControllerBase
     public async Task<ActionResult<IEnumerable<UserAdminDto>>> List(CancellationToken cancellationToken)
     {
         var users = await _dbContext.Users.OrderBy(x => x.Upn).ToListAsync(cancellationToken);
-        return Ok(users.Select(x => new UserAdminDto
-        {
-            Id = x.UserId,
-            Upn = x.Upn,
-            DisplayName = x.DisplayName,
-            Role = x.Role,
-            IsActive = x.IsActive
-        }));
+        return Ok(users.Select(ToDto));
     }
 
     [HttpPost]
@@ -52,27 +45,39 @@ public class UsersController : ControllerBase
         _dbContext.Users.Add(user);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return Ok(new UserAdminDto { Id = user.UserId, Upn = user.Upn, DisplayName = user.DisplayName, Role = user.Role, IsActive = user.IsActive });
+        return Ok(ToDto(user));
     }
 
-    [HttpPut("{id}")]
-    public async Task<ActionResult<UserAdminDto>> Update(string id, [FromBody] UpdateUserDto request, CancellationToken cancellationToken)
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<UserAdminDto>> Update(Guid id, [FromBody] UpdateUserDto request, CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(id, out var userId))
-        {
-            return BadRequest("Invalid user id.");
-        }
-
-        var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
-        if (user is null)
-        {
-            return NotFound();
-        }
+        var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.UserId == id, cancellationToken);
+        if (user is null) return NotFound();
 
         user.Role = request.Role.Trim();
         user.IsActive = request.IsActive;
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return Ok(new UserAdminDto { Id = user.UserId, Upn = user.Upn, DisplayName = user.DisplayName, Role = user.Role, IsActive = user.IsActive });
+        return Ok(ToDto(user));
     }
+
+    [HttpPost("{id:guid}/reset-password")]
+    public async Task<IActionResult> ResetPassword(Guid id, [FromBody] ResetPasswordDto request, CancellationToken cancellationToken)
+    {
+        var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.UserId == id, cancellationToken);
+        if (user is null) return NotFound();
+
+        user.PasswordHash = PasswordHasher.Hash(request.NewPassword);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(new { message = "Password reset." });
+    }
+
+    private static UserAdminDto ToDto(User user) => new()
+    {
+        Id = user.UserId,
+        Upn = user.Upn,
+        DisplayName = user.DisplayName,
+        Role = user.Role,
+        IsActive = user.IsActive
+    };
 }

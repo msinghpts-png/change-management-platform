@@ -1,20 +1,6 @@
-import type {
-  AppUser,
-  Approval,
-  ApprovalStatus,
-  Attachment,
-  ChangeCreateDto,
-  ChangeRequest,
-  ChangeTask,
-  ChangeUpdateDto,
-  DashboardStats,
-  DatabaseBackup,
-  DatabaseStatus
-} from "../types/change";
+import type { AppUser, Attachment, AuditLog, ChangeCreateDto, ChangeRequest, ChangeTask, ChangeUpdateDto } from "../types/change";
 
 const API_BASE_URL = "/api";
-
-const isValidId = (value?: string | null): value is string => Boolean(value && value !== "undefined" && value !== "null");
 
 const withAuth = (headers?: HeadersInit): HeadersInit => {
   const token = localStorage.getItem("authToken");
@@ -35,115 +21,65 @@ const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
   return response.json() as Promise<T>;
 };
 
-const normalizeChange = (item: any): ChangeRequest => ({
-  id: item.id ?? item.changeRequestId,
-  changeNumber: item.changeNumber ? `CHG-${String(item.changeNumber).padStart(6, "0")}` : undefined,
-  title: item.title,
-  description: item.description,
-  status: item.status ?? "Draft",
-  priority: item.priority ?? "P3",
-  riskLevel: item.riskLevel,
-  requestedBy: item.requestedBy,
-  plannedStart: item.plannedStart,
-  plannedEnd: item.plannedEnd,
-  createdAt: item.createdAt,
-  updatedAt: item.updatedAt
-});
-
 export const apiClient = {
-  isValidId,
-  getChanges: async () => (await request<any[]>("/changes")).map(normalizeChange),
-  getChangeById: async (id: string) => {
-    if (!isValidId(id)) throw new Error("Invalid change id");
-    return normalizeChange(await request<any>(`/changes/${id}`));
-  },
-  getApprovals: async (changeId: string) => {
-    if (!isValidId(changeId)) return [] as Approval[];
-    return request<Approval[]>(`/changes/${changeId}/approvals`);
-  },
-  getAttachments: async (changeId: string) => {
-    if (!isValidId(changeId)) return [] as Attachment[];
-    return request<Attachment[]>(`/changes/${changeId}/attachments`);
-  },
-  getTasks: async (changeId: string) => {
-    if (!isValidId(changeId)) return [] as ChangeTask[];
-    return request<ChangeTask[]>(`/changes/${changeId}/tasks`);
-  },
-
-  createChange: async (payload: ChangeCreateDto) => normalizeChange(await request<any>("/changes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    })),
-
-  createApproval: (changeId: string, payload: { approver: string; comment?: string }) =>
-    request<Approval>(`/changes/${changeId}/approvals`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ approverUserId: payload.approver, comments: payload.comment ?? "" })
-    }),
-
-  submitChange: (changeId: string) =>
-    request<ChangeRequest>(`/changes/${changeId}/submit`, {
-      method: "POST"
-    }),
-
-  updateChange: async (id: string, payload: ChangeUpdateDto) => normalizeChange(await request<any>(`/changes/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    })),
-
-  decideApproval: (changeId: string, approvalId: string, payload: { status: ApprovalStatus; comment?: string }) =>
-    request<Approval>(`/changes/${changeId}/approvals/${approvalId}/decision`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ approvalStatusId: payload.status === "Approved" ? 2 : payload.status === "Rejected" ? 3 : 1, comments: payload.comment ?? "" })
-    }),
-
-  uploadAttachment: async (changeId: string, file: File): Promise<Attachment> => {
+  getChanges: () => request<ChangeRequest[]>("/changes"),
+  getChangeById: (id: string) => request<ChangeRequest>(`/changes/${id}`),
+  createChange: (payload: ChangeCreateDto) => request<ChangeRequest>("/changes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  }),
+  updateChange: (id: string, payload: ChangeUpdateDto) => request<ChangeRequest>(`/changes/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  }),
+  submitChange: (id: string) => request<ChangeRequest>(`/changes/${id}/submit`, { method: "POST" }),
+  approveChange: (id: string) => request<ChangeRequest>(`/changes/${id}/approve`, { method: "POST" }),
+  rejectChange: (id: string) => request<ChangeRequest>(`/changes/${id}/reject`, { method: "POST" }),
+  startChange: (id: string) => request<ChangeRequest>(`/changes/${id}/start`, { method: "POST" }),
+  completeChange: (id: string) => request<ChangeRequest>(`/changes/${id}/complete`, { method: "POST" }),
+  addTask: (id: string, payload: { title: string; description: string; dueDate?: string }) => request<ChangeTask>(`/changes/${id}/tasks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  }),
+  getTasks: (id: string) => request<ChangeTask[]>(`/changes/${id}/tasks`),
+  getAttachments: (id: string) => request<Attachment[]>(`/changes/${id}/attachments`),
+  uploadAttachment: async (id: string, file: File): Promise<Attachment> => {
     const form = new FormData();
     form.append("file", file);
 
-    const response = await fetch(`${API_BASE_URL}/changes/${changeId}/attachments`, {
+    const response = await fetch(`${API_BASE_URL}/changes/${id}/attachments`, {
       method: "POST",
       body: form,
       headers: withAuth()
     });
 
-    if (!response.ok) {
-      throw new Error(`Request failed: ${response.status}`);
-    }
-
-    return (await response.json()) as Attachment;
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+    return response.json() as Promise<Attachment>;
   },
 
-  deleteAttachment: async (changeId: string, attachmentId: string): Promise<void> => {
-    await request<void>(`/changes/${changeId}/attachments/${attachmentId}`, { method: "DELETE" });
-  },
-
-  getDashboardStats: () => request<DashboardStats>("/dashboard"),
-  getDatabaseStatus: () => request<DatabaseStatus>("/admin/database/status"),
-  exportDatabase: () => request<DatabaseBackup[]>("/admin/database/backups"),
-  importDatabase: (_file: File) => Promise.resolve(),
-  runMigrations: () => request<{ message: string }>("/admin/database/migrate", { method: "POST" }),
-  seedDatabase: () => Promise.resolve(),
-
-  login: (upn: string, password: string) => request<{ token: string; user: AppUser }>("/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ upn, password })
-    }),
-
+  getAuditLogs: () => request<AuditLog[]>("/admin/audit"),
   getUsers: () => request<AppUser[]>("/admin/users"),
   createUser: (payload: { upn: string; displayName: string; role: string; password: string }) => request<AppUser>("/admin/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    }),
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  }),
   updateUser: (id: string, payload: { role: string; isActive: boolean }) => request<AppUser>(`/admin/users/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    })
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  }),
+  resetPassword: (id: string, newPassword: string) => request<{ message: string }>(`/admin/users/${id}/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ newPassword })
+  }),
+  login: (upn: string, password: string) => request<{ token: string; user: AppUser }>("/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ upn, password })
+  })
 };

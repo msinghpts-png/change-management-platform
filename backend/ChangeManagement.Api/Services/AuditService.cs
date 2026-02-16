@@ -1,11 +1,13 @@
 using ChangeManagement.Api.Data;
 using ChangeManagement.Api.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace ChangeManagement.Api.Services;
 
 public interface IAuditService
 {
-    Task LogAsync(int eventTypeId, Guid actorUserId, string actorUpn, string entitySchema, string entityName, Guid entityId, string changeNumber, string reason, string details, CancellationToken cancellationToken);
+    Task LogAsync(Guid actorUserId, string action, string details, Guid? changeId, CancellationToken cancellationToken);
+    Task<List<AuditLog>> ListAsync(CancellationToken cancellationToken);
 }
 
 public class AuditService : IAuditService
@@ -13,23 +15,21 @@ public class AuditService : IAuditService
     private readonly ChangeManagementDbContext _dbContext;
     public AuditService(ChangeManagementDbContext dbContext) => _dbContext = dbContext;
 
-    public async Task LogAsync(int eventTypeId, Guid actorUserId, string actorUpn, string entitySchema, string entityName, Guid entityId, string changeNumber, string reason, string details, CancellationToken cancellationToken)
+    public async Task LogAsync(Guid actorUserId, string action, string details, Guid? changeId, CancellationToken cancellationToken)
     {
-        _dbContext.AuditEvents.Add(new AuditEvent
+        _dbContext.AuditLogs.Add(new AuditLog
         {
-            AuditEventId = Guid.NewGuid(),
-            EventTypeId = eventTypeId,
-            EventAt = DateTime.UtcNow,
+            AuditLogId = Guid.NewGuid(),
+            ChangeId = changeId,
             ActorUserId = actorUserId,
-            ActorUpn = actorUpn,
-            EntitySchema = entitySchema,
-            EntityName = entityName,
-            EntityId = entityId,
-            ChangeNumber = changeNumber,
-            Reason = reason,
-            Details = details
+            Action = action,
+            Details = details,
+            CreatedAt = DateTime.UtcNow
         });
 
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public Task<List<AuditLog>> ListAsync(CancellationToken cancellationToken) =>
+        _dbContext.AuditLogs.AsNoTracking().OrderByDescending(x => x.CreatedAt).ToListAsync(cancellationToken);
 }
