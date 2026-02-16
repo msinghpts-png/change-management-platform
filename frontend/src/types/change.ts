@@ -80,6 +80,7 @@ export type ChangeRequest = {
   changeNumber?: string;
   title: string;
   description: string;
+  changeTypeId?: number;
   status: ChangeRequestStatus;
   priority: ChangePriority;
   riskLevel?: RiskLevel;
@@ -101,6 +102,7 @@ export type ChangeRequest = {
 export type ChangeCreateDto = {
   title: string;
   description: string;
+  changeTypeId?: number;
   priority?: ChangePriority;
   riskLevel?: RiskLevel;
   impactLevel?: ImpactLevel;
@@ -111,6 +113,7 @@ export type ChangeCreateDto = {
 export type ChangeUpdateDto = {
   title?: string;
   description?: string;
+  changeTypeId?: number;
   priority?: ChangePriority;
   riskLevel?: RiskLevel;
   impactLevel?: ImpactLevel;
