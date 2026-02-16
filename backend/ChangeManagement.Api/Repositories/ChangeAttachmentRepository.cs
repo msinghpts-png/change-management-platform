@@ -10,16 +10,21 @@ public class ChangeAttachmentRepository : IChangeAttachmentRepository
     public ChangeAttachmentRepository(ChangeManagementDbContext dbContext) => _dbContext = dbContext;
 
     public Task<List<ChangeAttachment>> GetByChangeIdAsync(Guid changeRequestId, CancellationToken cancellationToken) =>
-        _dbContext.ChangeAttachments.Where(a => a.ChangeRequestId == changeRequestId).ToListAsync(cancellationToken);
+        _dbContext.ChangeAttachments
+            .Include(a => a.UploadedByUser)
+            .Where(a => a.ChangeRequestId == changeRequestId)
+            .ToListAsync(cancellationToken);
 
     public Task<ChangeAttachment?> GetByIdAsync(Guid attachmentId, CancellationToken cancellationToken) =>
-        _dbContext.ChangeAttachments.FirstOrDefaultAsync(a => a.ChangeAttachmentId == attachmentId, cancellationToken);
+        _dbContext.ChangeAttachments
+            .Include(a => a.UploadedByUser)
+            .FirstOrDefaultAsync(a => a.ChangeAttachmentId == attachmentId, cancellationToken);
 
     public async Task<ChangeAttachment> CreateAsync(ChangeAttachment attachment, CancellationToken cancellationToken)
     {
         _dbContext.ChangeAttachments.Add(attachment);
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return attachment;
+        return await GetByIdAsync(attachment.ChangeAttachmentId, cancellationToken) ?? attachment;
     }
 
     public async Task<bool> DeleteAsync(Guid attachmentId, CancellationToken cancellationToken)

@@ -10,16 +10,17 @@ public class ChangeRepository : IChangeRepository
 
     public ChangeRepository(ChangeManagementDbContext dbContext) => _dbContext = dbContext;
 
-    public Task<List<ChangeRequest>> GetAllAsync(CancellationToken cancellationToken) => _dbContext.ChangeRequests.AsNoTracking().ToListAsync(cancellationToken);
+    public Task<List<ChangeRequest>> GetAllAsync(CancellationToken cancellationToken) =>
+        BaseQuery().AsNoTracking().ToListAsync(cancellationToken);
 
     public Task<ChangeRequest?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
-        _dbContext.ChangeRequests.FirstOrDefaultAsync(c => c.ChangeRequestId == id, cancellationToken);
+        BaseQuery().FirstOrDefaultAsync(c => c.ChangeRequestId == id, cancellationToken);
 
     public async Task<ChangeRequest> CreateAsync(ChangeRequest changeRequest, CancellationToken cancellationToken)
     {
         _dbContext.ChangeRequests.Add(changeRequest);
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return changeRequest;
+        return await GetByIdAsync(changeRequest.ChangeRequestId, cancellationToken) ?? changeRequest;
     }
 
     public async Task<ChangeRequest?> UpdateAsync(ChangeRequest changeRequest, CancellationToken cancellationToken)
@@ -29,6 +30,17 @@ public class ChangeRepository : IChangeRepository
 
         _dbContext.Entry(existing).CurrentValues.SetValues(changeRequest);
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return existing;
+        return await GetByIdAsync(changeRequest.ChangeRequestId, cancellationToken);
     }
+
+    private IQueryable<ChangeRequest> BaseQuery() => _dbContext.ChangeRequests
+        .Include(c => c.ChangeType)
+        .Include(c => c.Priority)
+        .Include(c => c.Status)
+        .Include(c => c.RiskLevel)
+        .Include(c => c.RequestedByUser)
+        .Include(c => c.AssignedToUser)
+        .Include(c => c.ChangeApprovals)
+        .Include(c => c.ChangeAttachments)
+        .Include(c => c.ChangeTasks);
 }

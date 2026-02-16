@@ -53,16 +53,19 @@ const ChangeListPage = () => {
   const nav = useNavigate();
   const [items, setItems] = useState<ChangeRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("All");
   const [myOnly, setMyOnly] = useState(false);
 
   useEffect(() => {
+    setLoading(true);
     apiClient
       .getChanges()
       .then((data) => setItems(data ?? []))
-      .catch((err: Error) => setError(err.message));
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoading(false));
   }, []);
 
   const filtered = useMemo(() => {
@@ -104,6 +107,7 @@ const ChangeListPage = () => {
       </div>
 
       {error ? <div className="card card-pad" style={{ borderColor: "rgba(220,38,38,.35)" }}>{error}</div> : null}
+      {loading ? <div className="card card-pad">Loading…</div> : null}
 
       <div className="card card-pad">
         <div className="searchbar">

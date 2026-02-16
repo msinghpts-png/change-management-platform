@@ -2,6 +2,7 @@ namespace ChangeManagement.Api.DTOs;
 
 public class ChangeRequestDto
 {
+    public Guid Id { get; set; }
     public Guid ChangeRequestId { get; set; }
     public int ChangeNumber { get; set; }
     public string Title { get; set; } = string.Empty;
@@ -10,4 +11,12 @@ public class ChangeRequestDto
     public int PriorityId { get; set; }
     public int StatusId { get; set; }
     public int RiskLevelId { get; set; }
+    public string? Status { get; set; }
+    public string? Priority { get; set; }
+    public string? RiskLevel { get; set; }
+    public string? RequestedBy { get; set; }
+    public DateTime? PlannedStart { get; set; }
+    public DateTime? PlannedEnd { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
 }

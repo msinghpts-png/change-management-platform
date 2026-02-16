@@ -18,6 +18,40 @@ export type Attachment = {
   uploadedAt: string;
 };
 
+export type ChangeTask = {
+  id: string;
+  changeRequestId: string;
+  title: string;
+  description?: string;
+  status?: string;
+  dueAt?: string;
+  completedAt?: string;
+};
+
+export type AppUser = {
+  id: string;
+  upn: string;
+  displayName: string;
+  role: string;
+  isActive: boolean;
+};
+
+
+export type DatabaseStatus = {
+  databaseName: string;
+  totalChanges: number;
+  totalApprovals: number;
+  totalAttachments: number;
+  hasPendingMigrations: boolean;
+  pendingMigrations: string[];
+};
+
+export type DatabaseBackup = {
+  fileName: string;
+  createdAt: string;
+  sizeBytes: number;
+};
+
 export type DashboardStats = {
   totalChanges: number;
   pendingApprovals: number;

@@ -34,6 +34,7 @@ const DashboardPage = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [changes, setChanges] = useState<ChangeRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     Promise.all([apiClient.getDashboardStats(), apiClient.getChanges()])
@@ -72,6 +73,7 @@ const DashboardPage = () => {
       </div>
 
       {error ? <div className="card card-pad" style={{ borderColor: "rgba(220,38,38,.35)" }}>{error}</div> : null}
+      {loading ? <div className="card card-pad">Loading…</div> : null}
 
       <div className="grid grid-4">
         <div className="card card-pad">

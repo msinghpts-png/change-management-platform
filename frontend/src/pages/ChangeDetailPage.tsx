@@ -63,7 +63,8 @@ const ChangeDetailPage = () => {
   const nav = useNavigate();
   const { id } = useParams();
 
-  const isNew = !id;
+  const hasValidId = apiClient.isValidId(id);
+  const isNew = !hasValidId;
 
   const [tab, setTab] = useState<ViewTab>("Overview");
   const [formTab, setFormTab] = useState<FormTab>("Basic Info");
@@ -101,6 +102,7 @@ const ChangeDetailPage = () => {
 
 
   const refreshRelatedData = async (changeId: string) => {
+    if (!apiClient.isValidId(changeId)) return;
     const [nextApprovals, nextAttachments] = await Promise.all([
       apiClient.getApprovals(changeId),
       apiClient.getAttachments(changeId)
@@ -112,6 +114,10 @@ const ChangeDetailPage = () => {
 
   useEffect(() => {
     if (!id) return;
+    if (!apiClient.isValidId(id)) {
+      setError("Invalid change request id.");
+      return;
+    }
 
     setLoading(true);
     apiClient
@@ -130,7 +136,6 @@ const ChangeDetailPage = () => {
       })
       .catch((err: Error) => {
         setError(err.message);
-        refreshRelatedData(id).catch(() => void 0);
         setLoading(false);
       });
   }, [id]);
@@ -178,7 +183,7 @@ const ChangeDetailPage = () => {
         };
         const created = await apiClient.createChange(payload);
         nav(`/changes/${created.id}`);
-      } else if (id) {
+      } else if (apiClient.isValidId(id)) {
         const payload: ChangeUpdateDto = {
           title,
           description: compiledDescription,
@@ -200,11 +205,14 @@ const ChangeDetailPage = () => {
   };
 
   const submitForApproval = async () => {
-    if (!id && isNew) {
+    if (!apiClient.isValidId(id) && isNew) {
       await saveDraft();
       return;
     }
-    if (!id) return;
+    if (!apiClient.isValidId(id)) {
+      setError("Invalid change request id.");
+      return;
+    }
 
     setError(null);
     setLoading(true);
@@ -238,7 +246,10 @@ const ChangeDetailPage = () => {
   };
 
   const decideApproval = async (approvalId: string, status: ApprovalStatus) => {
-    if (!id) return;
+    if (!apiClient.isValidId(id)) {
+      setError("Invalid change request id.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {

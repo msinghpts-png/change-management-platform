@@ -1,9 +1,11 @@
 import type {
+  AppUser,
   Approval,
   ApprovalStatus,
   Attachment,
   ChangeCreateDto,
   ChangeRequest,
+  ChangeTask,
   ChangeUpdateDto,
   DashboardStats,
   DatabaseBackup,
@@ -12,34 +14,73 @@ import type {
 
 const API_BASE_URL = "/api";
 
+const isValidId = (value?: string | null): value is string => Boolean(value && value !== "undefined" && value !== "null");
+
+const withAuth = (headers?: HeadersInit): HeadersInit => {
+  const token = localStorage.getItem("authToken");
+  return token ? { ...headers, Authorization: `Bearer ${token}` } : headers ?? {};
+};
+
 const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
-  const response = await fetch(`${API_BASE_URL}${path}`, options);
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: withAuth(options?.headers)
+  });
 
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status}`);
   }
 
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 };
 
-export const apiClient = {
-  getChanges: () => request<ChangeRequest[]>("/changes"),
-  getChangeById: (id: string) => request<ChangeRequest>(`/changes/${id}`),
-  getApprovals: (changeId: string) => request<Approval[]>(`/changes/${changeId}/approvals`),
-  getAttachments: (changeId: string) => request<Attachment[]>(`/changes/${changeId}/attachments`),
+const normalizeChange = (item: any): ChangeRequest => ({
+  id: item.id ?? item.changeRequestId,
+  changeNumber: item.changeNumber ? `CHG-${String(item.changeNumber).padStart(6, "0")}` : undefined,
+  title: item.title,
+  description: item.description,
+  status: item.status ?? "Draft",
+  priority: item.priority ?? "P3",
+  riskLevel: item.riskLevel,
+  requestedBy: item.requestedBy,
+  plannedStart: item.plannedStart,
+  plannedEnd: item.plannedEnd,
+  createdAt: item.createdAt,
+  updatedAt: item.updatedAt
+});
 
-  createChange: (payload: ChangeCreateDto) =>
-    request<ChangeRequest>("/changes", {
+export const apiClient = {
+  isValidId,
+  getChanges: async () => (await request<any[]>("/changes")).map(normalizeChange),
+  getChangeById: async (id: string) => {
+    if (!isValidId(id)) throw new Error("Invalid change id");
+    return normalizeChange(await request<any>(`/changes/${id}`));
+  },
+  getApprovals: async (changeId: string) => {
+    if (!isValidId(changeId)) return [] as Approval[];
+    return request<Approval[]>(`/changes/${changeId}/approvals`);
+  },
+  getAttachments: async (changeId: string) => {
+    if (!isValidId(changeId)) return [] as Attachment[];
+    return request<Attachment[]>(`/changes/${changeId}/attachments`);
+  },
+  getTasks: async (changeId: string) => {
+    if (!isValidId(changeId)) return [] as ChangeTask[];
+    return request<ChangeTask[]>(`/changes/${changeId}/tasks`);
+  },
+
+  createChange: async (payload: ChangeCreateDto) => normalizeChange(await request<any>("/changes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
-    }),
+    })),
 
   createApproval: (changeId: string, payload: { approver: string; comment?: string }) =>
     request<Approval>(`/changes/${changeId}/approvals`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ approverUserId: payload.approver, comments: payload.comment ?? "" })
     }),
 
   submitChange: (changeId: string) =>
@@ -47,18 +88,17 @@ export const apiClient = {
       method: "POST"
     }),
 
-  updateChange: (id: string, payload: ChangeUpdateDto) =>
-    request<ChangeRequest>(`/changes/${id}`, {
+  updateChange: async (id: string, payload: ChangeUpdateDto) => normalizeChange(await request<any>(`/changes/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
-    }),
+    })),
 
   decideApproval: (changeId: string, approvalId: string, payload: { status: ApprovalStatus; comment?: string }) =>
     request<Approval>(`/changes/${changeId}/approvals/${approvalId}/decision`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ approvalStatusId: payload.status === "Approved" ? 2 : payload.status === "Rejected" ? 3 : 1, comments: payload.comment ?? "" })
     }),
 
   uploadAttachment: async (changeId: string, file: File): Promise<Attachment> => {
@@ -67,7 +107,8 @@ export const apiClient = {
 
     const response = await fetch(`${API_BASE_URL}/changes/${changeId}/attachments`, {
       method: "POST",
-      body: form
+      body: form,
+      headers: withAuth()
     });
 
     if (!response.ok) {
@@ -78,14 +119,31 @@ export const apiClient = {
   },
 
   deleteAttachment: async (changeId: string, attachmentId: string): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/changes/${changeId}/attachments/${attachmentId}`, {
-      method: "DELETE"
-    });
-
-    if (!response.ok) {
-      throw new Error(`Request failed: ${response.status}`);
-    }
+    await request<void>(`/changes/${changeId}/attachments/${attachmentId}`, { method: "DELETE" });
   },
 
-  getDashboardStats: () => request<DashboardStats>("/dashboard")
+  getDashboardStats: () => request<DashboardStats>("/dashboard"),
+  getDatabaseStatus: () => request<DatabaseStatus>("/admin/database/status"),
+  exportDatabase: () => request<DatabaseBackup[]>("/admin/database/backups"),
+  importDatabase: (_file: File) => Promise.resolve(),
+  runMigrations: () => request<{ message: string }>("/admin/database/migrate", { method: "POST" }),
+  seedDatabase: () => Promise.resolve(),
+
+  login: (upn: string, password: string) => request<{ token: string; user: AppUser }>("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ upn, password })
+    }),
+
+  getUsers: () => request<AppUser[]>("/admin/users"),
+  createUser: (payload: { upn: string; displayName: string; role: string; password: string }) => request<AppUser>("/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }),
+  updateUser: (id: string, payload: { role: string; isActive: boolean }) => request<AppUser>(`/admin/users/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
 };
