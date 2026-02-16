@@ -184,16 +184,10 @@ public class ChangesController : ControllerBase
             return BadRequest(new { message = "Only Draft changes can be submitted for approval." });
         }
 
-        var validationError = ValidateSubmitRequirements(existing);
-        if (!string.IsNullOrEmpty(validationError))
+        var submitValidationError = ValidateSubmitRequirements(existing);
+        if (!string.IsNullOrEmpty(submitValidationError))
         {
-            return BadRequest(new { message = validationError });
-        }
-
-        var validationError = ValidateSubmitRequirements(existing);
-        if (!string.IsNullOrEmpty(validationError))
-        {
-            return BadRequest(new { message = validationError });
+            return BadRequest(new { message = submitValidationError });
         }
 
         existing.StatusId = 2;
