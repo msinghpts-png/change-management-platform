@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.StaticFiles;
 using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.Repositories;
 
