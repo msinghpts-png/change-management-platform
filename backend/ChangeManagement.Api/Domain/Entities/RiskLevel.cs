@@ -1,10 +1,9 @@
 namespace ChangeManagement.Api.Domain.Entities;
 
-public class RiskLevel
+public enum RiskLevel
 {
-    public int RiskLevelId { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public int Score { get; set; }
-
-    public ICollection<ChangeRequest> ChangeRequests { get; set; } = new List<ChangeRequest>();
+    Low = 1,
+    Medium = 2,
+    High = 3,
+    Critical = 4
 }

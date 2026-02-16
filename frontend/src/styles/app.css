@@ -297,3 +297,7 @@ a:hover{ text-decoration: none; }
   text-align: center;
   color: var(--muted);
 }
+
+.pill-darkred{ background:#7f1d1d; border-color:#7f1d1d; color:#fff; }
+.pill-orange{ background:#ffedd5; border-color:#fb923c; color:#9a3412; }
+.pill-darkgreen{ background:#14532d; border-color:#14532d; color:#fff; }

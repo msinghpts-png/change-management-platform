@@ -1,11 +1,12 @@
 namespace ChangeManagement.Api.Domain.Entities;
 
-public class ChangeStatus
+public enum ChangeStatus
 {
-    public int StatusId { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public bool IsTerminal { get; set; }
-
-    public ICollection<ChangeRequest> ChangeRequests { get; set; } = new List<ChangeRequest>();
-    public ICollection<ChangeTask> ChangeTasks { get; set; } = new List<ChangeTask>();
+    Draft = 1,
+    Submitted = 2,
+    Approved = 3,
+    Rejected = 4,
+    InImplementation = 5,
+    Completed = 6,
+    Closed = 7
 }
