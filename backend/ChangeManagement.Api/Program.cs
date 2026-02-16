@@ -7,6 +7,7 @@ using ChangeManagement.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,7 +17,14 @@ builder.Services.AddDbContext<ChangeManagementDbContext>(options => options.UseS
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Change Management API",
+        Version = "v1"
+    });
+});
 
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "local-dev-super-secret-key-change-me";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "ChangeManagement.Api";

@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using ChangeManagement.Api.Data;
+using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.DTOs.Auth;
 using ChangeManagement.Api.Security;
 using Microsoft.AspNetCore.Mvc;
@@ -37,7 +38,7 @@ public class AuthController : ControllerBase
             return Unauthorized("Invalid credentials.");
         }
 
-        var token = CreateToken(user.UserId, user.Upn, user.Role);
+        var token = CreateToken(user);
         return Ok(new LoginResponseDto
         {
             Token = token,
@@ -45,24 +46,30 @@ public class AuthController : ControllerBase
         });
     }
 
-    private string CreateToken(Guid userId, string upn, string role)
+    private string CreateToken(ChangeManagement.Api.Domain.Entities.User user)
     {
-        var key = _configuration["Jwt:Key"] ?? "local-dev-super-secret-key-change-me";
-        var issuer = _configuration["Jwt:Issuer"] ?? "ChangeManagement.Api";
-        var audience = _configuration["Jwt:Audience"] ?? "ChangeManagement.Frontend";
-        var creds = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)), SecurityAlgorithms.HmacSha256);
+        var jwtSecret = _configuration["Jwt:Key"] ?? "local-dev-super-secret-key-change-me";
+        var jwtIssuer = _configuration["Jwt:Issuer"] ?? "ChangeManagement.Api";
+        var jwtAudience = _configuration["Jwt:Audience"] ?? "ChangeManagement.Frontend";
+
+        var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+            new Claim(ClaimTypes.Email, user.Upn),
+            new Claim(ClaimTypes.Name, user.DisplayName),
+            new Claim(ClaimTypes.Role, user.Role)
+        };
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
-            issuer: issuer,
-            audience: audience,
-            claims:
-            [
-                new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
-                new Claim(JwtRegisteredClaimNames.Upn, upn),
-                new Claim(ClaimTypes.Role, role)
-            ],
+            issuer: jwtIssuer,
+            audience: jwtAudience,
+            claims: claims,
             expires: DateTime.UtcNow.AddHours(8),
-            signingCredentials: creds);
+            signingCredentials: creds
+        );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
