@@ -178,6 +178,7 @@ const ChangeDetailPage = () => {
       .getChangeById(id)
       .then((data) => {
         setItem(data);
+        const descriptionBlob = data.description ?? "";
         setTitle(data.title ?? "");
         setDescription(data.description ?? "");
         setBusinessJustification(data.businessJustification ?? "");
