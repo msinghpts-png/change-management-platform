@@ -179,6 +179,16 @@ public class ChangesController : ControllerBase
 
         var existing = await _changeService.GetByIdAsync(guidResult, cancellationToken);
         if (existing is null) return NotFound();
+        if (existing.StatusId != 1)
+        {
+            return BadRequest(new { message = "Only Draft changes can be submitted for approval." });
+        }
+
+        var validationError = ValidateSubmitRequirements(existing);
+        if (!string.IsNullOrEmpty(validationError))
+        {
+            return BadRequest(new { message = validationError });
+        }
 
         var validationError = ValidateSubmitRequirements(existing);
         if (!string.IsNullOrEmpty(validationError))

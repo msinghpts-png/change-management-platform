@@ -155,6 +155,7 @@ const ChangeDetailPage = () => {
     rollbackPlan.trim()
   );
 
+
   const refreshRelatedData = async (changeId: string) => {
     if (!apiClient.isValidId(changeId)) return;
     const [nextApprovals, nextAttachments] = await Promise.all([
@@ -218,6 +219,20 @@ const ChangeDetailPage = () => {
 
     return parts.join("\n");
   }, [description, businessJustification, implementationSteps, backoutPlan, service, category, environment, downtimeRequired]);
+
+
+  const isDirty = Boolean(
+    isNew ||
+    !item ||
+    title !== (item.title ?? "") ||
+    compiledDescription !== (item.description ?? "") ||
+    changeTypeId !== (item.changeTypeId ?? 2) ||
+    priority !== (item.priority ?? "P3") ||
+    riskLevel !== (item.riskLevel ?? "Medium") ||
+    impactLevel !== (item.impactLevel ?? "Medium") ||
+    plannedStart !== (item.plannedStart ? item.plannedStart.slice(0, 16) : "") ||
+    plannedEnd !== (item.plannedEnd ? item.plannedEnd.slice(0, 16) : "")
+  );
 
   const applyTemplate = (tplId: string) => {
     setTemplateId(tplId);
@@ -285,12 +300,13 @@ const ChangeDetailPage = () => {
   const submitForApproval = async () => {
     setError(null);
 
-    const savedId = await saveDraft({ navigateOnCreate: false });
-    if (!apiClient.isValidId(savedId)) {
-      return;
+    let targetId = id;
+    if (isDirty) {
+      targetId = await saveDraft({ navigateOnCreate: false });
+      if (!apiClient.isValidId(targetId)) {
+        return;
+      }
     }
-
-    const targetId = savedId;
 
     if (!apiClient.isValidId(targetId)) {
       setError("Invalid change request id.");
@@ -299,7 +315,8 @@ const ChangeDetailPage = () => {
 
     setLoading(true);
     try {
-      await apiClient.submitChange(targetId);
+      const submitted = await apiClient.submitChange(targetId);
+      setItem(submitted);
       const refreshed = await apiClient.getChangeById(targetId);
       setItem(refreshed);
       await refreshRelatedData(targetId);
