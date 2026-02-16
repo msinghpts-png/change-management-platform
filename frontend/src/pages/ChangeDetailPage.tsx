@@ -101,6 +101,19 @@ const ChangeDetailPage = () => {
 
   const [templateId, setTemplateId] = useState("");
 
+  const changeTypeId = changeType === "Standard" ? 1 : changeType === "Emergency" ? 3 : 2;
+  const implementationDate = plannedStart;
+  const impactDescription = description;
+  const rollbackPlan = backoutPlan;
+
+  const isSubmitReady = Boolean(
+    title.trim() &&
+    changeTypeId &&
+    riskLevel &&
+    implementationDate &&
+    impactDescription.trim() &&
+    rollbackPlan.trim()
+  );
 
   const refreshRelatedData = async (changeId: string) => {
     if (!apiClient.isValidId(changeId)) return;
@@ -177,7 +190,7 @@ const ChangeDetailPage = () => {
         const payload: ChangeCreateDto = {
           title,
           description: compiledDescription,
-          changeTypeId: changeType === "Standard" ? 1 : changeType === "Emergency" ? 3 : 2,
+          changeTypeId,
           priority,
           riskLevel,
           impactLevel,
@@ -190,7 +203,7 @@ const ChangeDetailPage = () => {
         const payload: ChangeUpdateDto = {
           title,
           description: compiledDescription,
-          changeTypeId: changeType === "Standard" ? 1 : changeType === "Emergency" ? 3 : 2,
+          changeTypeId,
           priority,
           riskLevel,
           impactLevel,
@@ -466,7 +479,7 @@ const ChangeDetailPage = () => {
             <button className="btn" onClick={saveDraft} disabled={loading}>
               💾 Save Draft
             </button>
-            <button className="btn btn-primary" onClick={submitForApproval} disabled={loading || !title.trim()}>
+            <button className="btn btn-primary" onClick={submitForApproval} disabled={loading || !isSubmitReady}>
               ✈ Submit for Approval
             </button>
           </div>
