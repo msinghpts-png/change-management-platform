@@ -16,6 +16,12 @@ public class ChangeRequest
     public DateTime? PlannedEnd { get; set; }
     public DateTime? ActualStart { get; set; }
     public DateTime? ActualEnd { get; set; }
+    public string? ImplementationSteps { get; set; }
+    public string? BackoutPlan { get; set; }
+    public string? ServiceSystem { get; set; }
+    public string? Category { get; set; }
+    public string? Environment { get; set; }
+    public string? BusinessJustification { get; set; }
     public DateTime CreatedAt { get; set; }
     public Guid CreatedBy { get; set; }
     public DateTime? UpdatedAt { get; set; }

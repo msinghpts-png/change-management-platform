@@ -6,12 +6,12 @@ using Xunit;
 
 namespace ChangeManagement.Api.Tests.Scenarios;
 
-public class AuditEventTests : IClassFixture<TestWebApplicationFactory>
+public class AuditEventTests : IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly TestWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _client;
 
-    public AuditEventTests(TestWebApplicationFactory factory)
+    public AuditEventTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
         _client = factory.CreateClient();
