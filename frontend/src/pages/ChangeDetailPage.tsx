@@ -238,7 +238,6 @@ const ChangeDetailPage = () => {
     plannedEnd !== (item.plannedEnd ? item.plannedEnd.slice(0, 16) : "")
   );
 
-
   const applyTemplate = (tplId: string) => {
     setTemplateId(tplId);
     const tpl = templates.find((t) => t.id === tplId);
