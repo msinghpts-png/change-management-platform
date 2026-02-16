@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.Repositories;
+using Microsoft.AspNetCore.Http;
 
 namespace ChangeManagement.Api.Services;
 
@@ -15,11 +17,13 @@ public class ChangeService : IChangeService
 {
     private readonly IChangeRepository _repository;
     private readonly IAuditService _audit;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public ChangeService(IChangeRepository repository, IAuditService audit)
+    public ChangeService(IChangeRepository repository, IAuditService audit, IHttpContextAccessor httpContextAccessor)
     {
         _repository = repository;
         _audit = audit;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public Task<List<ChangeRequest>> GetAllAsync(CancellationToken cancellationToken) => _repository.GetAllAsync(cancellationToken);
@@ -27,6 +31,10 @@ public class ChangeService : IChangeService
 
     public async Task<ChangeRequest> CreateAsync(ChangeRequest changeRequest, CancellationToken cancellationToken)
     {
+        var actorUserId = ResolveActorUserId();
+        changeRequest.CreatedAt = DateTime.UtcNow;
+        changeRequest.CreatedBy = actorUserId;
+
         var created = await _repository.CreateAsync(changeRequest, cancellationToken);
         await _audit.LogAsync(1, created.CreatedBy, "system@local", "cm", "ChangeRequest", created.ChangeRequestId, created.ChangeNumber.ToString(), "Create", created.Title, cancellationToken);
         return created;
@@ -34,6 +42,8 @@ public class ChangeService : IChangeService
 
     public async Task<ChangeRequest?> UpdateAsync(ChangeRequest changeRequest, CancellationToken cancellationToken)
     {
+        changeRequest.UpdatedAt = DateTime.UtcNow;
+
         var updated = await _repository.UpdateAsync(changeRequest, cancellationToken);
         if (updated is not null)
         {
@@ -41,5 +51,18 @@ public class ChangeService : IChangeService
         }
 
         return updated;
+    }
+
+    private Guid ResolveActorUserId()
+    {
+        var user = _httpContextAccessor.HttpContext?.User;
+        var rawValue = user?.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (Guid.TryParse(rawValue, out var userId) && userId != Guid.Empty)
+        {
+            return userId;
+        }
+
+        return Guid.Parse("11111111-1111-1111-1111-111111111111");
     }
 }
