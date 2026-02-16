@@ -9,6 +9,9 @@ public class User
     public string PasswordHash { get; set; } = string.Empty;
     public bool IsActive { get; set; }
 
-    public ICollection<ChangeRequest> CreatedChanges { get; set; } = new List<ChangeRequest>();
+    public ICollection<ChangeRequest> RequestedChanges { get; set; } = new List<ChangeRequest>();
     public ICollection<ChangeRequest> AssignedChanges { get; set; } = new List<ChangeRequest>();
+    public ICollection<ChangeTask> AssignedTasks { get; set; } = new List<ChangeTask>();
+    public ICollection<ChangeApproval> Approvals { get; set; } = new List<ChangeApproval>();
+    public ICollection<ChangeAttachment> UploadedAttachments { get; set; } = new List<ChangeAttachment>();
 }

@@ -10,10 +10,9 @@ public static class AttachmentMappings
         return new AttachmentDto
         {
             ChangeAttachmentId = attachment.ChangeAttachmentId,
-            ChangeId = attachment.ChangeId,
+            ChangeRequestId = attachment.ChangeRequestId,
             FileName = attachment.FileName,
-            ContentType = attachment.ContentType,
-            FileSizeBytes = attachment.FileSizeBytes,
+            FileUrl = attachment.FileUrl,
             UploadedAt = attachment.UploadedAt
         };
     }

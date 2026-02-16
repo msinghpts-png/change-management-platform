@@ -14,27 +14,31 @@ public class ChangeRepository : IChangeRepository
         BaseQuery().AsNoTracking().ToListAsync(cancellationToken);
 
     public Task<ChangeRequest?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
-        BaseQuery().FirstOrDefaultAsync(c => c.ChangeId == id, cancellationToken);
+        BaseQuery().FirstOrDefaultAsync(c => c.ChangeRequestId == id, cancellationToken);
 
     public async Task<ChangeRequest> CreateAsync(ChangeRequest changeRequest, CancellationToken cancellationToken)
     {
         _dbContext.ChangeRequests.Add(changeRequest);
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return await GetByIdAsync(changeRequest.ChangeId, cancellationToken) ?? changeRequest;
+        return await GetByIdAsync(changeRequest.ChangeRequestId, cancellationToken) ?? changeRequest;
     }
 
     public async Task<ChangeRequest?> UpdateAsync(ChangeRequest changeRequest, CancellationToken cancellationToken)
     {
-        var existing = await _dbContext.ChangeRequests.FirstOrDefaultAsync(c => c.ChangeId == changeRequest.ChangeId, cancellationToken);
+        var existing = await _dbContext.ChangeRequests.FirstOrDefaultAsync(c => c.ChangeRequestId == changeRequest.ChangeRequestId, cancellationToken);
         if (existing is null) return null;
 
         _dbContext.Entry(existing).CurrentValues.SetValues(changeRequest);
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return await GetByIdAsync(changeRequest.ChangeId, cancellationToken);
+        return await GetByIdAsync(changeRequest.ChangeRequestId, cancellationToken);
     }
 
     private IQueryable<ChangeRequest> BaseQuery() => _dbContext.ChangeRequests
-        .Include(c => c.CreatedByUser)
+        .Include(c => c.ChangeType)
+        .Include(c => c.Priority)
+        .Include(c => c.Status)
+        .Include(c => c.RiskLevel)
+        .Include(c => c.RequestedByUser)
         .Include(c => c.AssignedToUser)
         .Include(c => c.ChangeApprovals)
         .Include(c => c.ChangeAttachments)

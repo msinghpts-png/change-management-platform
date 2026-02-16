@@ -1,64 +1,31 @@
-export type ChangeType = "Standard" | "Emergency";
-export type RiskLevel = "Low" | "Medium" | "High" | "Critical";
-export type ChangeStatus = "Draft" | "Submitted" | "Approved" | "Rejected" | "InImplementation" | "Completed" | "Closed";
+export type ApprovalStatus = "Pending" | "Approved" | "Rejected";
 
-export type ChangeRequest = {
-  changeId: string;
-  changeNumber: number;
-  title: string;
-  description: string;
-  changeType: ChangeType;
-  riskLevel: RiskLevel;
-  status: ChangeStatus;
-  impactDescription: string;
-  rollbackPlan: string;
-  implementationDate?: string;
-  implementationStartDate?: string;
-  completedDate?: string;
-  assignedToUserId?: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type ChangeCreateDto = {
-  title: string;
-  description: string;
-  changeType?: ChangeType;
-  riskLevel?: RiskLevel;
-  implementationDate?: string;
-  impactDescription: string;
-  rollbackPlan: string;
-  assignedToUserId?: string;
-};
-
-export type ChangeUpdateDto = Partial<ChangeCreateDto>;
-
-export type ChangeTask = {
-  changeTaskId: string;
-  changeId: string;
-  title: string;
-  description: string;
-  assignedToUserId?: string;
-  dueDate?: string;
-  completedDate?: string;
+export type Approval = {
+  id: string;
+  changeRequestId: string;
+  approver: string;
+  status: ApprovalStatus;
+  comment?: string;
+  decisionAt?: string;
 };
 
 export type Attachment = {
-  changeAttachmentId: string;
-  changeId: string;
+  id: string;
+  changeRequestId: string;
   fileName: string;
   contentType: string;
-  fileSizeBytes: number;
+  sizeBytes: number;
   uploadedAt: string;
 };
 
-export type AuditLog = {
-  auditLogId: string;
-  changeId?: string;
-  actorUserId: string;
-  action: string;
-  details: string;
-  createdAt: string;
+export type ChangeTask = {
+  id: string;
+  changeRequestId: string;
+  title: string;
+  description?: string;
+  status?: string;
+  dueAt?: string;
+  completedAt?: string;
 };
 
 export type AppUser = {
@@ -67,4 +34,92 @@ export type AppUser = {
   displayName: string;
   role: string;
   isActive: boolean;
+};
+
+
+export type DatabaseStatus = {
+  databaseName: string;
+  totalChanges: number;
+  totalApprovals: number;
+  totalAttachments: number;
+  hasPendingMigrations: boolean;
+  pendingMigrations: string[];
+};
+
+export type DatabaseBackup = {
+  fileName: string;
+  createdAt: string;
+  sizeBytes: number;
+};
+
+export type DashboardStats = {
+  totalChanges: number;
+  pendingApprovals: number;
+  scheduledThisWeek: number;
+  completedThisMonth: number;
+  inImplementation?: number;
+  emergencyChanges?: number;
+};
+
+export type ChangeRequestStatus =
+  | "Draft"
+  | "PendingApproval"
+  | "Approved"
+  | "InProgress"
+  | "Completed"
+  | "Closed"
+  | "Rejected"
+  | string;
+
+export type ChangePriority = "P1" | "P2" | "P3" | "P4" | string;
+export type RiskLevel = "Low" | "Medium" | "High" | string;
+export type ImpactLevel = "Low" | "Medium" | "High" | string;
+
+export type ChangeRequest = {
+  id: string;
+  changeNumber?: string;
+  title: string;
+  description: string;
+  status: ChangeRequestStatus;
+  priority: ChangePriority;
+  riskLevel?: RiskLevel;
+  impactLevel?: ImpactLevel;
+  category?: string;
+  environment?: string;
+  service?: string;
+  requestedBy?: string;
+  plannedStart?: string;
+  plannedEnd?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  approvalsTotal?: number;
+  approvalsApproved?: number;
+  approvalsRejected?: number;
+  approvalsPending?: number;
+};
+
+export type ChangeCreateDto = {
+  title: string;
+  description: string;
+  priority?: ChangePriority;
+  riskLevel?: RiskLevel;
+  impactLevel?: ImpactLevel;
+  plannedStart?: string;
+  plannedEnd?: string;
+};
+
+export type ChangeUpdateDto = {
+  title?: string;
+  description?: string;
+  priority?: ChangePriority;
+  riskLevel?: RiskLevel;
+  impactLevel?: ImpactLevel;
+  plannedStart?: string;
+  plannedEnd?: string;
+  status?: ChangeRequestStatus;
+};
+
+export type ApprovalDecisionDto = {
+  status: ApprovalStatus;
+  comment?: string;
 };
