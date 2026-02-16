@@ -166,6 +166,7 @@ const ChangeDetailPage = () => {
       .getChangeById(id)
       .then((data) => {
         setItem(data);
+        const descriptionBlob = data.description ?? "";
         setTitle(data.title ?? "");
         setDescription(data.description ?? "");
         setBusinessJustification(data.businessJustification ?? "");
@@ -209,6 +210,20 @@ const ChangeDetailPage = () => {
     plannedEnd !== (item.plannedEnd ? item.plannedEnd.slice(0, 16) : "")
   );
 
+
+
+  const isDirty = Boolean(
+    isNew ||
+    !item ||
+    title !== (item.title ?? "") ||
+    compiledDescription !== (item.description ?? "") ||
+    changeTypeId !== (item.changeTypeId ?? 2) ||
+    priority !== (item.priority ?? "P3") ||
+    riskLevel !== (item.riskLevel ?? "Medium") ||
+    impactLevel !== (item.impactLevel ?? "Medium") ||
+    plannedStart !== (item.plannedStart ? item.plannedStart.slice(0, 16) : "") ||
+    plannedEnd !== (item.plannedEnd ? item.plannedEnd.slice(0, 16) : "")
+  );
 
   const applyTemplate = (tplId: string) => {
     setTemplateId(tplId);
