@@ -5,6 +5,7 @@ using ChangeManagement.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace ChangeManagement.Api.Controllers;
 
@@ -222,6 +223,45 @@ public class ChangesController : ControllerBase
         if (string.IsNullOrWhiteSpace(change.BackoutPlan)) return "RollbackPlan is required before submit.";
 
         return null;
+    }
+
+
+    [HttpPost("{id}/approve")]
+    public async Task<ActionResult<ChangeRequestDto>> Approve(string id, [FromBody] ApprovalDecisionDto request, CancellationToken cancellationToken)
+    {
+        if (!User.IsInRole("CAB") && !User.IsInRole("Admin")) return Forbid();
+        if (!TryParseId(id, out var guidResult, out var badRequest)) return badRequest;
+
+        var actor = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(actor, out var actorUserId) || actorUserId == Guid.Empty)
+        {
+            return Unauthorized();
+        }
+
+        var approval = await _approvalService.ApproveChangeAsync(guidResult, actorUserId, request.Comments ?? string.Empty, cancellationToken);
+        if (approval is null) return NotFound();
+
+        var change = await _changeService.GetByIdAsync(guidResult, cancellationToken);
+        return change is null ? NotFound() : Ok(ToDto(change));
+    }
+
+    [HttpPost("{id}/reject")]
+    public async Task<ActionResult<ChangeRequestDto>> Reject(string id, [FromBody] ApprovalDecisionDto request, CancellationToken cancellationToken)
+    {
+        if (!User.IsInRole("CAB") && !User.IsInRole("Admin")) return Forbid();
+        if (!TryParseId(id, out var guidResult, out var badRequest)) return badRequest;
+
+        var actor = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(actor, out var actorUserId) || actorUserId == Guid.Empty)
+        {
+            return Unauthorized();
+        }
+
+        var approval = await _approvalService.RejectChangeAsync(guidResult, actorUserId, request.Comments ?? string.Empty, cancellationToken);
+        if (approval is null) return NotFound();
+
+        var change = await _changeService.GetByIdAsync(guidResult, cancellationToken);
+        return change is null ? NotFound() : Ok(ToDto(change));
     }
 
     private bool TryParseId(string id, out Guid guidResult, out BadRequestObjectResult badRequest)

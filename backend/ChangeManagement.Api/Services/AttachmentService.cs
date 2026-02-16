@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.StaticFiles;
 using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.Repositories;
 
@@ -14,6 +15,8 @@ public interface IAttachmentService
 
 public class AttachmentService : IAttachmentService
 {
+    private const long MaxFileBytes = 5 * 1024 * 1024;
+    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase) { ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".txt" };
     private readonly IChangeAttachmentRepository _attachmentRepository;
     private readonly IChangeRepository _changeRepository;
     private readonly IAuditService _audit;
@@ -38,11 +41,19 @@ public class AttachmentService : IAttachmentService
             return (null, "Change request not found.");
         }
 
-        var rootPath = Path.Combine(_environment.ContentRootPath, "App_Data", "attachments", changeId.ToString("N"));
+        if (file is null || file.Length == 0) return (null, "No file uploaded.");
+        if (file.Length > MaxFileBytes) return (null, "File exceeds 5MB limit.");
+
+        var extension = Path.GetExtension(file.FileName);
+        if (string.IsNullOrWhiteSpace(extension) || !AllowedExtensions.Contains(extension))
+        {
+            return (null, "File type is not allowed.");
+        }
+
+        var rootPath = Path.Combine("/data", "attachments", changeId.ToString());
         Directory.CreateDirectory(rootPath);
 
         var fileId = Guid.NewGuid();
-        var extension = Path.GetExtension(file.FileName);
         var storedPath = Path.Combine(rootPath, $"{fileId:N}{extension}");
 
         await using var stream = File.Create(storedPath);

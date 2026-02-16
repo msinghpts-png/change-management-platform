@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiClient } from "../services/apiClient";
-import type { Approval, ApprovalStatus, Attachment, ChangeCreateDto, ChangeRequest, ChangeUpdateDto } from "../types/change";
+import type { Approval, ApprovalStatus, Attachment, ChangeCreateDto, ChangeRequest, ChangeTask, ChangeUpdateDto } from "../types/change";
 
 type ViewTab = "Overview" | "Approvals" | "Tasks" | "Attachments";
 type FormTab = "Basic Info" | "Schedule" | "Plans" | "Risk & Impact";
@@ -103,6 +103,9 @@ const ChangeDetailPage = () => {
 
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [tasks, setTasks] = useState<ChangeTask[]>([]);
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
   const [approverEmail, setApproverEmail] = useState("");
   const [approvalComment, setApprovalComment] = useState("");
   const [decisionComment, setDecisionComment] = useState("");
@@ -142,16 +145,25 @@ const ChangeDetailPage = () => {
     rollbackPlan.trim()
   );
   const isSubmitDisabled = loading || !isSubmitReady;
+  const submitBlockers: string[] = [];
+  if (!title.trim()) submitBlockers.push("Title is required");
+  if (!changeTypeId) submitBlockers.push("Change Type is required");
+  if (!riskLevel) submitBlockers.push("Risk Level is required");
+  if (!implementationDate) submitBlockers.push("Implementation Date is required");
+  if (!impactDescription.trim()) submitBlockers.push("Impact Description is required");
+  if (!rollbackPlan.trim()) submitBlockers.push("Backout Plan is required");
 
   const refreshRelatedData = async (changeId: string) => {
     if (!apiClient.isValidId(changeId)) return;
-    const [nextApprovals, nextAttachments] = await Promise.all([
+    const [nextApprovals, nextAttachments, nextTasks] = await Promise.all([
       apiClient.getApprovals(changeId),
-      apiClient.getAttachments(changeId)
+      apiClient.getAttachments(changeId),
+      apiClient.getTasks(changeId)
     ]);
 
     setApprovals(nextApprovals ?? []);
     setAttachments(nextAttachments ?? []);
+    setTasks(nextTasks ?? []);
   };
 
   useEffect(() => {
@@ -349,6 +361,22 @@ const ChangeDetailPage = () => {
       const refreshed = await apiClient.getChangeById(id);
       setItem(refreshed);
       setDecisionComment("");
+      await refreshRelatedData(id);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addTask = async () => {
+    if (!apiClient.isValidId(id) || !taskTitle.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await apiClient.createTask(id, { title: taskTitle.trim(), description: taskDescription.trim(), statusId: 1 });
+      setTaskTitle("");
+      setTaskDescription("");
       await refreshRelatedData(id);
     } catch (e) {
       setError((e as Error).message);
@@ -558,6 +586,11 @@ const ChangeDetailPage = () => {
               ✈ Submit for Approval
             </button>
           </div>
+          {isSubmitDisabled && !loading && submitBlockers.length ? (
+            <div className="small" style={{ marginTop: 8, color: "#fca5a5" }}>
+              Missing required fields: {submitBlockers.join(", ")}
+            </div>
+          ) : null}
         </div>
       </div>
     );
@@ -697,6 +730,7 @@ const ChangeDetailPage = () => {
                   <div className="row-left">
                     <div className="h3">{approval.approver}</div>
                     <div className="small">{approval.comment ?? "No comment"}</div>
+                    <div className="small">{fmtDT(approval.decisionAt)}</div>
                   </div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <span className={pillForStatus(approval.status)}>{approval.status}</span>
@@ -716,7 +750,7 @@ const ChangeDetailPage = () => {
       {tab === "Attachments" ? (
         <div className="card card-pad">
           <div className="h3">Attachments</div>
-          <div className="small">Allowed: pdf, doc(x), xls(x), png, jpg. Max 10 MB.</div>
+          <div className="small">Allowed: pdf, doc(x), xls(x), png, jpg. Max 5 MB.</div>
           <input className="input" style={{ marginTop: 8 }} type="file" onChange={uploadAttachment} />
           <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
             {attachments.map((attachment) => (
@@ -734,8 +768,33 @@ const ChangeDetailPage = () => {
       ) : null}
 
       {tab === "Tasks" ? (
-        <div className="card">
-          <div className="empty">Tasks workflow can be wired next.</div>
+        <div className="grid" style={{ gap: 12 }}>
+          <div className="card card-pad">
+            <div className="h3">Add Task</div>
+            <div className="form-grid" style={{ marginTop: 8 }}>
+              <div><input className="input" placeholder="Task title" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} /></div>
+              <div><input className="input" placeholder="Task description" value={taskDescription} onChange={(e) => setTaskDescription(e.target.value)} /></div>
+            </div>
+            <div style={{ marginTop: 8 }}><button className="btn btn-primary" disabled={!taskTitle.trim() || loading} onClick={addTask}>Add Task</button></div>
+          </div>
+          <div className="card card-pad">
+            <div className="h3">Task List</div>
+            <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+              {tasks.map((task) => (
+                <div key={task.id} className="row">
+                  <div className="row-left">
+                    <div className="h3">{task.title}</div>
+                    <div className="small">{task.description ?? "No description"}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <span className={pillForStatus(task.status)}>{task.status ?? "Pending"}</span>
+                    <span className="small">Due: {fmtDT(task.dueAt)}</span>
+                  </div>
+                </div>
+              ))}
+              {!tasks.length ? <div className="empty">No tasks yet.</div> : null}
+            </div>
+          </div>
         </div>
       ) : null}
     </div>
