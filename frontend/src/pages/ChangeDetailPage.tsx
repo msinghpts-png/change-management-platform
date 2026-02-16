@@ -90,6 +90,7 @@ const ChangeDetailPage = () => {
   const [implementationSteps, setImplementationSteps] = useState("");
   const [backoutPlan, setBackoutPlan] = useState("");
 
+  const [changeType, setChangeType] = useState("Normal");
   const [priority, setPriority] = useState("P3");
   const [riskLevel, setRiskLevel] = useState("Medium");
   const [impactLevel, setImpactLevel] = useState("Medium");
@@ -100,6 +101,19 @@ const ChangeDetailPage = () => {
 
   const [templateId, setTemplateId] = useState("");
 
+  const changeTypeId = changeType === "Standard" ? 1 : changeType === "Emergency" ? 3 : 2;
+  const implementationDate = plannedStart;
+  const impactDescription = description;
+  const rollbackPlan = backoutPlan;
+
+  const isSubmitReady = Boolean(
+    title.trim() &&
+    changeTypeId &&
+    riskLevel &&
+    implementationDate &&
+    impactDescription.trim() &&
+    rollbackPlan.trim()
+  );
 
   const refreshRelatedData = async (changeId: string) => {
     if (!apiClient.isValidId(changeId)) return;
@@ -126,6 +140,7 @@ const ChangeDetailPage = () => {
         setItem(data);
         setTitle(data.title ?? "");
         setDescription(data.description ?? "");
+        setChangeType(data.changeTypeId === 1 ? "Standard" : data.changeTypeId === 3 ? "Emergency" : "Normal");
         setPriority(data.priority ?? "P3");
         setRiskLevel(data.riskLevel ?? "Medium");
         setImpactLevel(data.impactLevel ?? "Medium");
@@ -175,6 +190,7 @@ const ChangeDetailPage = () => {
         const payload: ChangeCreateDto = {
           title,
           description: compiledDescription,
+          changeTypeId,
           priority,
           riskLevel,
           impactLevel,
@@ -187,6 +203,7 @@ const ChangeDetailPage = () => {
         const payload: ChangeUpdateDto = {
           title,
           description: compiledDescription,
+          changeTypeId,
           priority,
           riskLevel,
           impactLevel,
@@ -350,10 +367,10 @@ const ChangeDetailPage = () => {
 
                 <div>
                   <div className="label">Change Type *</div>
-                  <select className="select" value="Normal" onChange={() => void 0}>
-                    <option>Normal</option>
-                    <option>Standard</option>
-                    <option>Emergency</option>
+                  <select className="select" value={changeType} onChange={(e) => setChangeType(e.target.value)}>
+                    <option value="Normal">Normal</option>
+                    <option value="Standard">Standard</option>
+                    <option value="Emergency">Emergency</option>
                   </select>
                 </div>
 
@@ -462,7 +479,7 @@ const ChangeDetailPage = () => {
             <button className="btn" onClick={saveDraft} disabled={loading}>
               💾 Save Draft
             </button>
-            <button className="btn btn-primary" onClick={submitForApproval} disabled={loading || !title.trim()}>
+            <button className="btn btn-primary" onClick={submitForApproval} disabled={loading || !isSubmitReady}>
               ✈ Submit for Approval
             </button>
           </div>

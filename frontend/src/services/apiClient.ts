@@ -40,6 +40,7 @@ const normalizeChange = (item: any): ChangeRequest => ({
   changeNumber: item.changeNumber ? `CHG-${String(item.changeNumber).padStart(6, "0")}` : undefined,
   title: item.title,
   description: item.description,
+  changeTypeId: item.changeTypeId,
   status: item.status ?? "Draft",
   priority: item.priority ?? "P3",
   riskLevel: item.riskLevel,
