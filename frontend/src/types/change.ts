@@ -103,6 +103,8 @@ export type ChangeCreateDto = {
   title: string;
   description: string;
   changeTypeId?: number;
+  priorityId?: number;
+  riskLevelId?: number;
   priority?: ChangePriority;
   riskLevel?: RiskLevel;
   impactLevel?: ImpactLevel;
@@ -114,6 +116,8 @@ export type ChangeUpdateDto = {
   title?: string;
   description?: string;
   changeTypeId?: number;
+  priorityId?: number;
+  riskLevelId?: number;
   priority?: ChangePriority;
   riskLevel?: RiskLevel;
   impactLevel?: ImpactLevel;
