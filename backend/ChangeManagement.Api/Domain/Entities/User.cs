@@ -6,6 +6,7 @@ public class User
     public string Upn { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string Role { get; set; } = string.Empty;
+    public string PasswordHash { get; set; } = string.Empty;
     public bool IsActive { get; set; }
 
     public ICollection<ChangeRequest> RequestedChanges { get; set; } = new List<ChangeRequest>();

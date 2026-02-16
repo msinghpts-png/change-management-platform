@@ -1,7 +1,13 @@
+using System.Text;
 using ChangeManagement.Api.Data;
+using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.Repositories;
+using ChangeManagement.Api.Security;
 using ChangeManagement.Api.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +16,37 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<ChangeManagementDbContext>(options => options.UseSqlServer(connectionString));
 
 builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Change Management API",
+        Version = "v1"
+    });
+});
+
+var jwtKey = builder.Configuration["Jwt:Key"] ?? "local-dev-super-secret-key-change-me";
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "ChangeManagement.Api";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "ChangeManagement.Frontend";
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+        };
+    });
+
+builder.Services.AddAuthorization();
+
 builder.Services.AddScoped<IChangeRepository, ChangeRepository>();
 builder.Services.AddScoped<IChangeService, ChangeService>();
 builder.Services.AddScoped<IApprovalRepository, ApprovalRepository>();
@@ -25,10 +62,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ChangeManagementDbContext>();
-    var isSqlite = string.Equals(
-        dbContext.Database.ProviderName,
-        "Microsoft.EntityFrameworkCore.Sqlite",
-        StringComparison.Ordinal);
+    var isSqlite = string.Equals(dbContext.Database.ProviderName, "Microsoft.EntityFrameworkCore.Sqlite", StringComparison.Ordinal);
 
     var discoveredMigrations = dbContext.Database.GetMigrations().ToList();
     if (discoveredMigrations.Count == 0)
@@ -36,41 +70,33 @@ using (var scope = app.Services.CreateScope())
         throw new InvalidOperationException("No EF Core migrations were discovered. Ensure migration attributes and assembly scanning are configured correctly.");
     }
 
-    if (isSqlite)
-    {
-        dbContext.Database.EnsureCreated();
-    }
-    else
-    {
-        dbContext.Database.Migrate();
-    }
+    if (isSqlite) dbContext.Database.EnsureCreated(); else dbContext.Database.Migrate();
 
-    var missingTables = isSqlite
-        ? dbContext.Database.SqlQueryRaw<string>(@"
-SELECT required.TableName
-FROM (VALUES
-('ChangeRequest'),('ChangeTask'),('ChangeApproval'),('ChangeAttachment'),('[User]'),
-('Event'),('EventType'),
-('ChangeType'),('ChangePriority'),('ChangeStatus'),('RiskLevel'),('ApprovalStatus')
-) AS required(TableName)
-WHERE NOT EXISTS (
-    SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = REPLACE(REPLACE(required.TableName, '[', ''), ']', '')
-);").ToList()
-        : dbContext.Database.SqlQueryRaw<string>(@"
-SELECT required.TableName
-FROM (VALUES
-('cm.ChangeRequest'),('cm.ChangeTask'),('cm.ChangeApproval'),('cm.ChangeAttachment'),('cm.[User]'),
-('audit.Event'),('audit.EventType'),
-('ref.ChangeType'),('ref.ChangePriority'),('ref.ChangeStatus'),('ref.RiskLevel'),('ref.ApprovalStatus')
-) AS required(TableName)
-WHERE OBJECT_ID(required.TableName, 'U') IS NULL;").ToList();
-
-    if (missingTables.Count > 0)
+    var adminUpn = app.Configuration["SeedAdmin:Upn"] ?? "admin@local";
+    var adminPassword = app.Configuration["SeedAdmin:Password"] ?? "Admin123!";
+    if (!dbContext.Users.Any())
     {
-        throw new InvalidOperationException($"Database validation failed. Missing required tables: {string.Join(", ", missingTables)}");
+        dbContext.Users.Add(new User
+        {
+            UserId = Guid.NewGuid(),
+            Upn = adminUpn,
+            DisplayName = "Local Administrator",
+            Role = "Admin",
+            IsActive = true,
+            PasswordHash = PasswordHasher.Hash(adminPassword)
+        });
+        dbContext.SaveChanges();
     }
 }
 
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 app.Run();
 

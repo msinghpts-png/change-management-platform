@@ -1,7 +1,9 @@
+using ChangeManagement.Api.Data;
 using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.DTOs;
 using ChangeManagement.Api.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace ChangeManagement.Api.Controllers;
 
@@ -10,8 +12,13 @@ namespace ChangeManagement.Api.Controllers;
 public class ApprovalsController : ControllerBase
 {
     private readonly IApprovalService _approvalService;
+    private readonly ChangeManagementDbContext _dbContext;
 
-    public ApprovalsController(IApprovalService approvalService) => _approvalService = approvalService;
+    public ApprovalsController(IApprovalService approvalService, ChangeManagementDbContext dbContext)
+    {
+        _approvalService = approvalService;
+        _dbContext = dbContext;
+    }
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<ChangeApproval>>> GetApprovals(Guid changeId, CancellationToken cancellationToken)
@@ -20,11 +27,22 @@ public class ApprovalsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ChangeApproval>> CreateApproval(Guid changeId, [FromBody] ApprovalCreateDto request, CancellationToken cancellationToken)
     {
+        var approverUserId = request.ApproverUserId ?? Guid.Empty;
+        if (approverUserId == Guid.Empty && !string.IsNullOrWhiteSpace(request.Approver))
+        {
+            approverUserId = await _dbContext.Users.Where(x => x.Upn == request.Approver).Select(x => x.UserId).FirstOrDefaultAsync(cancellationToken);
+        }
+
+        if (approverUserId == Guid.Empty)
+        {
+            return BadRequest("Approver user could not be resolved.");
+        }
+
         var approval = new ChangeApproval
         {
             ChangeApprovalId = Guid.NewGuid(),
             ChangeRequestId = changeId,
-            ApproverUserId = request.ApproverUserId,
+            ApproverUserId = approverUserId,
             ApprovalStatusId = 1,
             Comments = request.Comments
         };
