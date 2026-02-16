@@ -3,6 +3,7 @@ using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.DTOs;
 using ChangeManagement.Api.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChangeManagement.Api.Controllers;
@@ -131,9 +132,7 @@ public class ChangesController : ControllerBase
             RequestedByUserId = requestedByUserId,
             AssignedToUserId = request.AssignedToUserId,
             PlannedStart = request.PlannedStart,
-            PlannedEnd = request.PlannedEnd,
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = requestedByUserId
+            PlannedEnd = request.PlannedEnd
         };
 
         var created = await _changeService.CreateAsync(entity, cancellationToken);
@@ -160,7 +159,6 @@ public class ChangesController : ControllerBase
         existing.PlannedEnd = request.PlannedEnd;
         existing.ActualStart = request.ActualStart;
         existing.ActualEnd = request.ActualEnd;
-        existing.UpdatedAt = DateTime.UtcNow;
         existing.UpdatedBy = request.UpdatedBy == Guid.Empty ? existing.UpdatedBy : request.UpdatedBy;
 
         var updated = await _changeService.UpdateAsync(existing, cancellationToken);
@@ -181,15 +179,50 @@ public class ChangesController : ControllerBase
 
         var existing = await _changeService.GetByIdAsync(guidResult, cancellationToken);
         if (existing is null) return NotFound();
+        if (existing.StatusId != 1)
+        {
+            return BadRequest(new { message = "Only Draft changes can be submitted for approval." });
+        }
+
+        var validationError = ValidateSubmitRequirements(existing);
+        if (!string.IsNullOrEmpty(validationError))
+        {
+            return BadRequest(new { message = validationError });
+        }
 
         existing.StatusId = 2;
-        existing.UpdatedAt = DateTime.UtcNow;
-        existing.UpdatedBy = actorUserId;
+        existing.UpdatedBy = actorUserId == Guid.Empty ? existing.UpdatedBy : actorUserId;
 
         var updated = await _changeService.UpdateAsync(existing, cancellationToken);
         await _audit.LogAsync(3, actorUserId, "system@local", "cm", "ChangeRequest", existing.ChangeRequestId, existing.ChangeNumber.ToString(), "Submit", "Submitted for approval", cancellationToken);
         _logger.LogInformation("Submitted change {ChangeRequestId}", existing.ChangeRequestId);
         return Ok(ToDto(updated!));
+    }
+
+
+    private static string? ValidateSubmitRequirements(ChangeRequest change)
+    {
+        if (string.IsNullOrWhiteSpace(change.Title)) return "Title is required before submit.";
+        if (change.ChangeTypeId <= 0) return "ChangeTypeId is required before submit.";
+        if (change.RiskLevelId <= 0) return "RiskLevel is required before submit.";
+        if (!change.PlannedStart.HasValue) return "ImplementationDate is required before submit.";
+
+        var impactDescription = ExtractSection(change.Description, "Description");
+        if (string.IsNullOrWhiteSpace(impactDescription)) return "ImpactDescription is required before submit.";
+
+        var rollbackPlan = ExtractSection(change.Description, "Backout Plan");
+        if (string.IsNullOrWhiteSpace(rollbackPlan)) return "RollbackPlan is required before submit.";
+
+        return null;
+    }
+
+    private static string ExtractSection(string? source, string sectionName)
+    {
+        if (string.IsNullOrWhiteSpace(source)) return string.Empty;
+
+        var pattern = $@"{Regex.Escape(sectionName)}:\s*(.*?)(?:\n[A-Za-z][^\n]*:\s*|$)";
+        var match = Regex.Match(source, pattern, RegexOptions.Singleline);
+        return match.Success ? match.Groups[1].Value.Trim() : string.Empty;
     }
 
     private bool TryParseId(string id, out Guid guidResult, out BadRequestObjectResult badRequest)
