@@ -212,7 +212,7 @@ namespace ChangeManagement.Api.Migrations
                 {
                     table.PrimaryKey("PK_ChangeTask", x => x.ChangeTaskId);
                     table.ForeignKey("FK_ChangeTask_ChangeRequest_ChangeRequestId", x => x.ChangeRequestId, "ChangeRequest", "ChangeRequestId", "cm", onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey("FK_ChangeTask_ChangeStatus_StatusId", x => x.StatusId, "ChangeStatus", "StatusId", "ref", onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey("FK_ChangeTask_ChangeStatus_StatusId", x => x.StatusId, "ChangeStatus", "StatusId", "ref", onDelete: ReferentialAction.Restrict);
                     table.ForeignKey("FK_ChangeTask_User_AssignedToUserId", x => x.AssignedToUserId, "User", "UserId", "cm", onDelete: ReferentialAction.Restrict);
                 });
 
