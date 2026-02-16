@@ -112,17 +112,6 @@ END
 ");
     }
 
-    if (!isSqlite)
-    {
-        dbContext.Database.ExecuteSqlRaw(@"
-IF COL_LENGTH('cm.ChangeAttachment', 'FileSizeBytes') IS NULL
-BEGIN
-    ALTER TABLE [cm].[ChangeAttachment]
-    ADD [FileSizeBytes] BIGINT NOT NULL CONSTRAINT [DF_ChangeAttachment_FileSizeBytes] DEFAULT(0);
-END
-");
-    }
-
     var adminUpn = app.Configuration["SeedAdmin:Upn"] ?? "admin@local";
     var adminPassword = app.Configuration["SeedAdmin:Password"] ?? "Admin123!";
     if (!dbContext.Users.Any())

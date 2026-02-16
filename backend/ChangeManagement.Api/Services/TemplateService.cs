@@ -63,7 +63,7 @@ public class TemplateService : ITemplateService
 
         _dbContext.ChangeTemplates.Add(entity);
         await _dbContext.SaveChangesAsync(cancellationToken);
-        await _auditService.LogAsync(6, actorId ?? Guid.Empty, ResolveActorUpn(), "cm", "ChangeTemplate", entity.TemplateId, string.Empty, "CreateTemplate", entity.Name, cancellationToken);
+        await _auditService.LogAsync(6, actorId ?? Guid.Empty, ResolveActorUpn(), "cm", "ChangeTemplate", entity.TemplateId, string.Empty, "TemplateCreate", entity.Name, cancellationToken);
         return entity;
     }
 
@@ -87,7 +87,7 @@ public class TemplateService : ITemplateService
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         var actorId = ResolveActorUserId() ?? Guid.Empty;
-        await _auditService.LogAsync(7, actorId, ResolveActorUpn(), "cm", "ChangeTemplate", entity.TemplateId, string.Empty, "UpdateTemplate", entity.Name, cancellationToken);
+        await _auditService.LogAsync(7, actorId, ResolveActorUpn(), "cm", "ChangeTemplate", entity.TemplateId, string.Empty, "TemplateUpdate", entity.Name, cancellationToken);
         return entity;
     }
 
@@ -100,7 +100,7 @@ public class TemplateService : ITemplateService
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         var actorId = ResolveActorUserId() ?? Guid.Empty;
-        await _auditService.LogAsync(7, actorId, ResolveActorUpn(), "cm", "ChangeTemplate", entity.TemplateId, string.Empty, "DeactivateTemplate", entity.Name, cancellationToken);
+        await _auditService.LogAsync(7, actorId, ResolveActorUpn(), "cm", "ChangeTemplate", entity.TemplateId, string.Empty, "TemplateUpdate", entity.Name, cancellationToken);
         return true;
     }
 

@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.StaticFiles;
+using System.Security.Claims;
 using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.Repositories;
 
@@ -21,13 +21,15 @@ public class AttachmentService : IAttachmentService
     private readonly IChangeRepository _changeRepository;
     private readonly IAuditService _audit;
     private readonly IWebHostEnvironment _environment;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public AttachmentService(IChangeAttachmentRepository attachmentRepository, IChangeRepository changeRepository, IAuditService audit, IWebHostEnvironment environment)
+    public AttachmentService(IChangeAttachmentRepository attachmentRepository, IChangeRepository changeRepository, IAuditService audit, IWebHostEnvironment environment, IHttpContextAccessor httpContextAccessor)
     {
         _attachmentRepository = attachmentRepository;
         _changeRepository = changeRepository;
         _audit = audit;
         _environment = environment;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public Task<List<ChangeAttachment>> GetForChangeAsync(Guid changeId, CancellationToken cancellationToken) => _attachmentRepository.GetByChangeIdAsync(changeId, cancellationToken);
@@ -72,8 +74,16 @@ public class AttachmentService : IAttachmentService
 
         var created = await _attachmentRepository.CreateAsync(entity, cancellationToken);
         var actor = created.UploadedBy ?? change.CreatedBy;
-        await _audit.LogAsync(5, actor, "system@local", "cm", "ChangeAttachment", created.ChangeAttachmentId, change.ChangeNumber.ToString(), "Upload", created.FileName, cancellationToken);
+        await _audit.LogAsync(5, actor, ResolveActorUpn(), "cm", "ChangeAttachment", created.ChangeAttachmentId, change.ChangeNumber.ToString(), "AttachmentUpload", created.FileName, cancellationToken);
         return (created, null);
+    }
+
+    private string ResolveActorUpn()
+    {
+        var user = _httpContextAccessor.HttpContext?.User;
+        return user?.FindFirstValue(ClaimTypes.Email)
+               ?? user?.Identity?.Name
+               ?? "system@local";
     }
 
     public Task<bool> DeleteAsync(Guid attachmentId, CancellationToken cancellationToken) => _attachmentRepository.DeleteAsync(attachmentId, cancellationToken);

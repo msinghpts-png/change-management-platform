@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiClient } from "../services/apiClient";
 import type { ChangeRequest, DashboardStats } from "../types/change";
+import { labelForChangeType, pillForChangeType } from "../utils/trafficColors";
 
 const pillForStatus = (status?: string) => {
   const s = (status ?? "").toLowerCase();
@@ -203,7 +204,7 @@ const DashboardPage = () => {
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <span className="mono">{c.changeNumber ?? "CHG-000000"}</span>
                       <span className={pillForPriority(c.priority)}>{c.priority ?? "P3"}</span>
-                      <span className="pill pill-blue">Normal</span>
+                      <span className={pillForChangeType(c.changeTypeId)}>{labelForChangeType(c.changeTypeId)}</span>
                     </div>
                     <div className="h3">{c.title}</div>
                     <div className="small">

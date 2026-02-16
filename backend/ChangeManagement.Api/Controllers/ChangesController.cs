@@ -65,7 +65,7 @@ public class ChangesController : ControllerBase
         {
             id = a.ChangeApprovalId,
             changeRequestId = a.ChangeRequestId,
-            approver = a.ApproverUser?.Upn ?? string.Empty,
+            approver = a.ApproverUser?.DisplayName ?? a.ApproverUser?.Upn ?? string.Empty,
             status = a.ApprovalStatus?.Name ?? "Pending",
             comment = a.Comments,
             decisionAt = a.ApprovedAt
@@ -155,28 +155,44 @@ public class ChangesController : ControllerBase
         var existing = await _changeService.GetByIdAsync(guidResult, cancellationToken);
         if (existing is null) return NotFound();
 
-        existing.Title = string.IsNullOrWhiteSpace(request.Title) ? existing.Title : request.Title;
-        existing.Description = request.Description ?? existing.Description;
-        existing.ImplementationSteps = request.ImplementationSteps ?? existing.ImplementationSteps;
-        existing.BackoutPlan = request.BackoutPlan ?? existing.BackoutPlan;
-        existing.ServiceSystem = request.ServiceSystem ?? existing.ServiceSystem;
-        existing.Category = request.Category ?? existing.Category;
-        existing.Environment = request.Environment ?? existing.Environment;
-        existing.BusinessJustification = request.BusinessJustification ?? existing.BusinessJustification;
-        existing.ChangeTypeId = request.ChangeTypeId > 0 ? request.ChangeTypeId : existing.ChangeTypeId;
-        existing.PriorityId = request.PriorityId > 0 ? request.PriorityId : existing.PriorityId;
-        existing.StatusId = request.StatusId > 0 ? request.StatusId : existing.StatusId;
-        existing.RiskLevelId = request.RiskLevelId > 0 ? request.RiskLevelId : existing.RiskLevelId;
-        existing.AssignedToUserId = request.AssignedToUserId;
-        existing.PlannedStart = request.PlannedStart;
-        existing.PlannedEnd = request.PlannedEnd;
-        existing.ActualStart = request.ActualStart;
-        existing.ActualEnd = request.ActualEnd;
-        existing.UpdatedBy = request.UpdatedBy == Guid.Empty ? existing.UpdatedBy : request.UpdatedBy;
+        if (existing.StatusId == 2)
+        {
+            existing.Description = request.Description ?? existing.Description;
+            existing.AssignedToUserId = request.AssignedToUserId;
+            existing.PlannedStart = request.PlannedStart;
+            existing.PlannedEnd = request.PlannedEnd;
+            existing.UpdatedBy = request.UpdatedBy == Guid.Empty ? existing.UpdatedBy : request.UpdatedBy;
+        }
+        else
+        {
+            existing.Title = string.IsNullOrWhiteSpace(request.Title) ? existing.Title : request.Title;
+            existing.Description = request.Description ?? existing.Description;
+            existing.ImplementationSteps = request.ImplementationSteps ?? existing.ImplementationSteps;
+            existing.BackoutPlan = request.BackoutPlan ?? existing.BackoutPlan;
+            existing.ServiceSystem = request.ServiceSystem ?? existing.ServiceSystem;
+            existing.Category = request.Category ?? existing.Category;
+            existing.Environment = request.Environment ?? existing.Environment;
+            existing.BusinessJustification = request.BusinessJustification ?? existing.BusinessJustification;
+            existing.ChangeTypeId = request.ChangeTypeId > 0 ? request.ChangeTypeId : existing.ChangeTypeId;
+            existing.PriorityId = request.PriorityId > 0 ? request.PriorityId : existing.PriorityId;
+            existing.StatusId = request.StatusId > 0 ? request.StatusId : existing.StatusId;
+            existing.RiskLevelId = request.RiskLevelId > 0 ? request.RiskLevelId : existing.RiskLevelId;
+            existing.AssignedToUserId = request.AssignedToUserId;
+            existing.PlannedStart = request.PlannedStart;
+            existing.PlannedEnd = request.PlannedEnd;
+            existing.ActualStart = request.ActualStart;
+            existing.ActualEnd = request.ActualEnd;
+            existing.UpdatedBy = request.UpdatedBy == Guid.Empty ? existing.UpdatedBy : request.UpdatedBy;
+        }
 
         var updated = await _changeService.UpdateAsync(existing, cancellationToken);
+        if (updated is null)
+        {
+            return BadRequest(new { message = "This change cannot be edited in the current status." });
+        }
+
         _logger.LogInformation("Updated change {ChangeRequestId}", existing.ChangeRequestId);
-        return Ok(ToDto(updated!));
+        return Ok(ToDto(updated));
     }
 
     [HttpPost("{id}/submit")]
@@ -207,7 +223,8 @@ public class ChangesController : ControllerBase
         existing.UpdatedBy = actorUserId == Guid.Empty ? existing.UpdatedBy : actorUserId;
 
         var updated = await _changeService.UpdateAsync(existing, cancellationToken);
-        await _audit.LogAsync(3, actorUserId, "system@local", "cm", "ChangeRequest", existing.ChangeRequestId, existing.ChangeNumber.ToString(), "Submit", "Submitted for approval", cancellationToken);
+        var actorUpn = User.FindFirstValue(ClaimTypes.Email) ?? User.Identity?.Name ?? "system@local";
+        await _audit.LogAsync(3, actorUserId, actorUpn, "cm", "ChangeRequest", existing.ChangeRequestId, existing.ChangeNumber.ToString(), "Submit", "Submitted for approval", cancellationToken);
         _logger.LogInformation("Submitted change {ChangeRequestId}", existing.ChangeRequestId);
         return Ok(ToDto(updated!));
     }

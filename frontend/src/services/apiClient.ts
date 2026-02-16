@@ -49,9 +49,13 @@ const normalizeChange = (item: any): ChangeRequest => ({
   businessJustification: item.businessJustification,
   service: item.serviceSystem ?? item.service,
   changeTypeId: item.changeTypeId,
+  riskLevelId: item.riskLevelId,
+  priorityId: item.priorityId,
+  statusId: item.statusId,
   status: item.status ?? "Draft",
   priority: item.priority ?? "P3",
   riskLevel: item.riskLevel,
+  impactTypeId: item.impactTypeId,
   requestedBy: item.requestedBy,
   plannedStart: item.plannedStart,
   plannedEnd: item.plannedEnd,
@@ -167,6 +171,17 @@ export const apiClient = {
   importDatabase: (_file: File) => Promise.resolve(),
   runMigrations: () => request<{ message: string }>("/admin/database/migrate", { method: "POST" }),
   seedDatabase: () => Promise.resolve(),
+
+  getAuditEvents: () => request<any[]>("/admin/audit"),
+
+  getAllAttachments: (changeNumber?: string) => request<any[]>(`/admin/attachments${changeNumber ? `?changeNumber=${encodeURIComponent(changeNumber)}` : ""}`),
+  deleteAdminAttachment: (attachmentId: string) => request<void>(`/admin/attachments/${attachmentId}`, { method: "DELETE" }),
+
+  resetUserPassword: (id: string, newPassword: string) => request<{ message: string }>(`/admin/users/${id}/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newPassword })
+    }),
 
   login: (upn: string, password: string) => request<{ token: string; user: AppUser }>("/auth/login", {
       method: "POST",

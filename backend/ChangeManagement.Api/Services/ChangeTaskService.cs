@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.Repositories;
 
@@ -16,12 +17,14 @@ public class ChangeTaskService : IChangeTaskService
     private readonly IChangeTaskRepository _repository;
     private readonly IChangeRepository _changeRepository;
     private readonly IAuditService _audit;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public ChangeTaskService(IChangeTaskRepository repository, IChangeRepository changeRepository, IAuditService audit)
+    public ChangeTaskService(IChangeTaskRepository repository, IChangeRepository changeRepository, IAuditService audit, IHttpContextAccessor httpContextAccessor)
     {
         _repository = repository;
         _changeRepository = changeRepository;
         _audit = audit;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public Task<List<ChangeTask>> GetByChangeAsync(Guid changeId, CancellationToken cancellationToken) => _repository.GetByChangeIdAsync(changeId, cancellationToken);
@@ -32,7 +35,7 @@ public class ChangeTaskService : IChangeTaskService
         var change = await _changeRepository.GetByIdAsync(created.ChangeRequestId, cancellationToken);
         if (change is not null)
         {
-            await _audit.LogAsync(2, created.AssignedToUserId ?? change.CreatedBy, "system@local", "cm", "ChangeTask", created.ChangeTaskId, change.ChangeNumber.ToString(), "CreateTask", created.Title, cancellationToken);
+            await _audit.LogAsync(2, created.AssignedToUserId ?? change.CreatedBy, ResolveActorUpn(), "cm", "ChangeTask", created.ChangeTaskId, change.ChangeNumber.ToString(), "TaskCreate", created.Title, cancellationToken);
         }
 
         return created;
@@ -46,10 +49,18 @@ public class ChangeTaskService : IChangeTaskService
         var change = await _changeRepository.GetByIdAsync(updated.ChangeRequestId, cancellationToken);
         if (change is not null)
         {
-            await _audit.LogAsync(2, updated.AssignedToUserId ?? change.CreatedBy, "system@local", "cm", "ChangeTask", updated.ChangeTaskId, change.ChangeNumber.ToString(), "UpdateTask", updated.Title, cancellationToken);
+            await _audit.LogAsync(2, updated.AssignedToUserId ?? change.CreatedBy, ResolveActorUpn(), "cm", "ChangeTask", updated.ChangeTaskId, change.ChangeNumber.ToString(), "TaskUpdate", updated.Title, cancellationToken);
         }
 
         return updated;
+    }
+
+    private string ResolveActorUpn()
+    {
+        var user = _httpContextAccessor.HttpContext?.User;
+        return user?.FindFirstValue(ClaimTypes.Email)
+               ?? user?.Identity?.Name
+               ?? "system@local";
     }
 
     public Task<bool> DeleteAsync(Guid taskId, CancellationToken cancellationToken) => _repository.DeleteAsync(taskId, cancellationToken);

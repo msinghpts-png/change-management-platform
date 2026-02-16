@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiClient } from "../services/apiClient";
 import type { Approval, ApprovalStatus, Attachment, ChangeCreateDto, ChangeRequest, ChangeTask, ChangeTemplate, ChangeUpdateDto } from "../types/change";
+import { labelForChangeType, pillForChangeType, pillForImpactLevel, pillForRiskLevel } from "../utils/trafficColors";
 
 type ViewTab = "Overview" | "Approvals" | "Tasks" | "Attachments";
 type FormTab = "Basic Info" | "Schedule" | "Plans" | "Risk & Impact";
@@ -79,11 +80,16 @@ const priorityToId = (priority: string) => {
   return 2;
 };
 
-const riskToId = (risk: string) => {
-  const normalized = risk.trim().toLowerCase();
-  if (normalized === "low") return 1;
-  if (normalized === "high") return 3;
-  return 2;
+const riskIdToLabel = (riskLevelId?: number) => {
+  if (riskLevelId === 1) return "Low";
+  if (riskLevelId === 3) return "High";
+  return "Medium";
+};
+
+const impactIdToLabel = (impactTypeId?: number) => {
+  if (impactTypeId === 1) return "Low";
+  if (impactTypeId === 3) return "High";
+  return "Medium";
 };
 
 const ChangeDetailPage = () => {
@@ -120,10 +126,10 @@ const ChangeDetailPage = () => {
   const [implementationSteps, setImplementationSteps] = useState("");
   const [backoutPlan, setBackoutPlan] = useState("");
 
-  const [changeType, setChangeType] = useState("Normal");
+  const [changeTypeIdValue, setChangeTypeIdValue] = useState(2);
   const [priority, setPriority] = useState("P3");
-  const [riskLevel, setRiskLevel] = useState("Medium");
-  const [impactLevel, setImpactLevel] = useState("Medium");
+  const [riskLevelIdValue, setRiskLevelIdValue] = useState(2);
+  const [impactTypeIdValue, setImpactTypeIdValue] = useState(2);
 
   const [plannedStart, setPlannedStart] = useState("");
   const [plannedEnd, setPlannedEnd] = useState("");
@@ -132,7 +138,9 @@ const ChangeDetailPage = () => {
   const [templateId, setTemplateId] = useState("");
   const [templates, setTemplates] = useState<ChangeTemplate[]>(fallbackTemplates);
 
-  const changeTypeId = changeType === "Standard" ? 1 : changeType === "Emergency" ? 3 : 2;
+  const changeTypeId = changeTypeIdValue;
+  const riskLevel = riskIdToLabel(riskLevelIdValue);
+  const impactLevel = impactIdToLabel(impactTypeIdValue);
   const implementationDate = plannedStart;
   const impactDescription = description;
   const rollbackPlan = backoutPlan;
@@ -189,10 +197,10 @@ const ChangeDetailPage = () => {
         setCategory(data.category ?? "Application");
         setEnvironment(data.environment ?? "Non-Production");
         setDowntimeRequired(false);
-        setChangeType(data.changeTypeId === 1 ? "Standard" : data.changeTypeId === 3 ? "Emergency" : "Normal");
+        setChangeTypeIdValue(data.changeTypeId ?? 2);
         setPriority(data.priority ?? "P3");
-        setRiskLevel(data.riskLevel ?? "Medium");
-        setImpactLevel(data.impactLevel ?? "Medium");
+        setRiskLevelIdValue(data.riskLevelId ?? (data.riskLevel?.toLowerCase() === "low" ? 1 : data.riskLevel?.toLowerCase() === "high" ? 3 : 2));
+        setImpactTypeIdValue(data.impactTypeId ?? (data.impactLevel?.toLowerCase() === "low" ? 1 : data.impactLevel?.toLowerCase() === "high" ? 3 : 2));
         setPlannedStart(data.plannedStart ? data.plannedStart.slice(0, 16) : "");
         setPlannedEnd(data.plannedEnd ? data.plannedEnd.slice(0, 16) : "");
         refreshRelatedData(id).catch(() => void 0);
@@ -223,8 +231,8 @@ const ChangeDetailPage = () => {
     businessJustification !== (item.businessJustification ?? "") ||
     changeTypeId !== (item.changeTypeId ?? 2) ||
     priority !== (item.priority ?? "P3") ||
-    riskLevel !== (item.riskLevel ?? "Medium") ||
-    impactLevel !== (item.impactLevel ?? "Medium") ||
+    riskLevelIdValue !== (item.riskLevelId ?? ((item.riskLevel ?? "Medium").toLowerCase() === "low" ? 1 : (item.riskLevel ?? "Medium").toLowerCase() === "high" ? 3 : 2)) ||
+    impactTypeIdValue !== (item.impactTypeId ?? ((item.impactLevel ?? "Medium").toLowerCase() === "low" ? 1 : (item.impactLevel ?? "Medium").toLowerCase() === "high" ? 3 : 2)) ||
     plannedStart !== (item.plannedStart ? item.plannedStart.slice(0, 16) : "") ||
     plannedEnd !== (item.plannedEnd ? item.plannedEnd.slice(0, 16) : "")
   );
@@ -262,8 +270,9 @@ const ChangeDetailPage = () => {
           priority,
           priorityId: priorityToId(priority),
           riskLevel,
-          riskLevelId: riskToId(riskLevel),
+          riskLevelId: riskLevelIdValue,
           impactLevel,
+          impactTypeId: impactTypeIdValue,
           plannedStart: plannedStart ? new Date(plannedStart).toISOString() : undefined,
           plannedEnd: plannedEnd ? new Date(plannedEnd).toISOString() : undefined
         };
@@ -286,8 +295,9 @@ const ChangeDetailPage = () => {
           priority,
           priorityId: priorityToId(priority),
           riskLevel,
-          riskLevelId: riskToId(riskLevel),
+          riskLevelId: riskLevelIdValue,
           impactLevel,
+          impactTypeId: impactTypeIdValue,
           plannedStart: plannedStart ? new Date(plannedStart).toISOString() : undefined,
           plannedEnd: plannedEnd ? new Date(plannedEnd).toISOString() : undefined
         };
@@ -476,10 +486,10 @@ const ChangeDetailPage = () => {
 
                 <div>
                   <div className="label">Change Type *</div>
-                  <select className="select" value={changeType} onChange={(e) => setChangeType(e.target.value)}>
-                    <option value="Normal">Normal</option>
-                    <option value="Standard">Standard</option>
-                    <option value="Emergency">Emergency</option>
+                  <select className="select" value={changeTypeIdValue} onChange={(e) => setChangeTypeIdValue(Number(e.target.value))}>
+                    <option value={2}>Normal</option>
+                    <option value={1}>Standard</option>
+                    <option value={3}>Emergency</option>
                   </select>
                 </div>
 
@@ -565,18 +575,18 @@ const ChangeDetailPage = () => {
                 </div>
                 <div>
                   <div className="label">Risk</div>
-                  <select className="select" value={riskLevel} onChange={(e) => setRiskLevel(e.target.value)}>
-                    <option>Low</option>
-                    <option>Medium</option>
-                    <option>High</option>
+                  <select className="select" value={riskLevelIdValue} onChange={(e) => setRiskLevelIdValue(Number(e.target.value))}>
+                    <option value={1}>Low</option>
+                    <option value={2}>Medium</option>
+                    <option value={3}>High</option>
                   </select>
                 </div>
                 <div>
                   <div className="label">Impact</div>
-                  <select className="select" value={impactLevel} onChange={(e) => setImpactLevel(e.target.value)}>
-                    <option>Low</option>
-                    <option>Medium</option>
-                    <option>High</option>
+                  <select className="select" value={impactTypeIdValue} onChange={(e) => setImpactTypeIdValue(Number(e.target.value))}>
+                    <option value={1}>Low</option>
+                    <option value={2}>Medium</option>
+                    <option value={3}>High</option>
                   </select>
                 </div>
                 <div />
@@ -598,6 +608,26 @@ const ChangeDetailPage = () => {
             </div>
           ) : null}
         </div>
+
+        {!isNew ? (
+          <div className="card card-pad" style={{ marginTop: 12 }}>
+            <div className="h3">Attachments</div>
+            <div className="small">Allowed: pdf, doc(x), xls(x), png, jpg. Max 5 MB.</div>
+            <input className="input" style={{ marginTop: 8 }} type="file" onChange={uploadAttachment} />
+            <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+              {attachments.map((attachment) => (
+                <div key={attachment.id} className="row">
+                  <div className="row-left">
+                    <div className="h3">{attachment.fileName}</div>
+                    <div className="small">{Math.round(attachment.sizeBytes / 1024)} KB</div>
+                  </div>
+                  <a className="btn" href={`/api/changes/${id}/attachments/${attachment.id}/download`}>Download</a>
+                </div>
+              ))}
+              {!attachments.length ? <div className="empty">No attachments uploaded.</div> : null}
+            </div>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -622,9 +652,9 @@ const ChangeDetailPage = () => {
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
             <span className={pillForPriority(item?.priority)}>{item?.priority ?? "P3"}</span>
-            <span className="pill pill-blue">Normal</span>
-            {item?.riskLevel ? <span className="pill pill-amber">Risk: {item.riskLevel}</span> : null}
-            {item?.impactLevel ? <span className="pill pill-amber">Impact: {item.impactLevel}</span> : null}
+            <span className={pillForChangeType(item?.changeTypeId)}>{labelForChangeType(item?.changeTypeId)}</span>
+            {item?.riskLevel ? <span className={pillForRiskLevel(item.riskLevel)}>Risk: {item.riskLevel}</span> : null}
+            {item?.impactLevel ? <span className={pillForImpactLevel(item.impactLevel)}>Impact: {item.impactLevel}</span> : null}
           </div>
         </div>
 
