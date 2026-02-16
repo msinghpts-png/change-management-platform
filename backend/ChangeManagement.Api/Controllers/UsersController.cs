@@ -75,4 +75,28 @@ public class UsersController : ControllerBase
 
         return Ok(new UserAdminDto { Id = user.UserId, Upn = user.Upn, DisplayName = user.DisplayName, Role = user.Role, IsActive = user.IsActive });
     }
+
+    [HttpPost("{id}/reset-password")]
+    public async Task<IActionResult> ResetPassword(string id, [FromBody] ResetPasswordDto request, CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(id, out var userId))
+        {
+            return BadRequest("Invalid user id.");
+        }
+
+        var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+        if (user is null)
+        {
+            return NotFound();
+        }
+
+        if (string.IsNullOrWhiteSpace(request.NewPassword))
+        {
+            return BadRequest("NewPassword is required.");
+        }
+
+        user.PasswordHash = PasswordHasher.Hash(request.NewPassword);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return Ok(new { message = "Password reset successfully." });
+    }
 }

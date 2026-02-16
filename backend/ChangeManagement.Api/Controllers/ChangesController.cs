@@ -4,6 +4,7 @@ using ChangeManagement.Api.DTOs;
 using ChangeManagement.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace ChangeManagement.Api.Controllers;
 
@@ -82,7 +83,7 @@ public class ChangesController : ControllerBase
             changeRequestId = a.ChangeRequestId,
             fileName = a.FileName,
             contentType = "application/octet-stream",
-            sizeBytes = 0,
+            sizeBytes = a.FileSizeBytes,
             uploadedAt = a.UploadedAt
         }));
     }
@@ -123,7 +124,13 @@ public class ChangesController : ControllerBase
         {
             ChangeRequestId = Guid.NewGuid(),
             Title = request.Title,
-            Description = request.Description,
+            Description = request.Description ?? string.Empty,
+            ImplementationSteps = request.ImplementationSteps,
+            BackoutPlan = request.BackoutPlan,
+            ServiceSystem = request.ServiceSystem,
+            Category = request.Category,
+            Environment = request.Environment,
+            BusinessJustification = request.BusinessJustification,
             ChangeTypeId = changeTypeId,
             PriorityId = priorityId,
             StatusId = 1,
@@ -131,9 +138,7 @@ public class ChangesController : ControllerBase
             RequestedByUserId = requestedByUserId,
             AssignedToUserId = request.AssignedToUserId,
             PlannedStart = request.PlannedStart,
-            PlannedEnd = request.PlannedEnd,
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = requestedByUserId
+            PlannedEnd = request.PlannedEnd
         };
 
         var created = await _changeService.CreateAsync(entity, cancellationToken);
@@ -150,7 +155,13 @@ public class ChangesController : ControllerBase
         if (existing is null) return NotFound();
 
         existing.Title = string.IsNullOrWhiteSpace(request.Title) ? existing.Title : request.Title;
-        existing.Description = string.IsNullOrWhiteSpace(request.Description) ? existing.Description : request.Description;
+        existing.Description = request.Description ?? existing.Description;
+        existing.ImplementationSteps = request.ImplementationSteps ?? existing.ImplementationSteps;
+        existing.BackoutPlan = request.BackoutPlan ?? existing.BackoutPlan;
+        existing.ServiceSystem = request.ServiceSystem ?? existing.ServiceSystem;
+        existing.Category = request.Category ?? existing.Category;
+        existing.Environment = request.Environment ?? existing.Environment;
+        existing.BusinessJustification = request.BusinessJustification ?? existing.BusinessJustification;
         existing.ChangeTypeId = request.ChangeTypeId > 0 ? request.ChangeTypeId : existing.ChangeTypeId;
         existing.PriorityId = request.PriorityId > 0 ? request.PriorityId : existing.PriorityId;
         existing.StatusId = request.StatusId > 0 ? request.StatusId : existing.StatusId;
@@ -160,7 +171,6 @@ public class ChangesController : ControllerBase
         existing.PlannedEnd = request.PlannedEnd;
         existing.ActualStart = request.ActualStart;
         existing.ActualEnd = request.ActualEnd;
-        existing.UpdatedAt = DateTime.UtcNow;
         existing.UpdatedBy = request.UpdatedBy == Guid.Empty ? existing.UpdatedBy : request.UpdatedBy;
 
         var updated = await _changeService.UpdateAsync(existing, cancellationToken);
@@ -181,15 +191,76 @@ public class ChangesController : ControllerBase
 
         var existing = await _changeService.GetByIdAsync(guidResult, cancellationToken);
         if (existing is null) return NotFound();
+        if (existing.StatusId != 1)
+        {
+            return BadRequest(new { message = "Only Draft changes can be submitted for approval." });
+        }
+
+        var submitValidationError = ValidateSubmitRequirements(existing);
+        if (!string.IsNullOrEmpty(submitValidationError))
+        {
+            return BadRequest(new { message = submitValidationError });
+        }
 
         existing.StatusId = 2;
-        existing.UpdatedAt = DateTime.UtcNow;
-        existing.UpdatedBy = actorUserId;
+        existing.UpdatedBy = actorUserId == Guid.Empty ? existing.UpdatedBy : actorUserId;
 
         var updated = await _changeService.UpdateAsync(existing, cancellationToken);
         await _audit.LogAsync(3, actorUserId, "system@local", "cm", "ChangeRequest", existing.ChangeRequestId, existing.ChangeNumber.ToString(), "Submit", "Submitted for approval", cancellationToken);
         _logger.LogInformation("Submitted change {ChangeRequestId}", existing.ChangeRequestId);
         return Ok(ToDto(updated!));
+    }
+
+
+    private static string? ValidateSubmitRequirements(ChangeRequest change)
+    {
+        if (string.IsNullOrWhiteSpace(change.Title)) return "Title is required before submit.";
+        if (change.ChangeTypeId <= 0) return "ChangeTypeId is required before submit.";
+        if (change.RiskLevelId <= 0) return "RiskLevel is required before submit.";
+        if (!change.PlannedStart.HasValue) return "ImplementationDate is required before submit.";
+        if (string.IsNullOrWhiteSpace(change.Description)) return "ImpactDescription is required before submit.";
+        if (string.IsNullOrWhiteSpace(change.BackoutPlan)) return "RollbackPlan is required before submit.";
+
+        return null;
+    }
+
+
+    [HttpPost("{id}/approve")]
+    public async Task<ActionResult<ChangeRequestDto>> Approve(string id, [FromBody] ApprovalDecisionDto request, CancellationToken cancellationToken)
+    {
+        if (!User.IsInRole("CAB") && !User.IsInRole("Admin")) return Forbid();
+        if (!TryParseId(id, out var guidResult, out var badRequest)) return badRequest;
+
+        var actor = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(actor, out var actorUserId) || actorUserId == Guid.Empty)
+        {
+            return Unauthorized();
+        }
+
+        var approval = await _approvalService.ApproveChangeAsync(guidResult, actorUserId, request.Comments ?? string.Empty, cancellationToken);
+        if (approval is null) return NotFound();
+
+        var change = await _changeService.GetByIdAsync(guidResult, cancellationToken);
+        return change is null ? NotFound() : Ok(ToDto(change));
+    }
+
+    [HttpPost("{id}/reject")]
+    public async Task<ActionResult<ChangeRequestDto>> Reject(string id, [FromBody] ApprovalDecisionDto request, CancellationToken cancellationToken)
+    {
+        if (!User.IsInRole("CAB") && !User.IsInRole("Admin")) return Forbid();
+        if (!TryParseId(id, out var guidResult, out var badRequest)) return badRequest;
+
+        var actor = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(actor, out var actorUserId) || actorUserId == Guid.Empty)
+        {
+            return Unauthorized();
+        }
+
+        var approval = await _approvalService.RejectChangeAsync(guidResult, actorUserId, request.Comments ?? string.Empty, cancellationToken);
+        if (approval is null) return NotFound();
+
+        var change = await _changeService.GetByIdAsync(guidResult, cancellationToken);
+        return change is null ? NotFound() : Ok(ToDto(change));
     }
 
     private bool TryParseId(string id, out Guid guidResult, out BadRequestObjectResult badRequest)
@@ -212,6 +283,12 @@ public class ChangesController : ControllerBase
         ChangeNumber = change.ChangeNumber,
         Title = change.Title,
         Description = change.Description,
+        ImplementationSteps = change.ImplementationSteps,
+        BackoutPlan = change.BackoutPlan,
+        ServiceSystem = change.ServiceSystem,
+        Category = change.Category,
+        Environment = change.Environment,
+        BusinessJustification = change.BusinessJustification,
         ChangeTypeId = change.ChangeTypeId,
         PriorityId = change.PriorityId,
         StatusId = change.StatusId,
