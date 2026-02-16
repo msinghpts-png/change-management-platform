@@ -190,6 +190,12 @@ public class ChangesController : ControllerBase
             return BadRequest(new { message = validationError });
         }
 
+        var validationError = ValidateSubmitRequirements(existing);
+        if (!string.IsNullOrEmpty(validationError))
+        {
+            return BadRequest(new { message = validationError });
+        }
+
         existing.StatusId = 2;
         existing.UpdatedBy = actorUserId == Guid.Empty ? existing.UpdatedBy : actorUserId;
 
