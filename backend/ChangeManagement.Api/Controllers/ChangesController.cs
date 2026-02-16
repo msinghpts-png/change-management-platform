@@ -84,7 +84,7 @@ public class ChangesController : ControllerBase
             changeRequestId = a.ChangeRequestId,
             fileName = a.FileName,
             contentType = "application/octet-stream",
-            sizeBytes = 0,
+            sizeBytes = a.FileSizeBytes,
             uploadedAt = a.UploadedAt
         }));
     }

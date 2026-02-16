@@ -8,7 +8,7 @@ public interface IAttachmentService
 {
     Task<List<ChangeAttachment>> GetForChangeAsync(Guid changeId, CancellationToken cancellationToken);
     Task<ChangeAttachment?> GetAsync(Guid attachmentId, CancellationToken cancellationToken);
-    Task<(ChangeAttachment? Attachment, string? Error)> UploadAsync(Guid changeId, IFormFile file, Guid uploadedBy, CancellationToken cancellationToken);
+    Task<(ChangeAttachment? Attachment, string? Error)> UploadAsync(Guid changeId, IFormFile file, Guid? uploadedBy, CancellationToken cancellationToken);
     Task<bool> DeleteAsync(Guid attachmentId, CancellationToken cancellationToken);
     Task<byte[]?> ReadFileAsync(ChangeAttachment attachment, CancellationToken cancellationToken);
 }
@@ -33,7 +33,7 @@ public class AttachmentService : IAttachmentService
     public Task<List<ChangeAttachment>> GetForChangeAsync(Guid changeId, CancellationToken cancellationToken) => _attachmentRepository.GetByChangeIdAsync(changeId, cancellationToken);
     public Task<ChangeAttachment?> GetAsync(Guid attachmentId, CancellationToken cancellationToken) => _attachmentRepository.GetByIdAsync(attachmentId, cancellationToken);
 
-    public async Task<(ChangeAttachment? Attachment, string? Error)> UploadAsync(Guid changeId, IFormFile file, Guid uploadedBy, CancellationToken cancellationToken)
+    public async Task<(ChangeAttachment? Attachment, string? Error)> UploadAsync(Guid changeId, IFormFile file, Guid? uploadedBy, CancellationToken cancellationToken)
     {
         var change = await _changeRepository.GetByIdAsync(changeId, cancellationToken);
         if (change is null)
@@ -50,7 +50,7 @@ public class AttachmentService : IAttachmentService
             return (null, "File type is not allowed.");
         }
 
-        var rootPath = Path.Combine("/data", "attachments", changeId.ToString());
+        var rootPath = Path.Combine(_environment.ContentRootPath, "attachments", changeId.ToString());
         Directory.CreateDirectory(rootPath);
 
         var fileId = Guid.NewGuid();
@@ -66,11 +66,13 @@ public class AttachmentService : IAttachmentService
             FileName = Path.GetFileName(file.FileName),
             FileUrl = storedPath,
             UploadedAt = DateTime.UtcNow,
-            UploadedBy = uploadedBy
+            UploadedBy = uploadedBy == Guid.Empty ? change.CreatedBy : uploadedBy,
+            FileSizeBytes = file.Length
         };
 
         var created = await _attachmentRepository.CreateAsync(entity, cancellationToken);
-        await _audit.LogAsync(5, uploadedBy, "system@local", "cm", "ChangeAttachment", created.ChangeAttachmentId, change.ChangeNumber.ToString(), "Upload", created.FileName, cancellationToken);
+        var actor = created.UploadedBy ?? change.CreatedBy;
+        await _audit.LogAsync(5, actor, "system@local", "cm", "ChangeAttachment", created.ChangeAttachmentId, change.ChangeNumber.ToString(), "Upload", created.FileName, cancellationToken);
         return (created, null);
     }
 

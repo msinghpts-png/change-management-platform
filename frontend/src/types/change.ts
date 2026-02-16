@@ -146,3 +146,18 @@ export type ApprovalDecisionDto = {
   status: ApprovalStatus;
   comment?: string;
 };
+
+export type ChangeTemplate = {
+  templateId: string;
+  name: string;
+  description?: string;
+  implementationSteps?: string;
+  backoutPlan?: string;
+  serviceSystem?: string;
+  category?: string;
+  environment?: string;
+  businessJustification?: string;
+  createdAt?: string;
+  createdBy?: string;
+  isActive: boolean;
+};

@@ -9,7 +9,8 @@ import type {
   ChangeUpdateDto,
   DashboardStats,
   DatabaseBackup,
-  DatabaseStatus
+  DatabaseStatus,
+  ChangeTemplate
 } from "../types/change";
 
 const API_BASE_URL = "/api";
@@ -77,6 +78,22 @@ export const apiClient = {
     if (!isValidId(changeId)) return [] as ChangeTask[];
     return request<ChangeTask[]>(`/changes/${changeId}/tasks`);
   },
+
+  getTemplates: () => request<ChangeTemplate[]>("/templates"),
+
+  createTemplate: (payload: Partial<ChangeTemplate> & { name: string }) => request<ChangeTemplate>("/templates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }),
+
+  updateTemplate: (id: string, payload: Partial<ChangeTemplate> & { name: string }) => request<ChangeTemplate>(`/templates/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }),
+
+  deleteTemplate: (id: string) => request<void>(`/templates/${id}`, { method: "DELETE" }),
 
 
   createTask: (changeId: string, payload: { title: string; description?: string; statusId?: number; assignedToUserId?: string; dueAt?: string }) =>

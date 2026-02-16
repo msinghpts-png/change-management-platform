@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiClient } from "../services/apiClient";
-import type { Approval, ApprovalStatus, Attachment, ChangeCreateDto, ChangeRequest, ChangeTask, ChangeUpdateDto } from "../types/change";
+import type { Approval, ApprovalStatus, Attachment, ChangeCreateDto, ChangeRequest, ChangeTask, ChangeTemplate, ChangeUpdateDto } from "../types/change";
 
 type ViewTab = "Overview" | "Approvals" | "Tasks" | "Attachments";
 type FormTab = "Basic Info" | "Schedule" | "Plans" | "Risk & Impact";
@@ -32,42 +32,42 @@ const fmtDT = (value?: string) => {
   return d.toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 };
 
-const templates = [
+const fallbackTemplates: ChangeTemplate[] = [
   {
-    id: "tpl-windows-patch",
+    templateId: "00000000-0000-0000-0000-000000000001",
     name: "Windows Security Patch",
     category: "Server",
-    risk: "Low",
     description: "Deploy monthly Windows security patches to [SERVER_GROUP] as part of regular patch cycle.",
     implementationSteps: "1. Take VM snapshots\n2. Disable servers in load balancer (rolling)\n3. Install patches via WSUS\n4. Reboot\n5. Validate services\n6. Re-enable in load balancer",
     serviceSystem: "",
     environment: "Non-Production",
     businessJustification: "",
-    backoutPlan: ""
+    backoutPlan: "",
+    isActive: true
   },
   {
-    id: "tpl-firewall",
+    templateId: "00000000-0000-0000-0000-000000000002",
     name: "Network Firewall Rule Change",
     category: "Network",
-    risk: "Medium",
     description: "Modify firewall rules on [FIREWALL_NAME] to allow/block traffic for [SERVICE/APPLICATION].",
     implementationSteps: "1. Export current config\n2. Apply rule changes\n3. Validate connectivity\n4. Monitor logs",
     serviceSystem: "",
     environment: "Non-Production",
     businessJustification: "",
-    backoutPlan: ""
+    backoutPlan: "",
+    isActive: true
   },
   {
-    id: "tpl-db-maint",
+    templateId: "00000000-0000-0000-0000-000000000003",
     name: "Database Maintenance",
     category: "Database",
-    risk: "Low",
     description: "Perform scheduled database maintenance including index rebuild and statistics update on [DATABASE_NAME].",
     implementationSteps: "1. Confirm maintenance window\n2. Run index/statistics jobs\n3. Validate performance\n4. Confirm backups",
     serviceSystem: "",
     environment: "Non-Production",
     businessJustification: "",
-    backoutPlan: ""
+    backoutPlan: "",
+    isActive: true
   }
 ];
 
@@ -130,6 +130,7 @@ const ChangeDetailPage = () => {
   const [downtimeRequired, setDowntimeRequired] = useState(false);
 
   const [templateId, setTemplateId] = useState("");
+  const [templates, setTemplates] = useState<ChangeTemplate[]>(fallbackTemplates);
 
   const changeTypeId = changeType === "Standard" ? 1 : changeType === "Emergency" ? 3 : 2;
   const implementationDate = plannedStart;
@@ -203,6 +204,12 @@ const ChangeDetailPage = () => {
       });
   }, [id]);
 
+  useEffect(() => {
+    apiClient.getTemplates().then((items) => {
+      if (items?.length) setTemplates(items.filter((x) => x.isActive));
+    }).catch(() => void 0);
+  }, []);
+
   const formIsDirty = Boolean(
     isNew ||
     !item ||
@@ -225,10 +232,9 @@ const ChangeDetailPage = () => {
 
   const applyTemplate = (tplId: string) => {
     setTemplateId(tplId);
-    const tpl = templates.find((t) => t.id === tplId);
+    const tpl = templates.find((t) => t.templateId === tplId);
     if (!tpl) return;
     setCategory(tpl.category);
-    setRiskLevel(tpl.risk);
     if (!title) setTitle(tpl.name);
     setDescription(tpl.description);
     setImplementationSteps(tpl.implementationSteps ?? "");
@@ -434,7 +440,7 @@ const ChangeDetailPage = () => {
             <select className="select" value={templateId} onChange={(e) => applyTemplate(e.target.value)}>
               <option value="">Select template…</option>
               {templates.map((t) => (
-                <option key={t.id} value={t.id}>
+                <option key={t.templateId} value={t.templateId}>
                   {t.name}
                 </option>
               ))}
