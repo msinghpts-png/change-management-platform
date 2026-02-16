@@ -39,7 +39,10 @@ const templates = [
     category: "Server",
     risk: "Low",
     description: "Deploy monthly Windows security patches to [SERVER_GROUP] as part of regular patch cycle.",
-    steps: "1. Take VM snapshots\n2. Disable servers in load balancer (rolling)\n3. Install patches via WSUS\n4. Reboot\n5. Validate services\n6. Re-enable in load balancer"
+    steps: "1. Take VM snapshots\n2. Disable servers in load balancer (rolling)\n3. Install patches via WSUS\n4. Reboot\n5. Validate services\n6. Re-enable in load balancer",
+    serviceSystem: "",
+    environment: "Non-Production",
+    businessJustification: ""
   },
   {
     id: "tpl-firewall",
@@ -47,7 +50,10 @@ const templates = [
     category: "Network",
     risk: "Medium",
     description: "Modify firewall rules on [FIREWALL_NAME] to allow/block traffic for [SERVICE/APPLICATION].",
-    steps: "1. Export current config\n2. Apply rule changes\n3. Validate connectivity\n4. Monitor logs"
+    steps: "1. Export current config\n2. Apply rule changes\n3. Validate connectivity\n4. Monitor logs",
+    serviceSystem: "",
+    environment: "Non-Production",
+    businessJustification: ""
   },
   {
     id: "tpl-db-maint",
@@ -55,9 +61,43 @@ const templates = [
     category: "Database",
     risk: "Low",
     description: "Perform scheduled database maintenance including index rebuild and statistics update on [DATABASE_NAME].",
-    steps: "1. Confirm maintenance window\n2. Run index/statistics jobs\n3. Validate performance\n4. Confirm backups"
+    steps: "1. Confirm maintenance window\n2. Run index/statistics jobs\n3. Validate performance\n4. Confirm backups",
+    serviceSystem: "",
+    environment: "Non-Production",
+    businessJustification: ""
   }
 ];
+
+const extractSection = (source: string | undefined, sectionName: string) => {
+  if (!source) return "";
+  const escaped = sectionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`${escaped}:\\s*([\\s\\S]*?)(?=\\n[A-Za-z][^\\n]*:\\s*|$)`, "i");
+  const match = source.match(pattern);
+  return match?.[1]?.trim() ?? "";
+};
+
+const extractLineValue = (source: string | undefined, label: string) => {
+  if (!source) return "";
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`(?:^|\\n)${escaped}:\\s*([^\\n]+)`, "i");
+  const match = source.match(pattern);
+  return match?.[1]?.trim() ?? "";
+};
+
+const priorityToId = (priority: string) => {
+  const normalized = priority.trim().toUpperCase();
+  if (normalized === "P1") return 4;
+  if (normalized === "P2") return 3;
+  if (normalized === "P4") return 1;
+  return 2;
+};
+
+const riskToId = (risk: string) => {
+  const normalized = risk.trim().toLowerCase();
+  if (normalized === "low") return 1;
+  if (normalized === "high") return 3;
+  return 2;
+};
 
 const ChangeDetailPage = () => {
   const nav = useNavigate();
@@ -90,6 +130,7 @@ const ChangeDetailPage = () => {
   const [implementationSteps, setImplementationSteps] = useState("");
   const [backoutPlan, setBackoutPlan] = useState("");
 
+  const [changeType, setChangeType] = useState("Normal");
   const [priority, setPriority] = useState("P3");
   const [riskLevel, setRiskLevel] = useState("Medium");
   const [impactLevel, setImpactLevel] = useState("Medium");
@@ -100,6 +141,19 @@ const ChangeDetailPage = () => {
 
   const [templateId, setTemplateId] = useState("");
 
+  const changeTypeId = changeType === "Standard" ? 1 : changeType === "Emergency" ? 3 : 2;
+  const implementationDate = plannedStart;
+  const impactDescription = description;
+  const rollbackPlan = backoutPlan;
+
+  const isSubmitReady = Boolean(
+    title.trim() &&
+    changeTypeId &&
+    riskLevel &&
+    implementationDate &&
+    impactDescription.trim() &&
+    rollbackPlan.trim()
+  );
 
   const refreshRelatedData = async (changeId: string) => {
     if (!apiClient.isValidId(changeId)) return;
@@ -124,8 +178,17 @@ const ChangeDetailPage = () => {
       .getChangeById(id)
       .then((data) => {
         setItem(data);
+        const descriptionBlob = data.description ?? "";
         setTitle(data.title ?? "");
-        setDescription(data.description ?? "");
+        setDescription(extractSection(descriptionBlob, "Description") || descriptionBlob);
+        setBusinessJustification(extractSection(descriptionBlob, "Business Justification"));
+        setImplementationSteps(extractSection(descriptionBlob, "Implementation Steps"));
+        setBackoutPlan(extractSection(descriptionBlob, "Backout Plan"));
+        setService(extractLineValue(descriptionBlob, "Service/System"));
+        setCategory(extractLineValue(descriptionBlob, "Category") || "Application");
+        setEnvironment(extractLineValue(descriptionBlob, "Environment") || "Non-Production");
+        setDowntimeRequired(extractLineValue(descriptionBlob, "Downtime Required").toLowerCase() === "yes");
+        setChangeType(data.changeTypeId === 1 ? "Standard" : data.changeTypeId === 3 ? "Emergency" : "Normal");
         setPriority(data.priority ?? "P3");
         setRiskLevel(data.riskLevel ?? "Medium");
         setImpactLevel(data.impactLevel ?? "Medium");
@@ -165,9 +228,12 @@ const ChangeDetailPage = () => {
     if (!title) setTitle(tpl.name);
     if (!description) setDescription(tpl.description);
     if (!implementationSteps) setImplementationSteps(tpl.steps);
+    if (!service && tpl.serviceSystem) setService(tpl.serviceSystem);
+    if (!environment && tpl.environment) setEnvironment(tpl.environment);
+    if (!businessJustification && tpl.businessJustification) setBusinessJustification(tpl.businessJustification);
   };
 
-  const saveDraft = async () => {
+  const saveDraft = async (options?: { navigateOnCreate?: boolean }) => {
     setError(null);
     setLoading(true);
     try {
@@ -175,20 +241,29 @@ const ChangeDetailPage = () => {
         const payload: ChangeCreateDto = {
           title,
           description: compiledDescription,
+          changeTypeId,
           priority,
+          priorityId: priorityToId(priority),
           riskLevel,
+          riskLevelId: riskToId(riskLevel),
           impactLevel,
           plannedStart: plannedStart ? new Date(plannedStart).toISOString() : undefined,
           plannedEnd: plannedEnd ? new Date(plannedEnd).toISOString() : undefined
         };
         const created = await apiClient.createChange(payload);
-        nav(`/changes/${created.id}`);
+        if (options?.navigateOnCreate ?? true) {
+          nav(`/changes/${created.id}`);
+        }
+        return created.id;
       } else if (apiClient.isValidId(id)) {
         const payload: ChangeUpdateDto = {
           title,
           description: compiledDescription,
+          changeTypeId,
           priority,
+          priorityId: priorityToId(priority),
           riskLevel,
+          riskLevelId: riskToId(riskLevel),
           impactLevel,
           plannedStart: plannedStart ? new Date(plannedStart).toISOString() : undefined,
           plannedEnd: plannedEnd ? new Date(plannedEnd).toISOString() : undefined
@@ -196,31 +271,41 @@ const ChangeDetailPage = () => {
         const updated = await apiClient.updateChange(id, payload);
         setItem(updated);
         await refreshRelatedData(id);
+        return id;
       }
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
+
+    return null;
   };
 
   const submitForApproval = async () => {
-    if (!apiClient.isValidId(id) && isNew) {
-      await saveDraft();
+    setError(null);
+
+    const savedId = await saveDraft({ navigateOnCreate: false });
+    if (!apiClient.isValidId(savedId)) {
       return;
     }
-    if (!apiClient.isValidId(id)) {
+
+    const targetId = savedId;
+
+    if (!apiClient.isValidId(targetId)) {
       setError("Invalid change request id.");
       return;
     }
 
-    setError(null);
     setLoading(true);
     try {
-      await apiClient.submitChange(id);
-      const refreshed = await apiClient.getChangeById(id);
+      await apiClient.submitChange(targetId);
+      const refreshed = await apiClient.getChangeById(targetId);
       setItem(refreshed);
-      await refreshRelatedData(id);
+      await refreshRelatedData(targetId);
+      if (isNew) {
+        nav(`/changes/${targetId}`);
+      }
       alert("Submitted for approval.");
     } catch (e) {
       setError((e as Error).message);
@@ -350,10 +435,10 @@ const ChangeDetailPage = () => {
 
                 <div>
                   <div className="label">Change Type *</div>
-                  <select className="select" value="Normal" onChange={() => void 0}>
-                    <option>Normal</option>
-                    <option>Standard</option>
-                    <option>Emergency</option>
+                  <select className="select" value={changeType} onChange={(e) => setChangeType(e.target.value)}>
+                    <option value="Normal">Normal</option>
+                    <option value="Standard">Standard</option>
+                    <option value="Emergency">Emergency</option>
                   </select>
                 </div>
 
@@ -462,7 +547,7 @@ const ChangeDetailPage = () => {
             <button className="btn" onClick={saveDraft} disabled={loading}>
               💾 Save Draft
             </button>
-            <button className="btn btn-primary" onClick={submitForApproval} disabled={loading || !title.trim()}>
+            <button className="btn btn-primary" onClick={submitForApproval} disabled={loading || !isSubmitReady}>
               ✈ Submit for Approval
             </button>
           </div>
