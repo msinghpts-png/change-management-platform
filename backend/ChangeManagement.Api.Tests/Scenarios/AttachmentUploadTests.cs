@@ -5,10 +5,10 @@ using Xunit;
 
 namespace ChangeManagement.Api.Tests.Scenarios;
 
-public class AttachmentUploadTests : IClassFixture<TestWebApplicationFactory>
+public class AttachmentUploadTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly HttpClient _client;
-    public AttachmentUploadTests(TestWebApplicationFactory factory) => _client = factory.CreateClient();
+    public AttachmentUploadTests(CustomWebApplicationFactory factory) => _client = factory.CreateClient();
 
     [Fact]
     public async Task UploadAttachment_ReturnsCreated()
@@ -31,7 +31,7 @@ public class AttachmentUploadTests : IClassFixture<TestWebApplicationFactory>
         file.Headers.ContentType = MediaTypeHeaderValue.Parse("text/plain");
         form.Add(file, "File", "note.txt");
 
-        var response = await _client.PostAsync($"/api/changes/{changeId}/attachments?uploadedBy=11111111-1111-1111-1111-111111111111", form);
+        var response = await _client.PostAsync($"/api/changes/{changeId}/attachments", form);
         response.EnsureSuccessStatusCode();
     }
 }

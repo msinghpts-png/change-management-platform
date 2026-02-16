@@ -1,10 +1,12 @@
 using System.Text;
+using System.Text.Json;
 using ChangeManagement.Api.Data;
 using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.Repositories;
 using ChangeManagement.Api.Security;
 using ChangeManagement.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -46,6 +48,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<IChangeRepository, ChangeRepository>();
 builder.Services.AddScoped<IChangeService, ChangeService>();
@@ -56,11 +59,34 @@ builder.Services.AddScoped<IAttachmentService, AttachmentService>();
 builder.Services.AddScoped<IChangeTaskRepository, ChangeTaskRepository>();
 builder.Services.AddScoped<IChangeTaskService, ChangeTaskService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<ITemplateService, TemplateService>();
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+app.UseExceptionHandler(exceptionApp =>
 {
+    exceptionApp.Run(async context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "application/json";
+
+        var feature = context.Features.Get<IExceptionHandlerFeature>();
+        var errorMessage = feature?.Error?.Message ?? "An unexpected error occurred.";
+
+        var payload = JsonSerializer.Serialize(new
+        {
+            message = errorMessage,
+            traceId = context.TraceIdentifier
+        });
+
+        await context.Response.WriteAsync(payload);
+    });
+});
+
+var skipDatabaseInitialization = app.Environment.IsEnvironment("Testing") || app.Configuration.GetValue<bool>("SkipDatabaseInitialization");
+if (!skipDatabaseInitialization)
+{
+    using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<ChangeManagementDbContext>();
     var isSqlite = string.Equals(dbContext.Database.ProviderName, "Microsoft.EntityFrameworkCore.Sqlite", StringComparison.Ordinal);
 
@@ -70,7 +96,21 @@ using (var scope = app.Services.CreateScope())
         throw new InvalidOperationException("No EF Core migrations were discovered. Ensure migration attributes and assembly scanning are configured correctly.");
     }
 
-    if (isSqlite) dbContext.Database.EnsureCreated(); else dbContext.Database.Migrate();
+    if (isSqlite)
+    {
+        dbContext.Database.EnsureCreated();
+    }
+    else
+    {
+        dbContext.Database.Migrate();
+        dbContext.Database.ExecuteSqlRaw(@"
+IF COL_LENGTH('cm.ChangeAttachment', 'FileSizeBytes') IS NULL
+BEGIN
+    ALTER TABLE [cm].[ChangeAttachment]
+    ADD [FileSizeBytes] BIGINT NOT NULL CONSTRAINT [DF_ChangeAttachment_FileSizeBytes] DEFAULT(0);
+END
+");
+    }
 
     var adminUpn = app.Configuration["SeedAdmin:Upn"] ?? "admin@local";
     var adminPassword = app.Configuration["SeedAdmin:Password"] ?? "Admin123!";
