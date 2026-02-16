@@ -46,6 +46,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<IChangeRepository, ChangeRepository>();
 builder.Services.AddScoped<IChangeService, ChangeService>();
@@ -56,6 +57,7 @@ builder.Services.AddScoped<IAttachmentService, AttachmentService>();
 builder.Services.AddScoped<IChangeTaskRepository, ChangeTaskRepository>();
 builder.Services.AddScoped<IChangeTaskService, ChangeTaskService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<ITemplateService, TemplateService>();
 
 var app = builder.Build();
 
