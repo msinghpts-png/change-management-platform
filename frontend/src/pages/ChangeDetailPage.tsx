@@ -154,7 +154,11 @@ const ChangeDetailPage = () => {
     impactDescription.trim() &&
     rollbackPlan.trim()
   );
+  const isSubmitDisabled = loading || !isSubmitReady;
 
+  useEffect(() => {
+    console.log("Submit state", { isSubmitReady, isSubmitDisabled, id });
+  }, [isSubmitReady, isSubmitDisabled, id]);
 
   const refreshRelatedData = async (changeId: string) => {
     if (!apiClient.isValidId(changeId)) return;
@@ -298,6 +302,8 @@ const ChangeDetailPage = () => {
   };
 
   const submitForApproval = async () => {
+    console.log("Submit clicked");
+    console.log("Submit diagnostics", { isSubmitReady, isSubmitDisabled, isDirty, id });
     setError(null);
 
     let targetId = id;
@@ -564,7 +570,7 @@ const ChangeDetailPage = () => {
             <button className="btn" onClick={saveDraft} disabled={loading}>
               💾 Save Draft
             </button>
-            <button className="btn btn-primary" onClick={submitForApproval} disabled={loading || !isSubmitReady}>
+            <button type="button" className="btn btn-primary" onClick={submitForApproval} disabled={isSubmitDisabled}>
               ✈ Submit for Approval
             </button>
           </div>
