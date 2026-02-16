@@ -1,5 +1,6 @@
 using ChangeManagement.Api.Data;
 using ChangeManagement.Api.Domain.Entities;
+using ChangeManagement.Api.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChangeManagement.Api.Services;
@@ -26,7 +27,8 @@ public class DatabaseInitializer : IDatabaseInitializer
                 Upn = "system@local",
                 DisplayName = "System User",
                 Role = "Admin",
-                IsActive = true
+                IsActive = true,
+                PasswordHash = PasswordHasher.Hash("Admin123!")
             });
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
