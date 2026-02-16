@@ -124,7 +124,13 @@ public class ChangesController : ControllerBase
         {
             ChangeRequestId = Guid.NewGuid(),
             Title = request.Title,
-            Description = request.Description,
+            Description = request.Description ?? string.Empty,
+            ImplementationSteps = request.ImplementationSteps,
+            BackoutPlan = request.BackoutPlan,
+            ServiceSystem = request.ServiceSystem,
+            Category = request.Category,
+            Environment = request.Environment,
+            BusinessJustification = request.BusinessJustification,
             ChangeTypeId = changeTypeId,
             PriorityId = priorityId,
             StatusId = 1,
@@ -149,7 +155,13 @@ public class ChangesController : ControllerBase
         if (existing is null) return NotFound();
 
         existing.Title = string.IsNullOrWhiteSpace(request.Title) ? existing.Title : request.Title;
-        existing.Description = string.IsNullOrWhiteSpace(request.Description) ? existing.Description : request.Description;
+        existing.Description = request.Description ?? existing.Description;
+        existing.ImplementationSteps = request.ImplementationSteps ?? existing.ImplementationSteps;
+        existing.BackoutPlan = request.BackoutPlan ?? existing.BackoutPlan;
+        existing.ServiceSystem = request.ServiceSystem ?? existing.ServiceSystem;
+        existing.Category = request.Category ?? existing.Category;
+        existing.Environment = request.Environment ?? existing.Environment;
+        existing.BusinessJustification = request.BusinessJustification ?? existing.BusinessJustification;
         existing.ChangeTypeId = request.ChangeTypeId > 0 ? request.ChangeTypeId : existing.ChangeTypeId;
         existing.PriorityId = request.PriorityId > 0 ? request.PriorityId : existing.PriorityId;
         existing.StatusId = request.StatusId > 0 ? request.StatusId : existing.StatusId;
@@ -206,23 +218,10 @@ public class ChangesController : ControllerBase
         if (change.ChangeTypeId <= 0) return "ChangeTypeId is required before submit.";
         if (change.RiskLevelId <= 0) return "RiskLevel is required before submit.";
         if (!change.PlannedStart.HasValue) return "ImplementationDate is required before submit.";
-
-        var impactDescription = ExtractSection(change.Description, "Description");
-        if (string.IsNullOrWhiteSpace(impactDescription)) return "ImpactDescription is required before submit.";
-
-        var rollbackPlan = ExtractSection(change.Description, "Backout Plan");
-        if (string.IsNullOrWhiteSpace(rollbackPlan)) return "RollbackPlan is required before submit.";
+        if (string.IsNullOrWhiteSpace(change.Description)) return "ImpactDescription is required before submit.";
+        if (string.IsNullOrWhiteSpace(change.BackoutPlan)) return "RollbackPlan is required before submit.";
 
         return null;
-    }
-
-    private static string ExtractSection(string? source, string sectionName)
-    {
-        if (string.IsNullOrWhiteSpace(source)) return string.Empty;
-
-        var pattern = $@"{Regex.Escape(sectionName)}:\s*(.*?)(?:\n[A-Za-z][^\n]*:\s*|$)";
-        var match = Regex.Match(source, pattern, RegexOptions.Singleline);
-        return match.Success ? match.Groups[1].Value.Trim() : string.Empty;
     }
 
     private bool TryParseId(string id, out Guid guidResult, out BadRequestObjectResult badRequest)
@@ -245,6 +244,12 @@ public class ChangesController : ControllerBase
         ChangeNumber = change.ChangeNumber,
         Title = change.Title,
         Description = change.Description,
+        ImplementationSteps = change.ImplementationSteps,
+        BackoutPlan = change.BackoutPlan,
+        ServiceSystem = change.ServiceSystem,
+        Category = change.Category,
+        Environment = change.Environment,
+        BusinessJustification = change.BusinessJustification,
         ChangeTypeId = change.ChangeTypeId,
         PriorityId = change.PriorityId,
         StatusId = change.StatusId,

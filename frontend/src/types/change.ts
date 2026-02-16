@@ -80,13 +80,17 @@ export type ChangeRequest = {
   changeNumber?: string;
   title: string;
   description: string;
+  implementationSteps?: string;
+  backoutPlan?: string;
+  serviceSystem?: string;
+  category?: string;
+  environment?: string;
+  businessJustification?: string;
   changeTypeId?: number;
   status: ChangeRequestStatus;
   priority: ChangePriority;
   riskLevel?: RiskLevel;
   impactLevel?: ImpactLevel;
-  category?: string;
-  environment?: string;
   service?: string;
   requestedBy?: string;
   plannedStart?: string;
@@ -101,7 +105,13 @@ export type ChangeRequest = {
 
 export type ChangeCreateDto = {
   title: string;
-  description: string;
+  description?: string;
+  implementationSteps?: string;
+  backoutPlan?: string;
+  serviceSystem?: string;
+  category?: string;
+  environment?: string;
+  businessJustification?: string;
   changeTypeId?: number;
   priorityId?: number;
   riskLevelId?: number;
@@ -115,6 +125,12 @@ export type ChangeCreateDto = {
 export type ChangeUpdateDto = {
   title?: string;
   description?: string;
+  implementationSteps?: string;
+  backoutPlan?: string;
+  serviceSystem?: string;
+  category?: string;
+  environment?: string;
+  businessJustification?: string;
   changeTypeId?: number;
   priorityId?: number;
   riskLevelId?: number;

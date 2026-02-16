@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiClient } from "../services/apiClient";
 import type { Approval, ApprovalStatus, Attachment, ChangeCreateDto, ChangeRequest, ChangeUpdateDto } from "../types/change";
@@ -39,10 +39,11 @@ const templates = [
     category: "Server",
     risk: "Low",
     description: "Deploy monthly Windows security patches to [SERVER_GROUP] as part of regular patch cycle.",
-    steps: "1. Take VM snapshots\n2. Disable servers in load balancer (rolling)\n3. Install patches via WSUS\n4. Reboot\n5. Validate services\n6. Re-enable in load balancer",
+    implementationSteps: "1. Take VM snapshots\n2. Disable servers in load balancer (rolling)\n3. Install patches via WSUS\n4. Reboot\n5. Validate services\n6. Re-enable in load balancer",
     serviceSystem: "",
     environment: "Non-Production",
-    businessJustification: ""
+    businessJustification: "",
+    backoutPlan: ""
   },
   {
     id: "tpl-firewall",
@@ -50,10 +51,11 @@ const templates = [
     category: "Network",
     risk: "Medium",
     description: "Modify firewall rules on [FIREWALL_NAME] to allow/block traffic for [SERVICE/APPLICATION].",
-    steps: "1. Export current config\n2. Apply rule changes\n3. Validate connectivity\n4. Monitor logs",
+    implementationSteps: "1. Export current config\n2. Apply rule changes\n3. Validate connectivity\n4. Monitor logs",
     serviceSystem: "",
     environment: "Non-Production",
-    businessJustification: ""
+    businessJustification: "",
+    backoutPlan: ""
   },
   {
     id: "tpl-db-maint",
@@ -61,28 +63,13 @@ const templates = [
     category: "Database",
     risk: "Low",
     description: "Perform scheduled database maintenance including index rebuild and statistics update on [DATABASE_NAME].",
-    steps: "1. Confirm maintenance window\n2. Run index/statistics jobs\n3. Validate performance\n4. Confirm backups",
+    implementationSteps: "1. Confirm maintenance window\n2. Run index/statistics jobs\n3. Validate performance\n4. Confirm backups",
     serviceSystem: "",
     environment: "Non-Production",
-    businessJustification: ""
+    businessJustification: "",
+    backoutPlan: ""
   }
 ];
-
-const extractSection = (source: string | undefined, sectionName: string) => {
-  if (!source) return "";
-  const escaped = sectionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`${escaped}:\\s*([\\s\\S]*?)(?=\\n[A-Za-z][^\\n]*:\\s*|$)`, "i");
-  const match = source.match(pattern);
-  return match?.[1]?.trim() ?? "";
-};
-
-const extractLineValue = (source: string | undefined, label: string) => {
-  if (!source) return "";
-  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`(?:^|\\n)${escaped}:\\s*([^\\n]+)`, "i");
-  const match = source.match(pattern);
-  return match?.[1]?.trim() ?? "";
-};
 
 const priorityToId = (priority: string) => {
   const normalized = priority.trim().toUpperCase();
@@ -156,10 +143,6 @@ const ChangeDetailPage = () => {
   );
   const isSubmitDisabled = loading || !isSubmitReady;
 
-  useEffect(() => {
-    console.log("Submit state", { isSubmitReady, isSubmitDisabled, id });
-  }, [isSubmitReady, isSubmitDisabled, id]);
-
   const refreshRelatedData = async (changeId: string) => {
     if (!apiClient.isValidId(changeId)) return;
     const [nextApprovals, nextAttachments] = await Promise.all([
@@ -185,14 +168,14 @@ const ChangeDetailPage = () => {
         setItem(data);
         const descriptionBlob = data.description ?? "";
         setTitle(data.title ?? "");
-        setDescription(extractSection(descriptionBlob, "Description") || descriptionBlob);
-        setBusinessJustification(extractSection(descriptionBlob, "Business Justification"));
-        setImplementationSteps(extractSection(descriptionBlob, "Implementation Steps"));
-        setBackoutPlan(extractSection(descriptionBlob, "Backout Plan"));
-        setService(extractLineValue(descriptionBlob, "Service/System"));
-        setCategory(extractLineValue(descriptionBlob, "Category") || "Application");
-        setEnvironment(extractLineValue(descriptionBlob, "Environment") || "Non-Production");
-        setDowntimeRequired(extractLineValue(descriptionBlob, "Downtime Required").toLowerCase() === "yes");
+        setDescription(data.description ?? "");
+        setBusinessJustification(data.businessJustification ?? "");
+        setImplementationSteps(data.implementationSteps ?? "");
+        setBackoutPlan(data.backoutPlan ?? "");
+        setService(data.serviceSystem ?? data.service ?? "");
+        setCategory(data.category ?? "Application");
+        setEnvironment(data.environment ?? "Non-Production");
+        setDowntimeRequired(false);
         setChangeType(data.changeTypeId === 1 ? "Standard" : data.changeTypeId === 3 ? "Emergency" : "Normal");
         setPriority(data.priority ?? "P3");
         setRiskLevel(data.riskLevel ?? "Medium");
@@ -208,21 +191,25 @@ const ChangeDetailPage = () => {
       });
   }, [id]);
 
-  const compiledDescription = useMemo(() => {
-    // Keep it readable in the DB until backend supports first-class fields.
-    const parts = [
-      description?.trim() ? `Description:\n${description.trim()}` : "",
-      businessJustification?.trim() ? `\nBusiness Justification:\n${businessJustification.trim()}` : "",
-      implementationSteps?.trim() ? `\nImplementation Steps:\n${implementationSteps.trim()}` : "",
-      backoutPlan?.trim() ? `\nBackout Plan:\n${backoutPlan.trim()}` : "",
-      service?.trim() ? `\nService/System: ${service.trim()}` : "",
-      category ? `\nCategory: ${category}` : "",
-      environment ? `\nEnvironment: ${environment}` : "",
-      downtimeRequired ? `\nDowntime Required: Yes` : ""
-    ].filter(Boolean);
+  const isDirty = Boolean(
+    isNew ||
+    !item ||
+    title !== (item.title ?? "") ||
+    description !== (item.description ?? "") ||
+    implementationSteps !== (item.implementationSteps ?? "") ||
+    backoutPlan !== (item.backoutPlan ?? "") ||
+    service !== ((item.serviceSystem ?? item.service) ?? "") ||
+    category !== (item.category ?? "Application") ||
+    environment !== (item.environment ?? "Non-Production") ||
+    businessJustification !== (item.businessJustification ?? "") ||
+    changeTypeId !== (item.changeTypeId ?? 2) ||
+    priority !== (item.priority ?? "P3") ||
+    riskLevel !== (item.riskLevel ?? "Medium") ||
+    impactLevel !== (item.impactLevel ?? "Medium") ||
+    plannedStart !== (item.plannedStart ? item.plannedStart.slice(0, 16) : "") ||
+    plannedEnd !== (item.plannedEnd ? item.plannedEnd.slice(0, 16) : "")
+  );
 
-    return parts.join("\n");
-  }, [description, businessJustification, implementationSteps, backoutPlan, service, category, environment, downtimeRequired]);
 
 
   const isDirty = Boolean(
@@ -245,11 +232,12 @@ const ChangeDetailPage = () => {
     setCategory(tpl.category);
     setRiskLevel(tpl.risk);
     if (!title) setTitle(tpl.name);
-    if (!description) setDescription(tpl.description);
-    if (!implementationSteps) setImplementationSteps(tpl.steps);
-    if (!service && tpl.serviceSystem) setService(tpl.serviceSystem);
-    if (!environment && tpl.environment) setEnvironment(tpl.environment);
-    if (!businessJustification && tpl.businessJustification) setBusinessJustification(tpl.businessJustification);
+    setDescription(tpl.description);
+    setImplementationSteps(tpl.implementationSteps ?? "");
+    setBackoutPlan(tpl.backoutPlan ?? "");
+    setService(tpl.serviceSystem ?? "");
+    setEnvironment(tpl.environment ?? "Non-Production");
+    setBusinessJustification(tpl.businessJustification ?? "");
   };
 
   const saveDraft = async (options?: { navigateOnCreate?: boolean }) => {
@@ -259,7 +247,13 @@ const ChangeDetailPage = () => {
       if (isNew) {
         const payload: ChangeCreateDto = {
           title,
-          description: compiledDescription,
+          description,
+          implementationSteps,
+          backoutPlan,
+          serviceSystem: service,
+          category,
+          environment,
+          businessJustification,
           changeTypeId,
           priority,
           priorityId: priorityToId(priority),
@@ -277,7 +271,13 @@ const ChangeDetailPage = () => {
       } else if (apiClient.isValidId(id)) {
         const payload: ChangeUpdateDto = {
           title,
-          description: compiledDescription,
+          description,
+          implementationSteps,
+          backoutPlan,
+          serviceSystem: service,
+          category,
+          environment,
+          businessJustification,
           changeTypeId,
           priority,
           priorityId: priorityToId(priority),
@@ -302,8 +302,6 @@ const ChangeDetailPage = () => {
   };
 
   const submitForApproval = async () => {
-    console.log("Submit clicked");
-    console.log("Submit diagnostics", { isSubmitReady, isSubmitDisabled, isDirty, id });
     setError(null);
 
     let targetId = id;
@@ -635,7 +633,7 @@ const ChangeDetailPage = () => {
                 <div className="card-title">Implementation Steps</div>
               </div>
               <div className="card-body">
-                <div className="small">This section is currently stored in the description until backend fields are added.</div>
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit" }}>{item?.implementationSteps ?? "—"}</pre>
               </div>
             </div>
 
@@ -644,7 +642,7 @@ const ChangeDetailPage = () => {
                 <div className="card-title">Backout Plan</div>
               </div>
               <div className="card-body">
-                <div className="small">This section is currently stored in the description until backend fields are added.</div>
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit" }}>{item?.backoutPlan ?? "—"}</pre>
               </div>
             </div>
           </div>
@@ -662,7 +660,7 @@ const ChangeDetailPage = () => {
                 <div className="h3">{item?.environment ?? "—"}</div>
                 <div style={{ height: 10 }} />
                 <div className="small">Service</div>
-                <div className="h3">{item?.service ?? "—"}</div>
+                <div className="h3">{item?.serviceSystem ?? item?.service ?? "—"}</div>
               </div>
             </div>
 
