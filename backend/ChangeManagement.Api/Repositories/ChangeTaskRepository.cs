@@ -9,11 +9,17 @@ public class ChangeTaskRepository : IChangeTaskRepository
     private readonly ChangeManagementDbContext _dbContext;
     public ChangeTaskRepository(ChangeManagementDbContext dbContext) => _dbContext = dbContext;
 
-    public Task<List<ChangeTask>> GetByChangeIdAsync(Guid changeId, CancellationToken cancellationToken) =>
-        _dbContext.ChangeTasks.Include(t => t.AssignedToUser).Where(t => t.ChangeId == changeId).ToListAsync(cancellationToken);
+    public Task<List<ChangeTask>> GetByChangeIdAsync(Guid changeRequestId, CancellationToken cancellationToken) =>
+        _dbContext.ChangeTasks
+            .Include(t => t.AssignedToUser)
+            .Include(t => t.Status)
+            .Where(t => t.ChangeRequestId == changeRequestId)
+            .ToListAsync(cancellationToken);
 
-    public Task<ChangeTask?> GetByIdAsync(Guid taskId, CancellationToken cancellationToken) =>
-        _dbContext.ChangeTasks.Include(t => t.AssignedToUser).FirstOrDefaultAsync(t => t.ChangeTaskId == taskId, cancellationToken);
+    public Task<ChangeTask?> GetByIdAsync(Guid taskId, CancellationToken cancellationToken) => _dbContext.ChangeTasks
+        .Include(t => t.AssignedToUser)
+        .Include(t => t.Status)
+        .FirstOrDefaultAsync(t => t.ChangeTaskId == taskId, cancellationToken);
 
     public async Task<ChangeTask> CreateAsync(ChangeTask task, CancellationToken cancellationToken)
     {

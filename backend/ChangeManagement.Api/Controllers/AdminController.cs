@@ -1,34 +1,40 @@
+using ChangeManagement.Api.Data;
 using ChangeManagement.Api.DTOs.Admin;
-using ChangeManagement.Api.Services;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 
 namespace ChangeManagement.Api.Controllers;
 
 [ApiController]
-[Authorize(Roles = "Admin")]
-[Route("api/admin")]
+[Route("api/admin/database")]
 public class AdminController : ControllerBase
 {
-    private readonly IAuditService _auditService;
+    private readonly ChangeManagementDbContext _dbContext;
 
-    public AdminController(IAuditService auditService)
+    public AdminController(ChangeManagementDbContext dbContext) => _dbContext = dbContext;
+
+    [HttpGet("status")]
+    public async Task<ActionResult<DatabaseStatusDto>> GetStatus(CancellationToken cancellationToken)
     {
-        _auditService = auditService;
+        var pending = (await _dbContext.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
+        var csb = new SqlConnectionStringBuilder(_dbContext.Database.GetConnectionString());
+
+        return Ok(new DatabaseStatusDto
+        {
+            DatabaseName = csb.InitialCatalog,
+            TotalChanges = await _dbContext.ChangeRequests.CountAsync(cancellationToken),
+            TotalApprovals = await _dbContext.ChangeApprovals.CountAsync(cancellationToken),
+            TotalAttachments = await _dbContext.ChangeAttachments.CountAsync(cancellationToken),
+            HasPendingMigrations = pending.Count > 0,
+            PendingMigrations = pending
+        });
     }
 
-    [HttpGet("audit")]
-    public async Task<ActionResult<IEnumerable<AuditLogDto>>> GetAudit(CancellationToken cancellationToken)
+    [HttpPost("migrate")]
+    public async Task<IActionResult> RunMigrations(CancellationToken cancellationToken)
     {
-        var logs = await _auditService.ListAsync(cancellationToken);
-        return Ok(logs.Select(x => new AuditLogDto
-        {
-            AuditLogId = x.AuditLogId,
-            ChangeId = x.ChangeId,
-            ActorUserId = x.ActorUserId,
-            Action = x.Action,
-            Details = x.Details,
-            CreatedAt = x.CreatedAt
-        }));
+        await _dbContext.Database.MigrateAsync(cancellationToken);
+        return Ok(new { message = "Migrations applied successfully." });
     }
 }

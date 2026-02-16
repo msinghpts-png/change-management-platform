@@ -5,33 +5,46 @@ namespace ChangeManagement.Api.Services;
 
 public interface IApprovalService
 {
-    Task<ChangeApproval> CreateDecisionAsync(Guid changeId, bool isApproved, string comments, Guid actorUserId, CancellationToken cancellationToken);
-    Task<List<ChangeApproval>> GetApprovalsForChangeAsync(Guid changeId, CancellationToken cancellationToken);
+    Task<ChangeApproval> CreateApprovalAsync(ChangeApproval approval, CancellationToken cancellationToken);
+    Task<List<ChangeApproval>> GetApprovalsForChangeAsync(Guid changeRequestId, CancellationToken cancellationToken);
+    Task<ChangeApproval?> RecordDecisionAsync(Guid changeId, Guid approvalId, int approvalStatusId, string comments, CancellationToken cancellationToken);
 }
 
 public class ApprovalService : IApprovalService
 {
     private readonly IApprovalRepository _repository;
+    private readonly IChangeRepository _changeRepository;
+    private readonly IAuditService _audit;
 
-    public ApprovalService(IApprovalRepository repository)
+    public ApprovalService(IApprovalRepository repository, IChangeRepository changeRepository, IAuditService audit)
     {
         _repository = repository;
+        _changeRepository = changeRepository;
+        _audit = audit;
     }
 
-    public Task<List<ChangeApproval>> GetApprovalsForChangeAsync(Guid changeId, CancellationToken cancellationToken) => _repository.GetByChangeAsync(changeId, cancellationToken);
+    public Task<ChangeApproval> CreateApprovalAsync(ChangeApproval approval, CancellationToken cancellationToken) => _repository.CreateAsync(approval, cancellationToken);
+    public Task<List<ChangeApproval>> GetApprovalsForChangeAsync(Guid changeRequestId, CancellationToken cancellationToken) => _repository.GetByChangeAsync(changeRequestId, cancellationToken);
 
-    public Task<ChangeApproval> CreateDecisionAsync(Guid changeId, bool isApproved, string comments, Guid actorUserId, CancellationToken cancellationToken)
+    public async Task<ChangeApproval?> RecordDecisionAsync(Guid changeId, Guid approvalId, int approvalStatusId, string comments, CancellationToken cancellationToken)
     {
-        var entity = new ChangeApproval
+        var approval = await _repository.GetByIdAsync(approvalId, cancellationToken);
+        if (approval is null || approval.ChangeRequestId != changeId)
         {
-            ChangeApprovalId = Guid.NewGuid(),
-            ChangeId = changeId,
-            CabUserId = actorUserId,
-            IsApproved = isApproved,
-            Comments = comments,
-            DecisionDate = DateTime.UtcNow
-        };
+            return null;
+        }
 
-        return _repository.CreateAsync(entity, cancellationToken);
+        approval.ApprovalStatusId = approvalStatusId;
+        approval.Comments = comments;
+        approval.ApprovedAt = DateTime.UtcNow;
+        await _repository.SaveAsync(cancellationToken);
+
+        var change = await _changeRepository.GetByIdAsync(changeId, cancellationToken);
+        if (change is not null)
+        {
+            await _audit.LogAsync(4, approval.ApproverUserId, "system@local", "cm", "ChangeApproval", approval.ChangeApprovalId, change.ChangeNumber.ToString(), "Decision", comments, cancellationToken);
+        }
+
+        return approval;
     }
 }

@@ -16,15 +16,18 @@ public class ApprovalRepository : IApprovalRepository
         return await GetByIdAsync(approval.ChangeApprovalId, cancellationToken) ?? approval;
     }
 
-    public Task<List<ChangeApproval>> GetByChangeAsync(Guid changeId, CancellationToken cancellationToken) =>
+    public Task<List<ChangeApproval>> GetByChangeAsync(Guid changeRequestId, CancellationToken cancellationToken) =>
         _dbContext.ChangeApprovals
-            .Include(a => a.CabUser)
-            .Where(a => a.ChangeId == changeId)
-            .OrderByDescending(a => a.DecisionDate)
+            .Include(a => a.ApproverUser)
+            .Include(a => a.ApprovalStatus)
+            .Where(a => a.ChangeRequestId == changeRequestId)
             .ToListAsync(cancellationToken);
 
     public Task<ChangeApproval?> GetByIdAsync(Guid approvalId, CancellationToken cancellationToken) =>
-        _dbContext.ChangeApprovals.Include(a => a.CabUser).FirstOrDefaultAsync(a => a.ChangeApprovalId == approvalId, cancellationToken);
+        _dbContext.ChangeApprovals
+            .Include(a => a.ApproverUser)
+            .Include(a => a.ApprovalStatus)
+            .FirstOrDefaultAsync(a => a.ChangeApprovalId == approvalId, cancellationToken);
 
     public Task SaveAsync(CancellationToken cancellationToken) => _dbContext.SaveChangesAsync(cancellationToken);
 }
