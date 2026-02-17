@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using ChangeManagement.Api.DTOs;
 using ChangeManagement.Api.Extensions;
 using ChangeManagement.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -24,23 +23,29 @@ public class AttachmentsController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<AttachmentDto>> Upload(Guid changeId, [FromForm] AttachmentUploadDto request, CancellationToken cancellationToken)
+    public async Task<ActionResult<AttachmentDto>> Upload(Guid changeId, [FromForm] IFormFile? file, CancellationToken cancellationToken)
     {
-        Guid? uploadedBy = null;
-        var actorValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (Guid.TryParse(actorValue, out var actorGuid) && actorGuid != Guid.Empty)
+        try
         {
-            uploadedBy = actorGuid;
-        }
+            Guid? uploadedBy = null;
+            var actorValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (Guid.TryParse(actorValue, out var actorGuid) && actorGuid != Guid.Empty)
+            {
+                uploadedBy = actorGuid;
+            }
 
-        var uploadFile = request.File ?? request.FileLowerCase ?? Request.Form?.Files.FirstOrDefault();
-        if (uploadFile is null)
+            if (file is null)
+            {
+                return BadRequest("File is required.");
+            }
+
+            var result = await _attachmentService.UploadAsync(changeId, file, uploadedBy, cancellationToken);
+            return result.Attachment is null ? BadRequest(result.Error) : Ok(result.Attachment.ToDto());
+        }
+        catch (Exception ex)
         {
-            return BadRequest("File is required.");
+            return Problem(title: "Attachment upload failed", detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
         }
-
-        var result = await _attachmentService.UploadAsync(changeId, uploadFile, uploadedBy, cancellationToken);
-        return result.Attachment is null ? BadRequest(result.Error) : CreatedAtAction(nameof(List), new { changeId }, result.Attachment.ToDto());
     }
 
     [HttpGet("{attachmentId:guid}/download")]

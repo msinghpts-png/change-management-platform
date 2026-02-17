@@ -17,11 +17,11 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
-      - name: Restore API
-        run: dotnet restore backend/ChangeManagement.Api/ChangeManagement.Api.csproj
+      - name: Restore backend
+        run: dotnet restore change-management-platform.sln
 
-      - name: Build API
-        run: dotnet build backend/ChangeManagement.Api/ChangeManagement.Api.csproj --no-restore
+      - name: Build backend
+        run: dotnet build change-management-platform.sln --no-restore
 
       - name: Test API
         run: dotnet test backend/ChangeManagement.Api.Tests/ChangeManagement.Api.Tests.csproj --no-build

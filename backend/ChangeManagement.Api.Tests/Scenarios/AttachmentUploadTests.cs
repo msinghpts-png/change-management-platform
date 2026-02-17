@@ -13,6 +13,8 @@ public class AttachmentUploadTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task UploadAttachment_ReturnsCreated()
     {
+        await AuthTestHelper.AuthenticateAsAdminAsync(_client);
+
         var createResponse = await _client.PostAsJsonAsync("/api/changes", new
         {
             Title = "attachment-test",
@@ -29,7 +31,7 @@ public class AttachmentUploadTests : IClassFixture<CustomWebApplicationFactory>
         using var form = new MultipartFormDataContent();
         using var file = new ByteArrayContent("hello"u8.ToArray());
         file.Headers.ContentType = MediaTypeHeaderValue.Parse("text/plain");
-        form.Add(file, "File", "note.txt");
+        form.Add(file, "file", "note.txt");
 
         var response = await _client.PostAsync($"/api/changes/{changeId}/attachments", form);
         response.EnsureSuccessStatusCode();
