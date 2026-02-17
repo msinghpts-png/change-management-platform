@@ -183,6 +183,17 @@ export const apiClient = {
       body: JSON.stringify({ newPassword })
     }),
 
+  getAuditEvents: () => request<any[]>("/admin/audit"),
+
+  getAllAttachments: (changeNumber?: string) => request<any[]>(`/admin/attachments${changeNumber ? `?changeNumber=${encodeURIComponent(changeNumber)}` : ""}`),
+  deleteAdminAttachment: (attachmentId: string) => request<void>(`/admin/attachments/${attachmentId}`, { method: "DELETE" }),
+
+  resetUserPassword: (id: string, newPassword: string) => request<{ message: string }>(`/admin/users/${id}/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newPassword })
+    }),
+
   login: (upn: string, password: string) => request<{ token: string; user: AppUser }>("/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
