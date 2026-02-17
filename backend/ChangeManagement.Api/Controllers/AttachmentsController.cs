@@ -31,7 +31,7 @@ public class AttachmentsController : ControllerBase
             uploadedBy = actorGuid;
         }
 
-        var uploadFile = request.File ?? Request.Form?.Files.FirstOrDefault();
+        var uploadFile = request.File ?? request.FileLowerCase ?? Request.Form?.Files.FirstOrDefault();
         if (uploadFile is null)
         {
             return BadRequest("File is required.");

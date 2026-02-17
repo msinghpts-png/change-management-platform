@@ -4,6 +4,8 @@ namespace ChangeManagement.Api.DTOs;
 
 public class AttachmentUploadDto
 {
-    [FromForm(Name = "file")]
     public IFormFile? File { get; set; }
+
+    [FromForm(Name = "file")]
+    public IFormFile? FileLowerCase { get; set; }
 }
