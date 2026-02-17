@@ -41,20 +41,32 @@ public class ApprovalService : IApprovalService
             return null;
         }
 
+        var change = await _changeRepository.GetByIdAsync(changeId, cancellationToken);
+        if (change is null)
+        {
+            return null;
+        }
+
+        if (approval.ApproverUserId == Guid.Empty)
+        {
+            return null;
+        }
+
         approval.ApprovalStatusId = approvalStatusId;
         approval.Comments = comments;
         approval.ApprovedAt = DateTime.UtcNow;
         await _repository.SaveAsync(cancellationToken);
 
-        var change = await _changeRepository.GetByIdAsync(changeId, cancellationToken);
-        if (change is not null)
+        if (approvalStatusId == 2) change.StatusId = 3;
+        if (approvalStatusId == 3) change.StatusId = 4;
+
+        var updatedChange = await _changeService.UpdateAsync(change, cancellationToken);
+        if (updatedChange is null)
         {
-            if (approvalStatusId == 2) change.StatusId = 3;
-            if (approvalStatusId == 3) change.StatusId = 4;
-            await _changeService.UpdateAsync(change, cancellationToken);
-            await _audit.LogAsync(4, approval.ApproverUserId, ResolveActorUpn(), "cm", "ChangeApproval", approval.ChangeApprovalId, change.ChangeNumber.ToString(), approvalStatusId == 2 ? "Approve" : "Reject", comments, cancellationToken);
+            return null;
         }
 
+        await _audit.LogAsync(4, approval.ApproverUserId, ResolveActorUpn(), "cm", "ChangeApproval", approval.ChangeApprovalId, change.ChangeNumber.ToString(), approvalStatusId == 2 ? "Approve" : "Reject", comments, cancellationToken);
         return approval;
     }
 

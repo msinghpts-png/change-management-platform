@@ -267,6 +267,8 @@ const ChangeDetailPage = () => {
     setLoading(true);
     try {
       if (isNew) {
+        const authUserRaw = localStorage.getItem("authUser");
+        const authUser = authUserRaw ? JSON.parse(authUserRaw) as { id?: string } : null;
         const payload: ChangeCreateDto = {
           title,
           description,
@@ -283,6 +285,7 @@ const ChangeDetailPage = () => {
           riskLevelId: riskLevelIdValue,
           impactLevel,
           impactTypeId: impactTypeIdValue,
+          requestedByUserId: authUser?.id,
           plannedStart: plannedStart ? new Date(plannedStart).toISOString() : undefined,
           plannedEnd: plannedEnd ? new Date(plannedEnd).toISOString() : undefined
         };
@@ -411,6 +414,19 @@ const ChangeDetailPage = () => {
       setError((e as Error).message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const downloadAttachment = async (attachmentId: string, fileName: string) => {
+    if (!apiClient.isValidId(id)) {
+      setError("Invalid change request id.");
+      return;
+    }
+
+    try {
+      await apiClient.downloadAttachment(id, attachmentId, fileName);
+    } catch (e) {
+      setError((e as Error).message);
     }
   };
 
@@ -634,7 +650,7 @@ const ChangeDetailPage = () => {
                         <div className="h3">{attachment.fileName}</div>
                         <div className="small">{Math.round(attachment.sizeBytes / 1024)} KB</div>
                       </div>
-                      <a className="btn" href={`/api/changes/${id}/attachments/${attachment.id}/download`}>Download</a>
+                      <button type="button" className="btn" onClick={() => { void downloadAttachment(attachment.id, attachment.fileName); }}>Download</button>
                     </div>
                   ))}
                   {!attachments.length ? <div className="empty">No attachments uploaded.</div> : null}
@@ -657,27 +673,6 @@ const ChangeDetailPage = () => {
             </div>
           ) : null}
         </div>
-
-        {!isNew ? (
-          <div className="card card-pad" style={{ marginTop: 12 }}>
-            <div className="h3">Attachments</div>
-            <div className="small">Allowed: pdf, doc(x), xls(x), png, jpg. Max 5 MB.</div>
-            <input className="input" style={{ marginTop: 8 }} type="file" onChange={(e) => setSelectedAttachment(e.target.files?.[0] ?? null)} />
-            <div style={{ marginTop: 8 }}><button className="btn btn-primary" disabled={!selectedAttachment || uploadingAttachment} onClick={uploadAttachment}>{uploadingAttachment ? "Uploading..." : "Upload Attachment"}</button></div>
-            <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
-              {attachments.map((attachment) => (
-                <div key={attachment.id} className="row">
-                  <div className="row-left">
-                    <div className="h3">{attachment.fileName}</div>
-                    <div className="small">{Math.round(attachment.sizeBytes / 1024)} KB</div>
-                  </div>
-                  <a className="btn" href={`/api/changes/${id}/attachments/${attachment.id}/download`}>Download</a>
-                </div>
-              ))}
-              {!attachments.length ? <div className="empty">No attachments uploaded.</div> : null}
-            </div>
-          </div>
-        ) : null}
       </div>
     );
   }
@@ -846,7 +841,7 @@ const ChangeDetailPage = () => {
                   <div className="h3">{attachment.fileName}</div>
                   <div className="small">{Math.round(attachment.sizeBytes / 1024)} KB</div>
                 </div>
-                <a className="btn" href={`/api/changes/${id}/attachments/${attachment.id}/download`}>Download</a>
+                <button type="button" className="btn" onClick={() => { void downloadAttachment(attachment.id, attachment.fileName); }}>Download</button>
               </div>
             ))}
             {!attachments.length ? <div className="empty">No attachments uploaded.</div> : null}
