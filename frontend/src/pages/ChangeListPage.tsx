@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiClient } from "../services/apiClient";
 import type { ChangeRequest } from "../types/change";
+import { labelForChangeType, pillForChangeType, pillForImpactLevel, pillForRiskLevel } from "../utils/trafficColors";
 
 type FilterKey = "All" | "Draft" | "Pending" | "Approved" | "In Progress" | "Closed";
 
@@ -149,14 +150,14 @@ const ChangeListPage = () => {
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span className="mono">{c.changeNumber ?? "CHG-000000"}</span>
                     <span className={pillForPriority(c.priority)}>{c.priority ?? "P3"}</span>
-                    <span className="pill pill-blue">Normal</span>
+                    <span className={pillForChangeType(c.changeTypeId)}>{labelForChangeType(c.changeTypeId)}</span>
                   </div>
                   <div className="h3" style={{ marginTop: 4 }}>{c.title}</div>
                   <div className="small" style={{ marginTop: 4 }}>
                     {c.description ?? "—"}
                   </div>
                   <div className="small" style={{ marginTop: 10 }}>
-                    {c.category ?? "—"} &nbsp;•&nbsp; {fmtDate(c.plannedStart)} &nbsp;•&nbsp; {c.requestedBy ?? "admin@example.com"}
+                    {c.category ?? "—"} &nbsp;•&nbsp; {fmtDate(c.plannedStart)} &nbsp;•&nbsp; {c.requestedBy ?? "admin@example.com"} {c.riskLevel ? <span className={pillForRiskLevel(c.riskLevel)} style={{ marginLeft: 8 }}>Risk: {c.riskLevel}</span> : null} {c.impactLevel ? <span className={pillForImpactLevel(c.impactLevel)} style={{ marginLeft: 8 }}>Impact: {c.impactLevel}</span> : null}
                   </div>
                 </div>
 

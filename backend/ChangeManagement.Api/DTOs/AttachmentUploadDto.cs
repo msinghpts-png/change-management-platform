@@ -1,6 +1,9 @@
+using Microsoft.AspNetCore.Mvc;
+
 namespace ChangeManagement.Api.DTOs;
 
 public class AttachmentUploadDto
 {
-    public IFormFile File { get; set; } = null!;
+    [FromForm(Name = "file")]
+    public IFormFile? File { get; set; }
 }

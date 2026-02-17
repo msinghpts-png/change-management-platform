@@ -34,3 +34,8 @@ public class UpdateUserDto
     public string Role { get; set; } = "User";
     public bool IsActive { get; set; }
 }
+
+public class ResetPasswordDto
+{
+    public string NewPassword { get; set; } = string.Empty;
+}

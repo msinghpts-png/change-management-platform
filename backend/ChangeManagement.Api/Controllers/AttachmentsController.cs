@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using ChangeManagement.Api.DTOs;
 using ChangeManagement.Api.Extensions;
 using ChangeManagement.Api.Services;
@@ -21,9 +22,22 @@ public class AttachmentsController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<AttachmentDto>> Upload(Guid changeId, [FromForm] AttachmentUploadDto request, [FromQuery] Guid uploadedBy, CancellationToken cancellationToken)
+    public async Task<ActionResult<AttachmentDto>> Upload(Guid changeId, [FromForm] AttachmentUploadDto request, CancellationToken cancellationToken)
     {
-        var result = await _attachmentService.UploadAsync(changeId, request.File, uploadedBy, cancellationToken);
+        Guid? uploadedBy = null;
+        var actorValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (Guid.TryParse(actorValue, out var actorGuid) && actorGuid != Guid.Empty)
+        {
+            uploadedBy = actorGuid;
+        }
+
+        var uploadFile = request.File ?? Request.Form?.Files.FirstOrDefault();
+        if (uploadFile is null)
+        {
+            return BadRequest("File is required.");
+        }
+
+        var result = await _attachmentService.UploadAsync(changeId, uploadFile, uploadedBy, cancellationToken);
         return result.Attachment is null ? BadRequest(result.Error) : CreatedAtAction(nameof(List), new { changeId }, result.Attachment.ToDto());
     }
 
