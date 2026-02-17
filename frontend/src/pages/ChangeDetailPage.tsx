@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiClient } from "../services/apiClient";
-import type { Approval, ApprovalStatus, Attachment, ChangeCreateDto, ChangeRequest, ChangeUpdateDto } from "../types/change";
+import type { Approval, ApprovalStatus, Attachment, ChangeCreateDto, ChangeRequest, ChangeTask, ChangeTemplate, ChangeUpdateDto } from "../types/change";
+import { labelForChangeType, pillForChangeType, pillForImpactLevel, pillForRiskLevel } from "../utils/trafficColors";
 
 type ViewTab = "Overview" | "Approvals" | "Tasks" | "Attachments";
-type FormTab = "Basic Info" | "Schedule" | "Plans" | "Risk & Impact";
+type FormTab = "Basic Info" | "Schedule" | "Plans" | "Risk & Impact" | "Attachments";
 
 const pillForStatus = (status?: string) => {
   const s = (status ?? "").toLowerCase();
@@ -32,32 +33,70 @@ const fmtDT = (value?: string) => {
   return d.toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 };
 
-const templates = [
+const fallbackTemplates: ChangeTemplate[] = [
   {
-    id: "tpl-windows-patch",
+    templateId: "00000000-0000-0000-0000-000000000001",
     name: "Windows Security Patch",
     category: "Server",
-    risk: "Low",
     description: "Deploy monthly Windows security patches to [SERVER_GROUP] as part of regular patch cycle.",
-    steps: "1. Take VM snapshots\n2. Disable servers in load balancer (rolling)\n3. Install patches via WSUS\n4. Reboot\n5. Validate services\n6. Re-enable in load balancer"
+    implementationSteps: "1. Take VM snapshots\n2. Disable servers in load balancer (rolling)\n3. Install patches via WSUS\n4. Reboot\n5. Validate services\n6. Re-enable in load balancer",
+    serviceSystem: "",
+    environment: "Non-Production",
+    businessJustification: "",
+    backoutPlan: "",
+    isActive: true,
+    changeTypeId: 1,
+    riskLevelId: 1
   },
   {
-    id: "tpl-firewall",
+    templateId: "00000000-0000-0000-0000-000000000002",
     name: "Network Firewall Rule Change",
     category: "Network",
-    risk: "Medium",
     description: "Modify firewall rules on [FIREWALL_NAME] to allow/block traffic for [SERVICE/APPLICATION].",
-    steps: "1. Export current config\n2. Apply rule changes\n3. Validate connectivity\n4. Monitor logs"
+    implementationSteps: "1. Export current config\n2. Apply rule changes\n3. Validate connectivity\n4. Monitor logs",
+    serviceSystem: "",
+    environment: "Non-Production",
+    businessJustification: "",
+    backoutPlan: "",
+    isActive: true,
+    changeTypeId: 1,
+    riskLevelId: 1
   },
   {
-    id: "tpl-db-maint",
+    templateId: "00000000-0000-0000-0000-000000000003",
     name: "Database Maintenance",
     category: "Database",
-    risk: "Low",
     description: "Perform scheduled database maintenance including index rebuild and statistics update on [DATABASE_NAME].",
-    steps: "1. Confirm maintenance window\n2. Run index/statistics jobs\n3. Validate performance\n4. Confirm backups"
+    implementationSteps: "1. Confirm maintenance window\n2. Run index/statistics jobs\n3. Validate performance\n4. Confirm backups",
+    serviceSystem: "",
+    environment: "Non-Production",
+    businessJustification: "",
+    backoutPlan: "",
+    isActive: true,
+    changeTypeId: 2,
+    riskLevelId: 2
   }
 ];
+
+const priorityToId = (priority: string) => {
+  const normalized = priority.trim().toUpperCase();
+  if (normalized === "P1") return 4;
+  if (normalized === "P2") return 3;
+  if (normalized === "P4") return 1;
+  return 2;
+};
+
+const riskIdToLabel = (riskLevelId?: number) => {
+  if (riskLevelId === 1) return "Low";
+  if (riskLevelId === 3) return "High";
+  return "Medium";
+};
+
+const impactIdToLabel = (impactTypeId?: number) => {
+  if (impactTypeId === 1) return "Low";
+  if (impactTypeId === 3) return "High";
+  return "Medium";
+};
 
 const ChangeDetailPage = () => {
   const nav = useNavigate();
@@ -76,6 +115,9 @@ const ChangeDetailPage = () => {
 
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [tasks, setTasks] = useState<ChangeTask[]>([]);
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
   const [approverEmail, setApproverEmail] = useState("");
   const [approvalComment, setApprovalComment] = useState("");
   const [decisionComment, setDecisionComment] = useState("");
@@ -90,26 +132,55 @@ const ChangeDetailPage = () => {
   const [implementationSteps, setImplementationSteps] = useState("");
   const [backoutPlan, setBackoutPlan] = useState("");
 
+  const [changeTypeIdValue, setChangeTypeIdValue] = useState(2);
   const [priority, setPriority] = useState("P3");
-  const [riskLevel, setRiskLevel] = useState("Medium");
-  const [impactLevel, setImpactLevel] = useState("Medium");
+  const [riskLevelIdValue, setRiskLevelIdValue] = useState(2);
+  const [impactTypeIdValue, setImpactTypeIdValue] = useState(2);
 
   const [plannedStart, setPlannedStart] = useState("");
   const [plannedEnd, setPlannedEnd] = useState("");
   const [downtimeRequired, setDowntimeRequired] = useState(false);
 
   const [templateId, setTemplateId] = useState("");
+  const [templates, setTemplates] = useState<ChangeTemplate[]>(fallbackTemplates);
+  const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
+  const changeTypeId = changeTypeIdValue;
+  const riskLevel = riskIdToLabel(riskLevelIdValue);
+  const impactLevel = impactIdToLabel(impactTypeIdValue);
+  const implementationDate = plannedStart;
+  const impactDescription = description;
+  const rollbackPlan = backoutPlan;
+
+  const isSubmitReady = Boolean(
+    title.trim() &&
+    changeTypeId &&
+    riskLevel &&
+    implementationDate &&
+    impactDescription.trim() &&
+    rollbackPlan.trim()
+  );
+  const isSubmitDisabled = loading || !isSubmitReady;
+  const submitBlockers: string[] = [];
+  if (!title.trim()) submitBlockers.push("Title is required");
+  if (!changeTypeId) submitBlockers.push("Change Type is required");
+  if (!riskLevel) submitBlockers.push("Risk Level is required");
+  if (!implementationDate) submitBlockers.push("Implementation Date is required");
+  if (!impactDescription.trim()) submitBlockers.push("Impact Description is required");
+  if (!rollbackPlan.trim()) submitBlockers.push("Backout Plan is required");
 
   const refreshRelatedData = async (changeId: string) => {
     if (!apiClient.isValidId(changeId)) return;
-    const [nextApprovals, nextAttachments] = await Promise.all([
+    const [nextApprovals, nextAttachments, nextTasks] = await Promise.all([
       apiClient.getApprovals(changeId),
-      apiClient.getAttachments(changeId)
+      apiClient.getAttachments(changeId),
+      apiClient.getTasks(changeId)
     ]);
 
     setApprovals(nextApprovals ?? []);
     setAttachments(nextAttachments ?? []);
+    setTasks(nextTasks ?? []);
   };
 
   useEffect(() => {
@@ -126,9 +197,17 @@ const ChangeDetailPage = () => {
         setItem(data);
         setTitle(data.title ?? "");
         setDescription(data.description ?? "");
+        setBusinessJustification(data.businessJustification ?? "");
+        setImplementationSteps(data.implementationSteps ?? "");
+        setBackoutPlan(data.backoutPlan ?? "");
+        setService(data.serviceSystem ?? data.service ?? "");
+        setCategory(data.category ?? "Application");
+        setEnvironment(data.environment ?? "Non-Production");
+        setDowntimeRequired(false);
+        setChangeTypeIdValue(data.changeTypeId ?? 2);
         setPriority(data.priority ?? "P3");
-        setRiskLevel(data.riskLevel ?? "Medium");
-        setImpactLevel(data.impactLevel ?? "Medium");
+        setRiskLevelIdValue(data.riskLevelId ?? (data.riskLevel?.toLowerCase() === "low" ? 1 : data.riskLevel?.toLowerCase() === "high" ? 3 : 2));
+        setImpactTypeIdValue(data.impactTypeId ?? (data.impactLevel?.toLowerCase() === "low" ? 1 : data.impactLevel?.toLowerCase() === "high" ? 3 : 2));
         setPlannedStart(data.plannedStart ? data.plannedStart.slice(0, 16) : "");
         setPlannedEnd(data.plannedEnd ? data.plannedEnd.slice(0, 16) : "");
         refreshRelatedData(id).catch(() => void 0);
@@ -140,87 +219,140 @@ const ChangeDetailPage = () => {
       });
   }, [id]);
 
-  const compiledDescription = useMemo(() => {
-    // Keep it readable in the DB until backend supports first-class fields.
-    const parts = [
-      description?.trim() ? `Description:\n${description.trim()}` : "",
-      businessJustification?.trim() ? `\nBusiness Justification:\n${businessJustification.trim()}` : "",
-      implementationSteps?.trim() ? `\nImplementation Steps:\n${implementationSteps.trim()}` : "",
-      backoutPlan?.trim() ? `\nBackout Plan:\n${backoutPlan.trim()}` : "",
-      service?.trim() ? `\nService/System: ${service.trim()}` : "",
-      category ? `\nCategory: ${category}` : "",
-      environment ? `\nEnvironment: ${environment}` : "",
-      downtimeRequired ? `\nDowntime Required: Yes` : ""
-    ].filter(Boolean);
+  useEffect(() => {
+    apiClient.getTemplates().then((items) => {
+      if (items?.length) setTemplates(items.filter((x) => x.isActive));
+    }).catch(() => void 0);
+  }, []);
 
-    return parts.join("\n");
-  }, [description, businessJustification, implementationSteps, backoutPlan, service, category, environment, downtimeRequired]);
+  const formIsDirty = Boolean(
+    isNew ||
+    !item ||
+    title !== (item.title ?? "") ||
+    description !== (item.description ?? "") ||
+    implementationSteps !== (item.implementationSteps ?? "") ||
+    backoutPlan !== (item.backoutPlan ?? "") ||
+    service !== ((item.serviceSystem ?? item.service) ?? "") ||
+    category !== (item.category ?? "Application") ||
+    environment !== (item.environment ?? "Non-Production") ||
+    businessJustification !== (item.businessJustification ?? "") ||
+    changeTypeId !== (item.changeTypeId ?? 2) ||
+    priority !== (item.priority ?? "P3") ||
+    riskLevelIdValue !== (item.riskLevelId ?? ((item.riskLevel ?? "Medium").toLowerCase() === "low" ? 1 : (item.riskLevel ?? "Medium").toLowerCase() === "high" ? 3 : 2)) ||
+    impactTypeIdValue !== (item.impactTypeId ?? ((item.impactLevel ?? "Medium").toLowerCase() === "low" ? 1 : (item.impactLevel ?? "Medium").toLowerCase() === "high" ? 3 : 2)) ||
+    plannedStart !== (item.plannedStart ? item.plannedStart.slice(0, 16) : "") ||
+    plannedEnd !== (item.plannedEnd ? item.plannedEnd.slice(0, 16) : "")
+  );
+
 
   const applyTemplate = (tplId: string) => {
     setTemplateId(tplId);
-    const tpl = templates.find((t) => t.id === tplId);
+    const tpl = templates.find((t) => t.templateId === tplId);
     if (!tpl) return;
     setCategory(tpl.category);
-    setRiskLevel(tpl.risk);
     if (!title) setTitle(tpl.name);
-    if (!description) setDescription(tpl.description);
-    if (!implementationSteps) setImplementationSteps(tpl.steps);
+    setDescription(tpl.description);
+    setImplementationSteps(tpl.implementationSteps ?? "");
+    setBackoutPlan(tpl.backoutPlan ?? "");
+    setService(tpl.serviceSystem ?? "");
+    setEnvironment(tpl.environment ?? "Non-Production");
+    setBusinessJustification(tpl.businessJustification ?? "");
+    if (tpl.changeTypeId) setChangeTypeIdValue(tpl.changeTypeId);
+    if (tpl.riskLevelId) setRiskLevelIdValue(tpl.riskLevelId);
   };
 
-  const saveDraft = async () => {
+  const saveDraft = async (options?: { navigateOnCreate?: boolean }) => {
     setError(null);
     setLoading(true);
     try {
       if (isNew) {
         const payload: ChangeCreateDto = {
           title,
-          description: compiledDescription,
+          description,
+          implementationSteps,
+          backoutPlan,
+          serviceSystem: service,
+          category,
+          environment,
+          businessJustification,
+          changeTypeId,
           priority,
+          priorityId: priorityToId(priority),
           riskLevel,
+          riskLevelId: riskLevelIdValue,
           impactLevel,
+          impactTypeId: impactTypeIdValue,
           plannedStart: plannedStart ? new Date(plannedStart).toISOString() : undefined,
           plannedEnd: plannedEnd ? new Date(plannedEnd).toISOString() : undefined
         };
         const created = await apiClient.createChange(payload);
-        nav(`/changes/${created.id}`);
+        if (options?.navigateOnCreate ?? true) {
+          nav("/changes?mine=true");
+        }
+        return created.id;
       } else if (apiClient.isValidId(id)) {
         const payload: ChangeUpdateDto = {
           title,
-          description: compiledDescription,
+          description,
+          implementationSteps,
+          backoutPlan,
+          serviceSystem: service,
+          category,
+          environment,
+          businessJustification,
+          changeTypeId,
           priority,
+          priorityId: priorityToId(priority),
           riskLevel,
+          riskLevelId: riskLevelIdValue,
           impactLevel,
+          impactTypeId: impactTypeIdValue,
           plannedStart: plannedStart ? new Date(plannedStart).toISOString() : undefined,
           plannedEnd: plannedEnd ? new Date(plannedEnd).toISOString() : undefined
         };
         const updated = await apiClient.updateChange(id, payload);
         setItem(updated);
         await refreshRelatedData(id);
+        if (options?.navigateOnCreate ?? true) {
+          nav("/changes?mine=true");
+        }
+        return id;
       }
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
+
+    return null;
   };
 
   const submitForApproval = async () => {
-    if (!apiClient.isValidId(id) && isNew) {
-      await saveDraft();
-      return;
+    setError(null);
+
+    let targetId = id;
+    if (formIsDirty) {
+      targetId = await saveDraft({ navigateOnCreate: false });
+      if (!apiClient.isValidId(targetId)) {
+        return;
+      }
     }
-    if (!apiClient.isValidId(id)) {
+
+    if (!apiClient.isValidId(targetId)) {
       setError("Invalid change request id.");
       return;
     }
 
-    setError(null);
     setLoading(true);
     try {
-      await apiClient.submitChange(id);
-      const refreshed = await apiClient.getChangeById(id);
+      const submitted = await apiClient.submitChange(targetId);
+      setItem(submitted);
+      const refreshed = await apiClient.getChangeById(targetId);
       setItem(refreshed);
-      await refreshRelatedData(id);
+      await refreshRelatedData(targetId);
+      if (isNew) {
+        nav(`/changes/${targetId}`);
+      }
       alert("Submitted for approval.");
     } catch (e) {
       setError((e as Error).message);
@@ -265,18 +397,45 @@ const ChangeDetailPage = () => {
     }
   };
 
-  const uploadAttachment = async (event: any) => {
-    if (!id || !event.target.files?.[0]) return;
+  const addTask = async () => {
+    if (!apiClient.isValidId(id) || !taskTitle.trim()) return;
     setLoading(true);
     setError(null);
     try {
-      await apiClient.uploadAttachment(id, event.target.files[0]);
+      await apiClient.createTask(id, { title: taskTitle.trim(), description: taskDescription.trim(), statusId: 1 });
+      setTaskTitle("");
+      setTaskDescription("");
       await refreshRelatedData(id);
-      event.target.value = "";
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const uploadAttachment = async () => {
+    if (!selectedAttachment) return;
+    setUploadingAttachment(true);
+    setError(null);
+    try {
+      let targetId = id;
+      if (!apiClient.isValidId(targetId)) {
+        targetId = await saveDraft({ navigateOnCreate: false });
+      }
+      if (!apiClient.isValidId(targetId)) {
+        setError("Save draft first before uploading.");
+        return;
+      }
+      await apiClient.uploadAttachment(targetId, selectedAttachment);
+      await refreshRelatedData(targetId);
+      setSelectedAttachment(null);
+      if (isNew) {
+        nav(`/changes/${targetId}`);
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setUploadingAttachment(false);
     }
   };
 
@@ -314,7 +473,7 @@ const ChangeDetailPage = () => {
             <select className="select" value={templateId} onChange={(e) => applyTemplate(e.target.value)}>
               <option value="">Select template…</option>
               {templates.map((t) => (
-                <option key={t.id} value={t.id}>
+                <option key={t.templateId} value={t.templateId}>
                   {t.name}
                 </option>
               ))}
@@ -327,7 +486,7 @@ const ChangeDetailPage = () => {
         <div className="card">
           <div className="card-head">
             <div className="tabs" role="tablist" aria-label="Change form sections">
-              {(["Basic Info", "Schedule", "Plans", "Risk & Impact"] as FormTab[]).map((t) => (
+              {(["Basic Info", "Schedule", "Plans", "Risk & Impact", "Attachments"] as FormTab[]).map((t) => (
                 <button
                   key={t}
                   className={"tab " + (formTab === t ? "tab-active" : "")}
@@ -350,10 +509,10 @@ const ChangeDetailPage = () => {
 
                 <div>
                   <div className="label">Change Type *</div>
-                  <select className="select" value="Normal" onChange={() => void 0}>
-                    <option>Normal</option>
-                    <option>Standard</option>
-                    <option>Emergency</option>
+                  <select className="select" value={changeTypeIdValue} onChange={(e) => setChangeTypeIdValue(Number(e.target.value))}>
+                    <option value={2}>Normal</option>
+                    <option value={1}>Standard</option>
+                    <option value={3}>Emergency</option>
                   </select>
                 </div>
 
@@ -439,21 +598,46 @@ const ChangeDetailPage = () => {
                 </div>
                 <div>
                   <div className="label">Risk</div>
-                  <select className="select" value={riskLevel} onChange={(e) => setRiskLevel(e.target.value)}>
-                    <option>Low</option>
-                    <option>Medium</option>
-                    <option>High</option>
+                  <select className="select" value={riskLevelIdValue} onChange={(e) => setRiskLevelIdValue(Number(e.target.value))}>
+                    <option value={1}>Low</option>
+                    <option value={2}>Medium</option>
+                    <option value={3}>High</option>
                   </select>
                 </div>
                 <div>
                   <div className="label">Impact</div>
-                  <select className="select" value={impactLevel} onChange={(e) => setImpactLevel(e.target.value)}>
-                    <option>Low</option>
-                    <option>Medium</option>
-                    <option>High</option>
+                  <select className="select" value={impactTypeIdValue} onChange={(e) => setImpactTypeIdValue(Number(e.target.value))}>
+                    <option value={1}>Low</option>
+                    <option value={2}>Medium</option>
+                    <option value={3}>High</option>
                   </select>
                 </div>
                 <div />
+              </div>
+            ) : null}
+
+            {formTab === "Attachments" ? (
+              <div>
+                <div className="h3">Attachments</div>
+                <div className="small">Allowed: pdf, doc(x), xls(x), png, jpg. Max 5 MB.</div>
+                <input className="input" style={{ marginTop: 8 }} type="file" onChange={(e) => setSelectedAttachment(e.target.files?.[0] ?? null)} />
+                <div style={{ marginTop: 8 }}>
+                  <button className="btn btn-primary" disabled={!selectedAttachment || uploadingAttachment} onClick={uploadAttachment}>
+                    {uploadingAttachment ? "Uploading..." : "Upload Attachment"}
+                  </button>
+                </div>
+                <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+                  {attachments.map((attachment) => (
+                    <div key={attachment.id} className="row">
+                      <div className="row-left">
+                        <div className="h3">{attachment.fileName}</div>
+                        <div className="small">{Math.round(attachment.sizeBytes / 1024)} KB</div>
+                      </div>
+                      <a className="btn" href={`/api/changes/${id}/attachments/${attachment.id}/download`}>Download</a>
+                    </div>
+                  ))}
+                  {!attachments.length ? <div className="empty">No attachments uploaded.</div> : null}
+                </div>
               </div>
             ) : null}
           </div>
@@ -462,11 +646,37 @@ const ChangeDetailPage = () => {
             <button className="btn" onClick={saveDraft} disabled={loading}>
               💾 Save Draft
             </button>
-            <button className="btn btn-primary" onClick={submitForApproval} disabled={loading || !title.trim()}>
+            <button type="button" className="btn btn-primary" onClick={submitForApproval} disabled={isSubmitDisabled}>
               ✈ Submit for Approval
             </button>
           </div>
+          {isSubmitDisabled && !loading && submitBlockers.length ? (
+            <div className="small" style={{ marginTop: 8, color: "#fca5a5" }}>
+              Missing required fields: {submitBlockers.join(", ")}
+            </div>
+          ) : null}
         </div>
+
+        {!isNew ? (
+          <div className="card card-pad" style={{ marginTop: 12 }}>
+            <div className="h3">Attachments</div>
+            <div className="small">Allowed: pdf, doc(x), xls(x), png, jpg. Max 5 MB.</div>
+            <input className="input" style={{ marginTop: 8 }} type="file" onChange={(e) => setSelectedAttachment(e.target.files?.[0] ?? null)} />
+            <div style={{ marginTop: 8 }}><button className="btn btn-primary" disabled={!selectedAttachment || uploadingAttachment} onClick={uploadAttachment}>{uploadingAttachment ? "Uploading..." : "Upload Attachment"}</button></div>
+            <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+              {attachments.map((attachment) => (
+                <div key={attachment.id} className="row">
+                  <div className="row-left">
+                    <div className="h3">{attachment.fileName}</div>
+                    <div className="small">{Math.round(attachment.sizeBytes / 1024)} KB</div>
+                  </div>
+                  <a className="btn" href={`/api/changes/${id}/attachments/${attachment.id}/download`}>Download</a>
+                </div>
+              ))}
+              {!attachments.length ? <div className="empty">No attachments uploaded.</div> : null}
+            </div>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -491,9 +701,9 @@ const ChangeDetailPage = () => {
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
             <span className={pillForPriority(item?.priority)}>{item?.priority ?? "P3"}</span>
-            <span className="pill pill-blue">Normal</span>
-            {item?.riskLevel ? <span className="pill pill-amber">Risk: {item.riskLevel}</span> : null}
-            {item?.impactLevel ? <span className="pill pill-amber">Impact: {item.impactLevel}</span> : null}
+            <span className={pillForChangeType(item?.changeTypeId)}>{labelForChangeType(item?.changeTypeId)}</span>
+            {item?.riskLevel ? <span className={pillForRiskLevel(item.riskLevel)}>Risk: {item.riskLevel}</span> : null}
+            {item?.impactLevel ? <span className={pillForImpactLevel(item.impactLevel)}>Impact: {item.impactLevel}</span> : null}
           </div>
         </div>
 
@@ -527,7 +737,7 @@ const ChangeDetailPage = () => {
                 <div className="card-title">Implementation Steps</div>
               </div>
               <div className="card-body">
-                <div className="small">This section is currently stored in the description until backend fields are added.</div>
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit" }}>{item?.implementationSteps ?? "—"}</pre>
               </div>
             </div>
 
@@ -536,7 +746,7 @@ const ChangeDetailPage = () => {
                 <div className="card-title">Backout Plan</div>
               </div>
               <div className="card-body">
-                <div className="small">This section is currently stored in the description until backend fields are added.</div>
+                <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit" }}>{item?.backoutPlan ?? "—"}</pre>
               </div>
             </div>
           </div>
@@ -554,7 +764,7 @@ const ChangeDetailPage = () => {
                 <div className="h3">{item?.environment ?? "—"}</div>
                 <div style={{ height: 10 }} />
                 <div className="small">Service</div>
-                <div className="h3">{item?.service ?? "—"}</div>
+                <div className="h3">{item?.serviceSystem ?? item?.service ?? "—"}</div>
               </div>
             </div>
 
@@ -579,7 +789,7 @@ const ChangeDetailPage = () => {
               </div>
               <div className="card-body">
                 <div className="small">Owner</div>
-                <div className="h3">{item?.requestedBy ?? "admin@example.com"}</div>
+                <div className="h3">{item?.requestedBy ?? "—"}</div>
               </div>
             </div>
           </div>
@@ -605,6 +815,7 @@ const ChangeDetailPage = () => {
                   <div className="row-left">
                     <div className="h3">{approval.approver}</div>
                     <div className="small">{approval.comment ?? "No comment"}</div>
+                    <div className="small">{fmtDT(approval.decisionAt)}</div>
                   </div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <span className={pillForStatus(approval.status)}>{approval.status}</span>
@@ -624,8 +835,9 @@ const ChangeDetailPage = () => {
       {tab === "Attachments" ? (
         <div className="card card-pad">
           <div className="h3">Attachments</div>
-          <div className="small">Allowed: pdf, doc(x), xls(x), png, jpg. Max 10 MB.</div>
-          <input className="input" style={{ marginTop: 8 }} type="file" onChange={uploadAttachment} />
+          <div className="small">Allowed: pdf, doc(x), xls(x), png, jpg. Max 5 MB.</div>
+          <input className="input" style={{ marginTop: 8 }} type="file" onChange={(e) => setSelectedAttachment(e.target.files?.[0] ?? null)} />
+            <div style={{ marginTop: 8 }}><button className="btn btn-primary" disabled={!selectedAttachment || uploadingAttachment} onClick={uploadAttachment}>{uploadingAttachment ? "Uploading..." : "Upload Attachment"}</button></div>
           <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
             {attachments.map((attachment) => (
               <div key={attachment.id} className="row">
@@ -642,8 +854,33 @@ const ChangeDetailPage = () => {
       ) : null}
 
       {tab === "Tasks" ? (
-        <div className="card">
-          <div className="empty">Tasks workflow can be wired next.</div>
+        <div className="grid" style={{ gap: 12 }}>
+          <div className="card card-pad">
+            <div className="h3">Add Task</div>
+            <div className="form-grid" style={{ marginTop: 8 }}>
+              <div><input className="input" placeholder="Task title" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} /></div>
+              <div><input className="input" placeholder="Task description" value={taskDescription} onChange={(e) => setTaskDescription(e.target.value)} /></div>
+            </div>
+            <div style={{ marginTop: 8 }}><button className="btn btn-primary" disabled={!taskTitle.trim() || loading} onClick={addTask}>Add Task</button></div>
+          </div>
+          <div className="card card-pad">
+            <div className="h3">Task List</div>
+            <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+              {tasks.map((task) => (
+                <div key={task.id} className="row">
+                  <div className="row-left">
+                    <div className="h3">{task.title}</div>
+                    <div className="small">{task.description ?? "No description"}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <span className={pillForStatus(task.status)}>{task.status ?? "Pending"}</span>
+                    <span className="small">Due: {fmtDT(task.dueAt)}</span>
+                  </div>
+                </div>
+              ))}
+              {!tasks.length ? <div className="empty">No tasks yet.</div> : null}
+            </div>
+          </div>
         </div>
       ) : null}
     </div>

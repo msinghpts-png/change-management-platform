@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
 import { apiClient } from "../services/apiClient";
-import type { DatabaseBackup, DatabaseStatus } from "../types/change";
+import type { DatabaseStatus } from "../types/change";
 
 const AdminDatabasePage = () => {
   const [status, setStatus] = useState<DatabaseStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [importJson, setImportJson] = useState("");
 
   const loadStatus = async () => {
     setError(null);
@@ -18,46 +16,19 @@ const AdminDatabasePage = () => {
     }
   };
 
-  useEffect(() => {
-    loadStatus().catch(() => void 0);
-  }, []);
-
-  const runAction = async (fn: () => Promise<unknown>) => {
-    setLoading(true);
+  const loadDemoData = async () => {
     setError(null);
     try {
-      await fn();
+      await apiClient.seedDatabase();
       await loadStatus();
     } catch (e) {
       setError((e as Error).message);
-    } finally {
-      setLoading(false);
     }
   };
 
-  const onExport = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const blob = await apiClient.exportDatabase();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `change-management-backup-${new Date().toISOString()}.json`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onImport = async () => {
-    if (!importJson.trim()) return;
-    const payload = JSON.parse(importJson) as DatabaseBackup;
-    await runAction(() => apiClient.importDatabase(payload));
-  };
+  useEffect(() => {
+    loadStatus().catch(() => void 0);
+  }, []);
 
   return (
     <div>
@@ -94,23 +65,9 @@ const AdminDatabasePage = () => {
       <div style={{ height: 12 }} />
 
       <div className="card card-pad" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button className="btn" disabled={loading} onClick={() => runAction(() => apiClient.runMigrations())}>Run Migrations</button>
-        <button className="btn" disabled={loading} onClick={() => runAction(() => apiClient.seedDatabase())}>Seed Sample Data</button>
-        <button className="btn" disabled={loading} onClick={onExport}>Export DB (JSON backup)</button>
-        <button className="btn" disabled={loading} onClick={onImport}>Import DB (JSON restore)</button>
-      </div>
-
-      <div style={{ height: 12 }} />
-
-      <div className="card card-pad">
-        <div className="h3">Import JSON payload</div>
-        <textarea
-          className="textarea"
-          style={{ marginTop: 8, minHeight: 220 }}
-          value={importJson}
-          onChange={(e) => setImportJson(e.target.value)}
-          placeholder='Paste export JSON payload here then click "Import DB".'
-        />
+        <button className="btn" onClick={loadStatus}>Refresh</button>
+        <button className="btn btn-primary" onClick={loadDemoData}>Load Demo Data</button>
+        <div className="small" style={{ alignSelf: "center" }}>Read-only maintenance view (no destructive actions).</div>
       </div>
 
       {status?.pendingMigrations?.length ? (

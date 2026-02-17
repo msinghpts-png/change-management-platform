@@ -4,10 +4,10 @@ using Xunit;
 
 namespace ChangeManagement.Api.Tests.Scenarios;
 
-public class ChangeCreationTests : IClassFixture<TestWebApplicationFactory>
+public class ChangeCreationTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly HttpClient _client;
-    public ChangeCreationTests(TestWebApplicationFactory factory) => _client = factory.CreateClient();
+    public ChangeCreationTests(CustomWebApplicationFactory factory) => _client = factory.CreateClient();
 
     [Fact]
     public async Task CreateChange_WritesChangeAndReturnsIdentifier()

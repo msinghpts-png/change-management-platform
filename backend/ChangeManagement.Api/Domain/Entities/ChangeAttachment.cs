@@ -7,7 +7,8 @@ public class ChangeAttachment
     public string FileName { get; set; } = string.Empty;
     public string FileUrl { get; set; } = string.Empty;
     public DateTime UploadedAt { get; set; }
-    public Guid UploadedBy { get; set; }
+    public Guid? UploadedBy { get; set; }
+    public long FileSizeBytes { get; set; }
 
     public ChangeRequest? ChangeRequest { get; set; }
     public User? UploadedByUser { get; set; }

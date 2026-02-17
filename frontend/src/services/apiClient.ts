@@ -9,7 +9,8 @@ import type {
   ChangeUpdateDto,
   DashboardStats,
   DatabaseBackup,
-  DatabaseStatus
+  DatabaseStatus,
+  ChangeTemplate
 } from "../types/change";
 
 const API_BASE_URL = "/api";
@@ -40,9 +41,21 @@ const normalizeChange = (item: any): ChangeRequest => ({
   changeNumber: item.changeNumber ? `CHG-${String(item.changeNumber).padStart(6, "0")}` : undefined,
   title: item.title,
   description: item.description,
+  implementationSteps: item.implementationSteps,
+  backoutPlan: item.backoutPlan,
+  serviceSystem: item.serviceSystem,
+  category: item.category,
+  environment: item.environment,
+  businessJustification: item.businessJustification,
+  service: item.serviceSystem ?? item.service,
+  changeTypeId: item.changeTypeId,
+  riskLevelId: item.riskLevelId,
+  priorityId: item.priorityId,
+  statusId: item.statusId,
   status: item.status ?? "Draft",
   priority: item.priority ?? "P3",
   riskLevel: item.riskLevel,
+  impactTypeId: item.impactTypeId,
   requestedBy: item.requestedBy,
   plannedStart: item.plannedStart,
   plannedEnd: item.plannedEnd,
@@ -52,7 +65,7 @@ const normalizeChange = (item: any): ChangeRequest => ({
 
 export const apiClient = {
   isValidId,
-  getChanges: async () => (await request<any[]>("/changes")).map(normalizeChange),
+  getChanges: async (requestedByUserId?: string) => (await request<any[]>(`/changes${requestedByUserId ? `?requestedByUserId=${encodeURIComponent(requestedByUserId)}` : ""}`)).map(normalizeChange),
   getChangeById: async (id: string) => {
     if (!isValidId(id)) throw new Error("Invalid change id");
     return normalizeChange(await request<any>(`/changes/${id}`));
@@ -70,6 +83,36 @@ export const apiClient = {
     return request<ChangeTask[]>(`/changes/${changeId}/tasks`);
   },
 
+  getTemplates: () => request<ChangeTemplate[]>("/templates"),
+
+  createTemplate: (payload: Partial<ChangeTemplate> & { name: string }) => request<ChangeTemplate>("/templates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }),
+
+  updateTemplate: (id: string, payload: Partial<ChangeTemplate> & { name: string }) => request<ChangeTemplate>(`/templates/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }),
+
+  deleteTemplate: (id: string) => request<void>(`/templates/${id}`, { method: "DELETE" }),
+
+
+  createTask: (changeId: string, payload: { title: string; description?: string; statusId?: number; assignedToUserId?: string; dueAt?: string }) =>
+    request<ChangeTask>(`/changes/${changeId}/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }),
+
+  updateTask: (changeId: string, taskId: string, payload: { title: string; description?: string; statusId?: number; assignedToUserId?: string; dueAt?: string; completedAt?: string }) =>
+    request<ChangeTask>(`/changes/${changeId}/tasks/${taskId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }),
   createChange: async (payload: ChangeCreateDto) => normalizeChange(await request<any>("/changes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -80,7 +123,7 @@ export const apiClient = {
     request<Approval>(`/changes/${changeId}/approvals`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ approverUserId: payload.approver, comments: payload.comment ?? "" })
+      body: JSON.stringify({ approver: payload.approver, comments: payload.comment ?? "" })
     }),
 
   submitChange: (changeId: string) =>
@@ -127,7 +170,18 @@ export const apiClient = {
   exportDatabase: () => request<DatabaseBackup[]>("/admin/database/backups"),
   importDatabase: (_file: File) => Promise.resolve(),
   runMigrations: () => request<{ message: string }>("/admin/database/migrate", { method: "POST" }),
-  seedDatabase: () => Promise.resolve(),
+  seedDatabase: () => request<{ message: string }>("/admin/demo-data", { method: "POST" }),
+
+  getAuditEvents: () => request<any[]>("/admin/audit"),
+
+  getAllAttachments: (changeNumber?: string) => request<any[]>(`/admin/attachments${changeNumber ? `?changeNumber=${encodeURIComponent(changeNumber)}` : ""}`),
+  deleteAdminAttachment: (attachmentId: string) => request<void>(`/admin/attachments/${attachmentId}`, { method: "DELETE" }),
+
+  resetUserPassword: (id: string, newPassword: string) => request<{ message: string }>(`/admin/users/${id}/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newPassword })
+    }),
 
   login: (upn: string, password: string) => request<{ token: string; user: AppUser }>("/auth/login", {
       method: "POST",

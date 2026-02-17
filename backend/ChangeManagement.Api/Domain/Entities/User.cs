@@ -14,4 +14,5 @@ public class User
     public ICollection<ChangeTask> AssignedTasks { get; set; } = new List<ChangeTask>();
     public ICollection<ChangeApproval> Approvals { get; set; } = new List<ChangeApproval>();
     public ICollection<ChangeAttachment> UploadedAttachments { get; set; } = new List<ChangeAttachment>();
+    public ICollection<ChangeTemplate> CreatedTemplates { get; set; } = new List<ChangeTemplate>();
 }

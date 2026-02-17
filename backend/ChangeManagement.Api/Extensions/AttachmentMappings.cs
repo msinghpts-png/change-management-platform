@@ -9,11 +9,15 @@ public static class AttachmentMappings
     {
         return new AttachmentDto
         {
+            Id = attachment.ChangeAttachmentId,
             ChangeAttachmentId = attachment.ChangeAttachmentId,
             ChangeRequestId = attachment.ChangeRequestId,
             FileName = attachment.FileName,
             FileUrl = attachment.FileUrl,
-            UploadedAt = attachment.UploadedAt
+            FilePath = attachment.FileUrl,
+            FileSizeBytes = attachment.FileSizeBytes,
+            UploadedAt = attachment.UploadedAt,
+            UploadedBy = attachment.UploadedBy
         };
     }
 }

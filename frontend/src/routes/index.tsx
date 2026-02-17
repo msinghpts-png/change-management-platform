@@ -8,6 +8,8 @@ import ChangeListPage from "../pages/ChangeListPage";
 import DashboardPage from "../pages/DashboardPage";
 import LoginPage from "../pages/LoginPage";
 import TemplatesPage from "../pages/TemplatesPage";
+import AdminAuditLogsPage from "../pages/AdminAuditLogsPage";
+import AdminAttachmentsPage from "../pages/AdminAttachmentsPage";
 
 export const routes = [
   { path: "/dashboard", label: "Dashboard" },
@@ -16,8 +18,11 @@ export const routes = [
   { path: "/changes/:id", label: "Change Detail" },
   { path: "/calendar", label: "Calendar" },
   { path: "/templates", label: "Templates" },
-  { path: "/admin/users", label: "Users" },
-  { path: "/admin/database", label: "DB Admin" }
+  { path: "/admin/users", label: "Admin - User Maintenance" },
+  { path: "/admin/database", label: "Admin - DB Maintenance" },
+  { path: "/admin/audit", label: "Admin - Audit Logs" },
+  { path: "/admin/templates", label: "Admin - Template Maintenance" },
+  { path: "/admin/attachments", label: "Admin - Attachment Management" }
 ];
 
 const Protected = ({ children }: { children: JSX.Element }) => {
@@ -37,8 +42,11 @@ export const AppRoutes = () => {
       <Route path="/changes/:id" element={<Protected><ChangeDetailPage /></Protected>} />
       <Route path="/calendar" element={<Protected><CalendarPage /></Protected>} />
       <Route path="/templates" element={<Protected><TemplatesPage /></Protected>} />
+      <Route path="/admin/templates" element={<Protected><TemplatesPage /></Protected>} />
       <Route path="/admin/users" element={<Protected><AdminUsersPage /></Protected>} />
       <Route path="/admin/database" element={<Protected><AdminDatabasePage /></Protected>} />
+      <Route path="/admin/audit" element={<Protected><AdminAuditLogsPage /></Protected>} />
+      <Route path="/admin/attachments" element={<Protected><AdminAttachmentsPage /></Protected>} />
     </Routes>
   );
 };
