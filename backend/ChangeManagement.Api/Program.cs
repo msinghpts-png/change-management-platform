@@ -15,7 +15,19 @@ var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Server=localhost;Database=ChangeManagementDB;Trusted_Connection=true;TrustServerCertificate=true;";
-builder.Services.AddDbContext<ChangeManagementDbContext>(options => options.UseSqlServer(connectionString));
+var useInMemoryDatabase = builder.Environment.IsEnvironment("Testing") || builder.Configuration.GetValue<bool>("UseInMemoryDatabase");
+
+builder.Services.AddDbContext<ChangeManagementDbContext>(options =>
+{
+    if (useInMemoryDatabase)
+    {
+        options.UseInMemoryDatabase("ChangeManagement.Testing");
+    }
+    else
+    {
+        options.UseSqlServer(connectionString);
+    }
+});
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

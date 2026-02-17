@@ -12,15 +12,19 @@ namespace ChangeManagement.Api.Tests.Infrastructure;
 
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
+    private readonly string _databaseName = $"ChangeManagementTests_{Guid.NewGuid():N}";
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
 
         builder.ConfigureAppConfiguration((_, configBuilder) =>
         {
+            configBuilder.AddJsonFile("appsettings.Testing.json", optional: true);
             configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["SkipDatabaseInitialization"] = "true"
+                ["SkipDatabaseInitialization"] = "true",
+                ["UseInMemoryDatabase"] = "true"
             });
         });
 
@@ -30,7 +34,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             services.RemoveAll(typeof(ChangeManagementDbContext));
 
             services.AddDbContext<ChangeManagementDbContext>(options =>
-                options.UseInMemoryDatabase($"ChangeManagementTests_{Guid.NewGuid():N}"));
+                options.UseInMemoryDatabase(_databaseName));
 
             using var scope = services.BuildServiceProvider().CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ChangeManagementDbContext>();

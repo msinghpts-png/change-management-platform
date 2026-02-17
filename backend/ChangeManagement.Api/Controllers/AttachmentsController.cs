@@ -31,7 +31,13 @@ public class AttachmentsController : ControllerBase
             uploadedBy = actorGuid;
         }
 
-        var result = await _attachmentService.UploadAsync(changeId, request.File, uploadedBy, cancellationToken);
+        var uploadFile = request.File ?? Request.Form?.Files.FirstOrDefault();
+        if (uploadFile is null)
+        {
+            return BadRequest("File is required.");
+        }
+
+        var result = await _attachmentService.UploadAsync(changeId, uploadFile, uploadedBy, cancellationToken);
         return result.Attachment is null ? BadRequest(result.Error) : CreatedAtAction(nameof(List), new { changeId }, result.Attachment.ToDto());
     }
 

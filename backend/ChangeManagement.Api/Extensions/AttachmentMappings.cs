@@ -9,6 +9,7 @@ public static class AttachmentMappings
     {
         return new AttachmentDto
         {
+            Id = attachment.ChangeAttachmentId,
             ChangeAttachmentId = attachment.ChangeAttachmentId,
             ChangeRequestId = attachment.ChangeRequestId,
             FileName = attachment.FileName,
