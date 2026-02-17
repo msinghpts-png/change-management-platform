@@ -4,15 +4,15 @@ using Xunit;
 
 namespace ChangeManagement.Api.Tests.Scenarios;
 
-public class ApprovalWorkflowTests : IClassFixture<TestWebApplicationFactory>
+public class ApprovalWorkflowTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly HttpClient _client;
-    public ApprovalWorkflowTests(TestWebApplicationFactory factory) => _client = factory.CreateClient();
+    public ApprovalWorkflowTests(CustomWebApplicationFactory factory) => _client = factory.CreateClient();
 
     [Fact]
     public async Task ApprovalDecision_CanBeRecorded()
     {
-        var change = await (await _client.PostAsJsonAsync("/api/changes", new
+        var createResponse = await _client.PostAsJsonAsync("/api/changes", new
         {
             Title = "approval-test",
             Description = "desc",
@@ -20,9 +20,11 @@ public class ApprovalWorkflowTests : IClassFixture<TestWebApplicationFactory>
             PriorityId = 1,
             RiskLevelId = 1,
             RequestedByUserId = Guid.Parse("11111111-1111-1111-1111-111111111111")
-        })).Content.ReadFromJsonAsync<dynamic>();
+        });
+        createResponse.EnsureSuccessStatusCode();
 
-        var changeId = (Guid)change!.changeRequestId;
+        var change = await createResponse.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        var changeId = Guid.Parse(change!["changeRequestId"].ToString()!);
         var approvalResp = await _client.PostAsJsonAsync($"/api/changes/{changeId}/approvals", new { ApproverUserId = Guid.Parse("11111111-1111-1111-1111-111111111111"), Comments = "ok" });
         approvalResp.EnsureSuccessStatusCode();
     }
