@@ -29,6 +29,15 @@ const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("authUser");
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+      throw new Error("Unauthorized. Please sign in again.");
+    }
+
     throw new Error(`Request failed: ${response.status}`);
   }
 
@@ -171,17 +180,6 @@ export const apiClient = {
   importDatabase: (_file: File) => Promise.resolve(),
   runMigrations: () => request<{ message: string }>("/admin/database/migrate", { method: "POST" }),
   seedDatabase: () => request<{ message: string }>("/admin/demo-data", { method: "POST" }),
-
-  getAuditEvents: () => request<any[]>("/admin/audit"),
-
-  getAllAttachments: (changeNumber?: string) => request<any[]>(`/admin/attachments${changeNumber ? `?changeNumber=${encodeURIComponent(changeNumber)}` : ""}`),
-  deleteAdminAttachment: (attachmentId: string) => request<void>(`/admin/attachments/${attachmentId}`, { method: "DELETE" }),
-
-  resetUserPassword: (id: string, newPassword: string) => request<{ message: string }>(`/admin/users/${id}/reset-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ newPassword })
-    }),
 
   getAuditEvents: () => request<any[]>("/admin/audit"),
 

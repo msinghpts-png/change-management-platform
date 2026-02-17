@@ -65,25 +65,19 @@ const ChangeListPage = () => {
     setLoading(true);
     const rawUser = localStorage.getItem("authUser");
     const me = rawUser ? JSON.parse(rawUser) : null;
-    const requestedByUserId = searchParams.get("mine") === "true" ? me?.id : undefined;
+    const requestedByUserId = (searchParams.get("mine") === "true" || myOnly) ? me?.id : undefined;
     apiClient
       .getChanges(requestedByUserId)
       .then((data) => setItems(data ?? []))
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [searchParams]);
+  }, [searchParams, myOnly]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items
       .filter((c) => matchesFilter(c, filter))
-      .filter((c) => {
-        if (!myOnly) return true;
-        const rawUser = localStorage.getItem("authUser");
-        const me = rawUser ? JSON.parse(rawUser) : null;
-        return (c.requestedBy ?? "").toLowerCase() === (me?.upn ?? "").toLowerCase();
-      })
-      .filter((c) => {
+            .filter((c) => {
         if (!q) return true;
         const hay = [
           c.changeNumber,

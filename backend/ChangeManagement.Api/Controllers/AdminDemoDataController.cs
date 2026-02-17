@@ -1,5 +1,6 @@
 using ChangeManagement.Api.Data;
 using ChangeManagement.Api.Domain.Entities;
+using ChangeManagement.Api.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -33,14 +34,19 @@ public class AdminDemoDataController : ControllerBase
         var cab2 = Guid.Parse("33333333-3333-3333-3333-333333333333");
         var user1 = Guid.Parse("44444444-4444-4444-4444-444444444444");
 
+        var addedUsers = 0;
+        var addedTemplates = 0;
+        var addedChanges = 0;
+
         if (!await _dbContext.Users.AnyAsync(x => x.UserId == adminId, cancellationToken))
         {
             _dbContext.Users.AddRange(
-                new User { UserId = adminId, Upn = "admin@local", DisplayName = "Admin User", Role = "Admin", IsActive = true, PasswordHash = string.Empty },
-                new User { UserId = cab1, Upn = "cab1@local", DisplayName = "CAB One", Role = "CAB", IsActive = true, PasswordHash = string.Empty },
-                new User { UserId = cab2, Upn = "cab2@local", DisplayName = "CAB Two", Role = "CAB", IsActive = true, PasswordHash = string.Empty },
-                new User { UserId = user1, Upn = "user1@local", DisplayName = "Standard User", Role = "User", IsActive = true, PasswordHash = string.Empty }
+                new User { UserId = adminId, Upn = "admin@local", DisplayName = "Admin User", Role = "Admin", IsActive = true, PasswordHash = PasswordHasher.Hash("Admin123!") },
+                new User { UserId = cab1, Upn = "cab1@local", DisplayName = "CAB One", Role = "CAB", IsActive = true, PasswordHash = PasswordHasher.Hash("Admin123!") },
+                new User { UserId = cab2, Upn = "cab2@local", DisplayName = "CAB Two", Role = "CAB", IsActive = true, PasswordHash = PasswordHasher.Hash("Admin123!") },
+                new User { UserId = user1, Upn = "user1@local", DisplayName = "Standard User", Role = "User", IsActive = true, PasswordHash = PasswordHasher.Hash("Admin123!") }
             );
+            addedUsers += 4;
         }
 
         if (!await _dbContext.ChangeTemplates.AnyAsync(cancellationToken))
@@ -50,6 +56,7 @@ public class AdminDemoDataController : ControllerBase
                 new ChangeTemplate { TemplateId = Guid.NewGuid(), Name = "Firewall Rule Change", Description = "Firewall update", Category = "Network", IsActive = true, CreatedAt = DateTime.UtcNow, CreatedBy = adminId },
                 new ChangeTemplate { TemplateId = Guid.NewGuid(), Name = "DB Maintenance", Description = "Database maintenance", Category = "Database", IsActive = true, CreatedAt = DateTime.UtcNow, CreatedBy = adminId }
             );
+            addedTemplates += 3;
         }
 
         if (!await _dbContext.ChangeRequests.AnyAsync(cancellationToken))
@@ -84,9 +91,12 @@ public class AdminDemoDataController : ControllerBase
             };
             _dbContext.ChangeRequests.AddRange(draft, submitted);
             _dbContext.ChangeApprovals.Add(new ChangeApproval { ChangeApprovalId = Guid.NewGuid(), ChangeRequestId = submitted.ChangeRequestId, ApproverUserId = cab1, ApprovalStatusId = 1 });
+            _dbContext.ChangeTasks.Add(new ChangeTask { ChangeTaskId = Guid.NewGuid(), ChangeRequestId = submitted.ChangeRequestId, Title = "Review implementation plan", Description = "CAB checklist", StatusId = 1 });
+            _dbContext.ChangeAttachments.Add(new ChangeAttachment { ChangeAttachmentId = Guid.NewGuid(), ChangeRequestId = draft.ChangeRequestId, FileName = "demo.txt", FileUrl = "data/attachments/demo.txt", UploadedAt = DateTime.UtcNow, UploadedBy = adminId, FileSizeBytes = 0 });
+            addedChanges += 2;
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return Ok(new { message = "Demo data loaded." });
+        return Ok(new { message = "Demo data loaded.", usersAdded = addedUsers, templatesAdded = addedTemplates, changesAdded = addedChanges });
     }
 }

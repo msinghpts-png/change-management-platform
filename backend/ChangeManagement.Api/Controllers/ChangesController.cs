@@ -2,6 +2,7 @@ using ChangeManagement.Api.Data;
 using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.DTOs;
 using ChangeManagement.Api.Services;
+using ChangeManagement.Api.Security;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
@@ -374,6 +375,13 @@ public class ChangesController : ControllerBase
 
     private async Task<Guid> ResolveRequestedByUserIdAsync(ChangeCreateDto request, CancellationToken cancellationToken)
     {
+        var claimUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (Guid.TryParse(claimUserId, out var parsedClaimUserId) && parsedClaimUserId != Guid.Empty)
+        {
+            var existsByClaimId = await _dbContext.Users.AnyAsync(user => user.UserId == parsedClaimUserId, cancellationToken);
+            if (existsByClaimId) return parsedClaimUserId;
+        }
+
         if (request.RequestedByUserId.HasValue && request.RequestedByUserId.Value != Guid.Empty)
         {
             var existing = await _dbContext.Users.AnyAsync(user => user.UserId == request.RequestedByUserId.Value, cancellationToken);
@@ -384,13 +392,6 @@ public class ChangesController : ControllerBase
         {
             var existingByUpn = await _dbContext.Users.Where(user => user.Upn == request.RequestedBy).Select(user => user.UserId).FirstOrDefaultAsync(cancellationToken);
             if (existingByUpn != Guid.Empty) return existingByUpn;
-        }
-
-        var claimUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (Guid.TryParse(claimUserId, out var parsedClaimUserId) && parsedClaimUserId != Guid.Empty)
-        {
-            var existsByClaimId = await _dbContext.Users.AnyAsync(user => user.UserId == parsedClaimUserId, cancellationToken);
-            if (existsByClaimId) return parsedClaimUserId;
         }
 
         var claimUpn = User.FindFirstValue(ClaimTypes.Upn) ?? User.FindFirstValue(ClaimTypes.Email) ?? User.Identity?.Name;
@@ -404,7 +405,7 @@ public class ChangesController : ControllerBase
         if (fallback != Guid.Empty) return fallback;
 
         var adminId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-        _dbContext.Users.Add(new User { UserId = adminId, Upn = "admin@local", DisplayName = "Local Admin", Role = "Admin", IsActive = true, PasswordHash = string.Empty });
+        _dbContext.Users.Add(new User { UserId = adminId, Upn = "admin@local", DisplayName = "Local Admin", Role = "Admin", IsActive = true, PasswordHash = PasswordHasher.Hash("Admin123!") });
         await _dbContext.SaveChangesAsync(cancellationToken);
         return adminId;
     }

@@ -88,8 +88,6 @@ export type ChangeRequest = {
   businessJustification?: string;
   changeTypeId?: number;
   riskLevelId?: number;
-  changeTypeId?: number;
-  riskLevelId?: number;
   priorityId?: number;
   statusId?: number;
   status: ChangeRequestStatus;
@@ -119,8 +117,6 @@ export type ChangeCreateDto = {
   environment?: string;
   businessJustification?: string;
   changeTypeId?: number;
-  riskLevelId?: number;
-  changeTypeId?: number;
   priorityId?: number;
   riskLevelId?: number;
   priority?: ChangePriority;
@@ -140,8 +136,6 @@ export type ChangeUpdateDto = {
   category?: string;
   environment?: string;
   businessJustification?: string;
-  changeTypeId?: number;
-  riskLevelId?: number;
   changeTypeId?: number;
   priorityId?: number;
   riskLevelId?: number;

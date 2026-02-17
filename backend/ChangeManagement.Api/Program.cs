@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,7 +56,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = jwtIssuer,
             ValidAudience = jwtAudience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            NameClaimType = ClaimTypes.Name,
+            RoleClaimType = ClaimTypes.Role
         };
     });
 
@@ -167,19 +170,43 @@ END
 
     var adminUpn = app.Configuration["SeedAdmin:Upn"] ?? "admin@local";
     var adminPassword = app.Configuration["SeedAdmin:Password"] ?? "Admin123!";
-    if (!dbContext.Users.Any())
+    var adminUser = dbContext.Users.FirstOrDefault(x => x.Upn == adminUpn);
+    if (adminUser is null)
     {
         dbContext.Users.Add(new User
         {
-            UserId = Guid.NewGuid(),
+            UserId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
             Upn = adminUpn,
             DisplayName = "Local Administrator",
             Role = "Admin",
             IsActive = true,
             PasswordHash = PasswordHasher.Hash(adminPassword)
         });
-        dbContext.SaveChanges();
     }
+    else
+    {
+        adminUser.Role = "Admin";
+        adminUser.IsActive = true;
+        if (!PasswordHasher.Verify(adminPassword, adminUser.PasswordHash))
+        {
+            adminUser.PasswordHash = PasswordHasher.Hash(adminPassword);
+        }
+    }
+
+    if (!dbContext.Users.Any(x => x.Role == "CAB"))
+    {
+        dbContext.Users.Add(new User
+        {
+            UserId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            Upn = "cab@local",
+            DisplayName = "CAB User",
+            Role = "CAB",
+            IsActive = true,
+            PasswordHash = PasswordHasher.Hash("Admin123!")
+        });
+    }
+
+    dbContext.SaveChanges();
 }
 
 if (app.Environment.IsDevelopment())

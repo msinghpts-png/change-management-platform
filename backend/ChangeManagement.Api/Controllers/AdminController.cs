@@ -1,11 +1,13 @@
 using ChangeManagement.Api.Data;
 using ChangeManagement.Api.DTOs.Admin;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChangeManagement.Api.Controllers;
 
 [ApiController]
+[Authorize(Roles = "Admin")]
 [Route("api/admin/database")]
 public class AdminController : ControllerBase
 {

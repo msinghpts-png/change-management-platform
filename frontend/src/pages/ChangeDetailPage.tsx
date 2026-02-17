@@ -250,9 +250,9 @@ const ChangeDetailPage = () => {
     setTemplateId(tplId);
     const tpl = templates.find((t) => t.templateId === tplId);
     if (!tpl) return;
-    setCategory(tpl.category);
+    setCategory(tpl.category ?? "Application");
     if (!title) setTitle(tpl.name);
-    setDescription(tpl.description);
+    setDescription(tpl.description ?? "");
     setImplementationSteps(tpl.implementationSteps ?? "");
     setBackoutPlan(tpl.backoutPlan ?? "");
     setService(tpl.serviceSystem ?? "");
@@ -331,7 +331,7 @@ const ChangeDetailPage = () => {
   const submitForApproval = async () => {
     setError(null);
 
-    let targetId = id;
+    let targetId: string | null = id ?? null;
     if (formIsDirty) {
       targetId = await saveDraft({ navigateOnCreate: false });
       if (!apiClient.isValidId(targetId)) {
@@ -419,7 +419,7 @@ const ChangeDetailPage = () => {
     setUploadingAttachment(true);
     setError(null);
     try {
-      let targetId = id;
+      let targetId: string | null = id ?? null;
       if (!apiClient.isValidId(targetId)) {
         targetId = await saveDraft({ navigateOnCreate: false });
       }
@@ -644,7 +644,7 @@ const ChangeDetailPage = () => {
           </div>
 
           <div className="footer-actions">
-            <button className="btn" onClick={saveDraft} disabled={loading}>
+            <button className="btn" onClick={() => { void saveDraft(); }} disabled={loading}>
               💾 Save Draft
             </button>
             <button type="button" className="btn btn-primary" onClick={submitForApproval} disabled={isSubmitDisabled}>

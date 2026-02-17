@@ -2,11 +2,13 @@ using System.Security.Claims;
 using ChangeManagement.Api.DTOs;
 using ChangeManagement.Api.Extensions;
 using ChangeManagement.Api.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ChangeManagement.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/changes/{changeId:guid}/attachments")]
 public class AttachmentsController : ControllerBase
 {
