@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using ChangeManagement.Api.DTOs;
 using ChangeManagement.Api.Extensions;
 using ChangeManagement.Api.Services;
 using Microsoft.AspNetCore.Authorization;
