@@ -52,7 +52,7 @@ public class AttachmentService : IAttachmentService
             return (null, "File type is not allowed.");
         }
 
-        var rootPath = Path.Combine(_environment.ContentRootPath, "data", "attachments", changeId.ToString());
+        var rootPath = Path.Combine(_environment.ContentRootPath, "attachments", changeId.ToString());
         Directory.CreateDirectory(rootPath);
 
         var fileId = Guid.NewGuid();
@@ -66,6 +66,12 @@ public class AttachmentService : IAttachmentService
         await using var stream = File.Create(storedPath);
         await file.CopyToAsync(stream, cancellationToken);
 
+        var resolvedUploader = uploadedBy;
+        if (!resolvedUploader.HasValue || resolvedUploader == Guid.Empty)
+        {
+            resolvedUploader = change.RequestedByUserId != Guid.Empty ? change.RequestedByUserId : change.CreatedBy;
+        }
+
         var entity = new ChangeAttachment
         {
             ChangeAttachmentId = fileId,
@@ -73,7 +79,7 @@ public class AttachmentService : IAttachmentService
             FileName = Path.GetFileName(file.FileName),
             FileUrl = storedPath,
             UploadedAt = DateTime.UtcNow,
-            UploadedBy = uploadedBy == Guid.Empty ? change.CreatedBy : uploadedBy,
+            UploadedBy = resolvedUploader,
             FileSizeBytes = file.Length
         };
 
