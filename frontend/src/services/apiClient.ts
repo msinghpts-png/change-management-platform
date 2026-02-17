@@ -45,6 +45,15 @@ const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
   return response.json() as Promise<T>;
 };
 
+const normalizeAttachment = (item: any): Attachment => ({
+  id: item.id ?? item.changeAttachmentId,
+  changeRequestId: item.changeRequestId,
+  fileName: item.fileName,
+  contentType: item.contentType ?? "application/octet-stream",
+  sizeBytes: item.sizeBytes ?? item.fileSizeBytes ?? 0,
+  uploadedAt: item.uploadedAt
+});
+
 const normalizeChange = (item: any): ChangeRequest => ({
   id: item.id ?? item.changeRequestId,
   changeNumber: item.changeNumber ? `CHG-${String(item.changeNumber).padStart(6, "0")}` : undefined,
@@ -85,7 +94,7 @@ export const apiClient = {
   },
   getAttachments: async (changeId: string) => {
     if (!isValidId(changeId)) return [] as Attachment[];
-    return request<Attachment[]>(`/changes/${changeId}/attachments`);
+    return (await request<any[]>(`/changes/${changeId}/attachments`)).map(normalizeAttachment);
   },
   getTasks: async (changeId: string) => {
     if (!isValidId(changeId)) return [] as ChangeTask[];
@@ -167,7 +176,28 @@ export const apiClient = {
       throw new Error(`Request failed: ${response.status}`);
     }
 
-    return (await response.json()) as Attachment;
+    return normalizeAttachment(await response.json());
+  },
+
+  downloadAttachment: async (changeId: string, attachmentId: string, fileName: string): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/changes/${changeId}/attachments/${attachmentId}/download`, {
+      method: "GET",
+      headers: withAuth()
+    });
+
+    if (!response.ok) {
+      throw new Error(`Request failed: ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
   },
 
   deleteAttachment: async (changeId: string, attachmentId: string): Promise<void> => {

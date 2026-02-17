@@ -417,6 +417,19 @@ const ChangeDetailPage = () => {
     }
   };
 
+  const downloadAttachment = async (attachmentId: string, fileName: string) => {
+    if (!apiClient.isValidId(id)) {
+      setError("Invalid change request id.");
+      return;
+    }
+
+    try {
+      await apiClient.downloadAttachment(id, attachmentId, fileName);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
   const uploadAttachment = async () => {
     if (!selectedAttachment) return;
     setUploadingAttachment(true);
@@ -637,7 +650,7 @@ const ChangeDetailPage = () => {
                         <div className="h3">{attachment.fileName}</div>
                         <div className="small">{Math.round(attachment.sizeBytes / 1024)} KB</div>
                       </div>
-                      <a className="btn" href={`/api/changes/${id}/attachments/${attachment.id}/download`}>Download</a>
+                      <button type="button" className="btn" onClick={() => { void downloadAttachment(attachment.id, attachment.fileName); }}>Download</button>
                     </div>
                   ))}
                   {!attachments.length ? <div className="empty">No attachments uploaded.</div> : null}
@@ -828,7 +841,7 @@ const ChangeDetailPage = () => {
                   <div className="h3">{attachment.fileName}</div>
                   <div className="small">{Math.round(attachment.sizeBytes / 1024)} KB</div>
                 </div>
-                <a className="btn" href={`/api/changes/${id}/attachments/${attachment.id}/download`}>Download</a>
+                <button type="button" className="btn" onClick={() => { void downloadAttachment(attachment.id, attachment.fileName); }}>Download</button>
               </div>
             ))}
             {!attachments.length ? <div className="empty">No attachments uploaded.</div> : null}

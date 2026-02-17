@@ -32,6 +32,17 @@ builder.Services.AddDbContext<ChangeManagementDbContext>(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000")
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    });
+});
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
@@ -60,9 +71,41 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             NameClaimType = ClaimTypes.Name,
             RoleClaimType = "role"
         };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = context =>
+            {
+                if (context.Principal?.Identity is ClaimsIdentity identity)
+                {
+                    var roleValues = identity.FindAll("role").Select(c => c.Value).ToList();
+                    foreach (var role in roleValues)
+                    {
+                        if (!identity.HasClaim(ClaimTypes.Role, role))
+                        {
+                            identity.AddClaim(new Claim(ClaimTypes.Role, role));
+                        }
+                    }
+
+                    var claimTypeRoles = identity.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+                    foreach (var role in claimTypeRoles)
+                    {
+                        if (!identity.HasClaim("role", role))
+                        {
+                            identity.AddClaim(new Claim("role", role));
+                        }
+                    }
+                }
+
+                return Task.CompletedTask;
+            }
+        };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+});
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<IChangeRepository, ChangeRepository>();
@@ -234,6 +277,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

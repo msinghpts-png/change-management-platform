@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ChangeManagement.Api.Controllers;
 
 [ApiController]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = "AdminOnly")]
 [Route("api/admin/users")]
 public class UsersController : ControllerBase
 {
