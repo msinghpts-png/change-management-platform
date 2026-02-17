@@ -44,6 +44,13 @@ const AdminUsersPage = () => {
     await load();
   };
 
+  const resetPassword = async (u: AppUser) => {
+    const next = window.prompt(`New password for ${u.upn}`);
+    if (!next?.trim()) return;
+    await apiClient.resetUserPassword(u.id, next.trim());
+    alert("Password reset successfully.");
+  };
+
   return (
     <div>
       <div className="page-head"><h1 className="page-title">Admin Users</h1></div>
@@ -53,7 +60,7 @@ const AdminUsersPage = () => {
         <div className="form-grid">
           <input className="input" placeholder="UPN" value={upn} onChange={(e) => setUpn(e.target.value)} />
           <input className="input" placeholder="Display name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-          <select className="select" value={role} onChange={(e) => setRole(e.target.value)}><option>User</option><option>Admin</option></select>
+          <select className="select" value={role} onChange={(e) => setRole(e.target.value)}><option>User</option><option>CAB</option><option>Admin</option></select>
           <input className="input" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
         <button className="btn btn-primary" onClick={create} style={{ marginTop: 10 }}>Create</button>
@@ -71,11 +78,11 @@ const AdminUsersPage = () => {
                   <td>{u.displayName}</td>
                   <td>
                     <select value={u.role} onChange={(e) => setUserRole(u, e.target.value)}>
-                      <option>User</option><option>Admin</option>
+                      <option>User</option><option>CAB</option><option>Admin</option>
                     </select>
                   </td>
                   <td>{u.isActive ? "Yes" : "No"}</td>
-                  <td><button className="btn" onClick={() => toggle(u)}>{u.isActive ? "Deactivate" : "Activate"}</button></td>
+                  <td style={{ display: "flex", gap: 8 }}><button className="btn" onClick={() => toggle(u)}>{u.isActive ? "Deactivate" : "Activate"}</button><button className="btn" onClick={() => resetPassword(u)}>Reset Password</button></td>
                 </tr>
               ))}
             </tbody>

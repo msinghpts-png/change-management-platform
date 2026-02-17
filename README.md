@@ -74,3 +74,29 @@ docker compose --profile tools run --rm db-migrator
 - `scripts/db`: database automation scripts
 - `docs`: Architecture and lifecycle placeholders
 - `.github/workflows`: CI/CD workflows
+
+
+## Default Dev Admin
+
+When running in development, the API ensures a default admin exists:
+
+- UPN: `admin@local`
+- Password: `Admin123!`
+- Role: `Admin`
+
+A CAB demo user is also seeded (`cab@local` / `Admin123!`).
+
+## CI Build Notes
+
+GitHub Actions pipeline should run:
+
+```bash
+dotnet restore backend/ChangeManagement.Api/ChangeManagement.Api.csproj
+dotnet build backend/ChangeManagement.Api/ChangeManagement.Api.csproj --no-restore
+dotnet test backend/ChangeManagement.Api.Tests/ChangeManagement.Api.Tests.csproj --no-build
+cd frontend
+npm ci
+npm run build
+```
+
+In tests, the API uses the in-memory EF provider via `CustomWebApplicationFactory`, so CI does not require SQL Server.

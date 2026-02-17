@@ -1,12 +1,13 @@
 using ChangeManagement.Api.Data;
 using ChangeManagement.Api.DTOs.Admin;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace ChangeManagement.Api.Controllers;
 
 [ApiController]
+[Authorize(Roles = "Admin")]
 [Route("api/admin/database")]
 public class AdminController : ControllerBase
 {
@@ -18,11 +19,13 @@ public class AdminController : ControllerBase
     public async Task<ActionResult<DatabaseStatusDto>> GetStatus(CancellationToken cancellationToken)
     {
         var pending = (await _dbContext.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
-        var csb = new SqlConnectionStringBuilder(_dbContext.Database.GetConnectionString());
+        var provider = _dbContext.Database.ProviderName ?? "Unknown";
+        var connection = _dbContext.Database.GetConnectionString();
+        var dbName = connection is null ? provider : connection;
 
         return Ok(new DatabaseStatusDto
         {
-            DatabaseName = csb.InitialCatalog,
+            DatabaseName = dbName,
             TotalChanges = await _dbContext.ChangeRequests.CountAsync(cancellationToken),
             TotalApprovals = await _dbContext.ChangeApprovals.CountAsync(cancellationToken),
             TotalAttachments = await _dbContext.ChangeAttachments.CountAsync(cancellationToken),

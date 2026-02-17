@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiClient } from "../services/apiClient";
 import type { ChangeRequest } from "../types/change";
+import { labelForChangeType, pillForChangeType, pillForImpactLevel, pillForRiskLevel } from "../utils/trafficColors";
 
 type FilterKey = "All" | "Draft" | "Pending" | "Approved" | "In Progress" | "Closed";
 
@@ -51,29 +52,32 @@ const matchesFilter = (c: ChangeRequest, filter: FilterKey) => {
 
 const ChangeListPage = () => {
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState<ChangeRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("All");
-  const [myOnly, setMyOnly] = useState(false);
+  const [myOnly, setMyOnly] = useState(searchParams.get("mine") === "true");
 
   useEffect(() => {
     setLoading(true);
+    const rawUser = localStorage.getItem("authUser");
+    const me = rawUser ? JSON.parse(rawUser) : null;
+    const requestedByUserId = (searchParams.get("mine") === "true" || myOnly) ? me?.id : undefined;
     apiClient
-      .getChanges()
+      .getChanges(requestedByUserId)
       .then((data) => setItems(data ?? []))
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [searchParams, myOnly]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items
       .filter((c) => matchesFilter(c, filter))
-      .filter((c) => (!myOnly ? true : (c.requestedBy ?? "").toLowerCase().includes("admin")))
-      .filter((c) => {
+            .filter((c) => {
         if (!q) return true;
         const hay = [
           c.changeNumber,
@@ -149,14 +153,14 @@ const ChangeListPage = () => {
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span className="mono">{c.changeNumber ?? "CHG-000000"}</span>
                     <span className={pillForPriority(c.priority)}>{c.priority ?? "P3"}</span>
-                    <span className="pill pill-blue">Normal</span>
+                    <span className={pillForChangeType(c.changeTypeId)}>{labelForChangeType(c.changeTypeId)}</span>
                   </div>
                   <div className="h3" style={{ marginTop: 4 }}>{c.title}</div>
                   <div className="small" style={{ marginTop: 4 }}>
                     {c.description ?? "—"}
                   </div>
                   <div className="small" style={{ marginTop: 10 }}>
-                    {c.category ?? "—"} &nbsp;•&nbsp; {fmtDate(c.plannedStart)} &nbsp;•&nbsp; {c.requestedBy ?? "admin@example.com"}
+                    {c.category ?? "—"} &nbsp;•&nbsp; {fmtDate(c.plannedStart)} &nbsp;•&nbsp; {c.requestedBy ?? "admin@example.com"} {c.riskLevel ? <span className={pillForRiskLevel(c.riskLevel)} style={{ marginLeft: 8 }}>Risk: {c.riskLevel}</span> : null} {c.impactLevel ? <span className={pillForImpactLevel(c.impactLevel)} style={{ marginLeft: 8 }}>Impact: {c.impactLevel}</span> : null}
                   </div>
                 </div>
 

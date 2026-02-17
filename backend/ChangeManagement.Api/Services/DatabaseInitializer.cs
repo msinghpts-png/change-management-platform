@@ -24,8 +24,8 @@ public class DatabaseInitializer : IDatabaseInitializer
             _dbContext.Users.Add(new User
             {
                 UserId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
-                Upn = "system@local",
-                DisplayName = "System User",
+                Upn = "admin@local",
+                DisplayName = "Local Admin",
                 Role = "Admin",
                 IsActive = true,
                 PasswordHash = PasswordHasher.Hash("Admin123!")

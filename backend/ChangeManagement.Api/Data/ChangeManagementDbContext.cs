@@ -22,6 +22,7 @@ public class ChangeManagementDbContext : DbContext
     public DbSet<RiskLevel> RiskLevels => Set<RiskLevel>();
     public DbSet<ApprovalStatus> ApprovalStatuses => Set<ApprovalStatus>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<ChangeTemplate> ChangeTemplates => Set<ChangeTemplate>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,6 +47,9 @@ public class ChangeManagementDbContext : DbContext
                 entity.Property(e => e.ChangeNumber).ValueGeneratedOnAdd();
             }
             entity.HasIndex(e => e.ChangeNumber).IsUnique();
+            entity.HasIndex(e => e.StatusId);
+            entity.HasIndex(e => e.AssignedToUserId);
+            entity.Property(e => e.ImpactTypeId).HasDefaultValue(2);
 
             entity.HasOne(e => e.ChangeType).WithMany(e => e.ChangeRequests).HasForeignKey(e => e.ChangeTypeId);
             entity.HasOne(e => e.Priority).WithMany(e => e.ChangeRequests).HasForeignKey(e => e.PriorityId);
@@ -77,8 +81,25 @@ public class ChangeManagementDbContext : DbContext
         {
             entity.ToTable("ChangeAttachment", "cm");
             entity.HasKey(e => e.ChangeAttachmentId);
-            entity.HasOne(e => e.ChangeRequest).WithMany(e => e.ChangeAttachments).HasForeignKey(e => e.ChangeRequestId);
+            entity.Property(e => e.FileName).HasMaxLength(255);
+            entity.Property(e => e.FileUrl).HasMaxLength(500);
+            entity.HasOne(e => e.ChangeRequest).WithMany(e => e.ChangeAttachments).HasForeignKey(e => e.ChangeRequestId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(e => e.UploadedByUser).WithMany(e => e.UploadedAttachments).HasForeignKey(e => e.UploadedBy).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ChangeTemplate>(entity =>
+        {
+            entity.ToTable("ChangeTemplate", "cm");
+            entity.HasKey(e => e.TemplateId);
+            entity.Property(e => e.Name).HasMaxLength(200);
+            entity.Property(e => e.ServiceSystem).HasMaxLength(200);
+            entity.Property(e => e.Category).HasMaxLength(200);
+            entity.Property(e => e.Environment).HasMaxLength(200);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.HasOne(e => e.CreatedByUser).WithMany(e => e.CreatedTemplates).HasForeignKey(e => e.CreatedBy).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(e => e.IsActive);
+            entity.HasIndex(e => e.Name);
         });
 
         modelBuilder.Entity<AuditEvent>(entity =>
@@ -86,6 +107,8 @@ public class ChangeManagementDbContext : DbContext
             entity.ToTable("Event", "audit");
             entity.HasKey(e => e.AuditEventId);
             entity.HasOne(e => e.EventType).WithMany(e => e.Events).HasForeignKey(e => e.EventTypeId);
+            entity.HasIndex(e => e.EntityId);
+            entity.HasIndex(e => e.EventTypeId);
         });
 
         modelBuilder.Entity<EventType>(entity => { entity.ToTable("EventType", "audit"); entity.HasKey(e => e.EventTypeId); });
