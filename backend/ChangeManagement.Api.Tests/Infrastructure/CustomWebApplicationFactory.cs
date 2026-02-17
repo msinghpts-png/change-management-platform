@@ -1,5 +1,6 @@
 using ChangeManagement.Api.Data;
 using ChangeManagement.Api.Domain.Entities;
+using ChangeManagement.Api.Security;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -54,11 +55,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             db.Users.Add(new User
             {
                 UserId = userId,
-                Upn = "tester@example.com",
+                Upn = "admin@local",
                 DisplayName = "Tester",
                 Role = "Admin",
                 IsActive = true,
-                PasswordHash = string.Empty
+                PasswordHash = PasswordHasher.Hash("Admin123!")
             });
             db.SaveChanges();
         }

@@ -21,6 +21,7 @@ public class ChangeRequestDto
     public string? Status { get; set; }
     public string? Priority { get; set; }
     public string? RiskLevel { get; set; }
+    public string? ImpactLevel { get; set; }
     public string? RequestedBy { get; set; }
     public DateTime? PlannedStart { get; set; }
     public DateTime? PlannedEnd { get; set; }

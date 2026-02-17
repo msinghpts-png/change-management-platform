@@ -123,6 +123,7 @@ export type ChangeCreateDto = {
   riskLevel?: RiskLevel;
   impactLevel?: ImpactLevel;
   impactTypeId?: number;
+  requestedByUserId?: string;
   plannedStart?: string;
   plannedEnd?: string;
 };

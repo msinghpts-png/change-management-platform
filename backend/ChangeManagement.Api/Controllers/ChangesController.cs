@@ -324,6 +324,7 @@ public class ChangesController : ControllerBase
         Status = change.Status?.Name,
         Priority = change.Priority?.Name,
         RiskLevel = change.RiskLevel?.Name,
+        ImpactLevel = change.ImpactTypeId == 1 ? "Low" : change.ImpactTypeId == 3 ? "High" : "Medium",
         RequestedBy = change.RequestedByUser?.Upn,
         PlannedStart = change.PlannedStart,
         PlannedEnd = change.PlannedEnd,
