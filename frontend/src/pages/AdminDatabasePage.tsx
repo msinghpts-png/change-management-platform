@@ -16,6 +16,16 @@ const AdminDatabasePage = () => {
     }
   };
 
+  const loadDemoData = async () => {
+    setError(null);
+    try {
+      await apiClient.seedDatabase();
+      await loadStatus();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
   useEffect(() => {
     loadStatus().catch(() => void 0);
   }, []);
@@ -56,6 +66,7 @@ const AdminDatabasePage = () => {
 
       <div className="card card-pad" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button className="btn" onClick={loadStatus}>Refresh</button>
+        <button className="btn btn-primary" onClick={loadDemoData}>Load Demo Data</button>
         <div className="small" style={{ alignSelf: "center" }}>Read-only maintenance view (no destructive actions).</div>
       </div>
 

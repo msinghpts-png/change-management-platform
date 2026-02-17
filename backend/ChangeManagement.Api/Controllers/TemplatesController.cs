@@ -65,6 +65,8 @@ public class TemplatesController : ControllerBase
         Category = entity.Category,
         Environment = entity.Environment,
         BusinessJustification = entity.BusinessJustification,
+        ChangeTypeId = entity.ChangeTypeId,
+        RiskLevelId = entity.RiskLevelId,
         CreatedAt = entity.CreatedAt,
         CreatedBy = entity.CreatedBy,
         IsActive = entity.IsActive

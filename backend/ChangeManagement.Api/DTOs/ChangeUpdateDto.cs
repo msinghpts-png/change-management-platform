@@ -14,6 +14,7 @@ public class ChangeUpdateDto
     public int PriorityId { get; set; }
     public int StatusId { get; set; }
     public int RiskLevelId { get; set; }
+    public int? ImpactTypeId { get; set; }
     public Guid? AssignedToUserId { get; set; }
     public DateTime? PlannedStart { get; set; }
     public DateTime? PlannedEnd { get; set; }

@@ -40,9 +40,14 @@ public class ChangesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<ChangeRequestDto>>> GetChanges(CancellationToken cancellationToken)
+    public async Task<ActionResult<IEnumerable<ChangeRequestDto>>> GetChanges([FromQuery] Guid? requestedByUserId, CancellationToken cancellationToken)
     {
         var items = await _changeService.GetAllAsync(cancellationToken);
+        if (requestedByUserId.HasValue && requestedByUserId.Value != Guid.Empty)
+        {
+            items = items.Where(x => x.RequestedByUserId == requestedByUserId.Value).ToList();
+        }
+
         return Ok(items.Select(ToDto));
     }
 
@@ -136,6 +141,7 @@ public class ChangesController : ControllerBase
             PriorityId = priorityId,
             StatusId = 1,
             RiskLevelId = riskLevelId,
+            ImpactTypeId = request.ImpactTypeId,
             RequestedByUserId = requestedByUserId,
             AssignedToUserId = request.AssignedToUserId,
             PlannedStart = request.PlannedStart,
@@ -157,10 +163,11 @@ public class ChangesController : ControllerBase
 
         if (existing.StatusId == 2)
         {
-            existing.Description = request.Description ?? existing.Description;
+            existing.BusinessJustification = request.BusinessJustification ?? existing.BusinessJustification;
             existing.AssignedToUserId = request.AssignedToUserId;
             existing.PlannedStart = request.PlannedStart;
             existing.PlannedEnd = request.PlannedEnd;
+            existing.ImpactTypeId = request.ImpactTypeId ?? existing.ImpactTypeId;
             existing.UpdatedBy = request.UpdatedBy == Guid.Empty ? existing.UpdatedBy : request.UpdatedBy;
         }
         else
@@ -177,6 +184,7 @@ public class ChangesController : ControllerBase
             existing.PriorityId = request.PriorityId > 0 ? request.PriorityId : existing.PriorityId;
             existing.StatusId = request.StatusId > 0 ? request.StatusId : existing.StatusId;
             existing.RiskLevelId = request.RiskLevelId > 0 ? request.RiskLevelId : existing.RiskLevelId;
+            existing.ImpactTypeId = request.ImpactTypeId ?? existing.ImpactTypeId;
             existing.AssignedToUserId = request.AssignedToUserId;
             existing.PlannedStart = request.PlannedStart;
             existing.PlannedEnd = request.PlannedEnd;
@@ -223,7 +231,7 @@ public class ChangesController : ControllerBase
         existing.UpdatedBy = actorUserId == Guid.Empty ? existing.UpdatedBy : actorUserId;
 
         var updated = await _changeService.UpdateAsync(existing, cancellationToken);
-        var actorUpn = User.FindFirstValue(ClaimTypes.Email) ?? User.Identity?.Name ?? "system@local";
+        var actorUpn = User.FindFirstValue(ClaimTypes.Upn) ?? User.FindFirstValue(ClaimTypes.Email) ?? User.Identity?.Name ?? "unknown@local";
         await _audit.LogAsync(3, actorUserId, actorUpn, "cm", "ChangeRequest", existing.ChangeRequestId, existing.ChangeNumber.ToString(), "Submit", "Submitted for approval", cancellationToken);
         _logger.LogInformation("Submitted change {ChangeRequestId}", existing.ChangeRequestId);
         return Ok(ToDto(updated!));
@@ -311,6 +319,7 @@ public class ChangesController : ControllerBase
         PriorityId = change.PriorityId,
         StatusId = change.StatusId,
         RiskLevelId = change.RiskLevelId,
+        ImpactTypeId = change.ImpactTypeId,
         Status = change.Status?.Name,
         Priority = change.Priority?.Name,
         RiskLevel = change.RiskLevel?.Name,
@@ -377,14 +386,26 @@ public class ChangesController : ControllerBase
             if (existingByUpn != Guid.Empty) return existingByUpn;
         }
 
-        var fallbackId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-        var fallbackExists = await _dbContext.Users.AnyAsync(user => user.UserId == fallbackId, cancellationToken);
-        if (!fallbackExists)
+        var claimUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (Guid.TryParse(claimUserId, out var parsedClaimUserId) && parsedClaimUserId != Guid.Empty)
         {
-            _dbContext.Users.Add(new User { UserId = fallbackId, Upn = "system@local", DisplayName = "System User", Role = "Admin", IsActive = true, PasswordHash = string.Empty });
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            var existsByClaimId = await _dbContext.Users.AnyAsync(user => user.UserId == parsedClaimUserId, cancellationToken);
+            if (existsByClaimId) return parsedClaimUserId;
         }
 
-        return fallbackId;
+        var claimUpn = User.FindFirstValue(ClaimTypes.Upn) ?? User.FindFirstValue(ClaimTypes.Email) ?? User.Identity?.Name;
+        if (!string.IsNullOrWhiteSpace(claimUpn))
+        {
+            var existingByClaimUpn = await _dbContext.Users.Where(user => user.Upn == claimUpn).Select(user => user.UserId).FirstOrDefaultAsync(cancellationToken);
+            if (existingByClaimUpn != Guid.Empty) return existingByClaimUpn;
+        }
+
+                var fallback = await _dbContext.Users.Where(user => user.IsActive).Select(user => user.UserId).FirstOrDefaultAsync(cancellationToken);
+        if (fallback != Guid.Empty) return fallback;
+
+        var adminId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        _dbContext.Users.Add(new User { UserId = adminId, Upn = "admin@local", DisplayName = "Local Admin", Role = "Admin", IsActive = true, PasswordHash = string.Empty });
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return adminId;
     }
 }

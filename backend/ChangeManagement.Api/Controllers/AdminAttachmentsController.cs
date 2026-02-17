@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using ChangeManagement.Api.Data;
+using ChangeManagement.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -11,10 +13,12 @@ namespace ChangeManagement.Api.Controllers;
 public class AdminAttachmentsController : ControllerBase
 {
     private readonly ChangeManagementDbContext _dbContext;
+    private readonly IAuditService _audit;
 
-    public AdminAttachmentsController(ChangeManagementDbContext dbContext)
+    public AdminAttachmentsController(ChangeManagementDbContext dbContext, IAuditService audit)
     {
         _dbContext = dbContext;
+        _audit = audit;
     }
 
     [HttpGet]
@@ -23,6 +27,7 @@ public class AdminAttachmentsController : ControllerBase
         var query = _dbContext.ChangeAttachments
             .AsNoTracking()
             .Include(x => x.ChangeRequest)
+            .Include(x => x.UploadedByUser)
             .OrderByDescending(x => x.UploadedAt)
             .AsQueryable();
 
@@ -44,14 +49,17 @@ public class AdminAttachmentsController : ControllerBase
             fileName = x.FileName,
             filePath = x.FileUrl,
             sizeBytes = x.FileSizeBytes,
-            uploadedAt = x.UploadedAt
+            uploadedAt = x.UploadedAt,
+            uploadedBy = x.UploadedByUser?.Upn
         }));
     }
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var attachment = await _dbContext.ChangeAttachments.FirstOrDefaultAsync(x => x.ChangeAttachmentId == id, cancellationToken);
+        var attachment = await _dbContext.ChangeAttachments
+            .Include(x => x.ChangeRequest)
+            .FirstOrDefaultAsync(x => x.ChangeAttachmentId == id, cancellationToken);
         if (attachment is null) return NotFound();
 
         if (System.IO.File.Exists(attachment.FileUrl))
@@ -61,6 +69,23 @@ public class AdminAttachmentsController : ControllerBase
 
         _dbContext.ChangeAttachments.Remove(attachment);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var actorId = ResolveActorUserId();
+        var actorUpn = ResolveActorUpn();
+        await _audit.LogAsync(5, actorId, actorUpn, "cm", "ChangeAttachment", attachment.ChangeAttachmentId, attachment.ChangeRequest?.ChangeNumber.ToString() ?? string.Empty, "AttachmentDelete", attachment.FileName, cancellationToken);
+
         return NoContent();
     }
+
+    private Guid ResolveActorUserId()
+    {
+        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(claim, out var parsed) && parsed != Guid.Empty ? parsed : Guid.Parse("11111111-1111-1111-1111-111111111111");
+    }
+
+    private string ResolveActorUpn()
+        => User.FindFirstValue(ClaimTypes.Upn)
+           ?? User.FindFirstValue(ClaimTypes.Email)
+           ?? User.Identity?.Name
+           ?? "unknown@local";
 }

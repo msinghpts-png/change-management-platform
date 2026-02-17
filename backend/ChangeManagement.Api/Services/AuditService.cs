@@ -22,11 +22,12 @@ public class AuditService : IAuditService
     public async Task LogAsync(int eventTypeId, Guid actorUserId, string actorUpn, string entitySchema, string entityName, Guid entityId, string changeNumber, string reason, string details, CancellationToken cancellationToken)
     {
         var resolvedActorUpn = actorUpn;
-        if (string.IsNullOrWhiteSpace(resolvedActorUpn) || resolvedActorUpn.Equals("system@local", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(resolvedActorUpn))
         {
-            resolvedActorUpn = _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.Email)
+            resolvedActorUpn = _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.Upn)
+                ?? _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.Email)
                 ?? _httpContextAccessor.HttpContext?.User.Identity?.Name
-                ?? "system@local";
+                ?? "unknown@local";
         }
 
         _dbContext.AuditEvents.Add(new AuditEvent

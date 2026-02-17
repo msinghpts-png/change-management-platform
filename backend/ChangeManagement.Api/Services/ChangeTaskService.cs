@@ -58,9 +58,10 @@ public class ChangeTaskService : IChangeTaskService
     private string ResolveActorUpn()
     {
         var user = _httpContextAccessor.HttpContext?.User;
-        return user?.FindFirstValue(ClaimTypes.Email)
+        return user?.FindFirstValue(ClaimTypes.Upn)
+               ?? user?.FindFirstValue(ClaimTypes.Email)
                ?? user?.Identity?.Name
-               ?? "system@local";
+               ?? "unknown@local";
     }
 
     public Task<bool> DeleteAsync(Guid taskId, CancellationToken cancellationToken) => _repository.DeleteAsync(taskId, cancellationToken);

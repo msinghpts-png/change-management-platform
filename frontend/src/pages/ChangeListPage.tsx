@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiClient } from "../services/apiClient";
 import type { ChangeRequest } from "../types/change";
 import { labelForChangeType, pillForChangeType, pillForImpactLevel, pillForRiskLevel } from "../utils/trafficColors";
@@ -52,28 +52,37 @@ const matchesFilter = (c: ChangeRequest, filter: FilterKey) => {
 
 const ChangeListPage = () => {
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState<ChangeRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("All");
-  const [myOnly, setMyOnly] = useState(false);
+  const [myOnly, setMyOnly] = useState(searchParams.get("mine") === "true");
 
   useEffect(() => {
     setLoading(true);
+    const rawUser = localStorage.getItem("authUser");
+    const me = rawUser ? JSON.parse(rawUser) : null;
+    const requestedByUserId = searchParams.get("mine") === "true" ? me?.id : undefined;
     apiClient
-      .getChanges()
+      .getChanges(requestedByUserId)
       .then((data) => setItems(data ?? []))
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [searchParams]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items
       .filter((c) => matchesFilter(c, filter))
-      .filter((c) => (!myOnly ? true : (c.requestedBy ?? "").toLowerCase().includes("admin")))
+      .filter((c) => {
+        if (!myOnly) return true;
+        const rawUser = localStorage.getItem("authUser");
+        const me = rawUser ? JSON.parse(rawUser) : null;
+        return (c.requestedBy ?? "").toLowerCase() === (me?.upn ?? "").toLowerCase();
+      })
       .filter((c) => {
         if (!q) return true;
         const hay = [

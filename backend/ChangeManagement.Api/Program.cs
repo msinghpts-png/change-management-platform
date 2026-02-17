@@ -122,6 +122,47 @@ BEGIN
     ADD [FileSizeBytes] BIGINT NOT NULL CONSTRAINT [DF_ChangeAttachment_FileSizeBytes] DEFAULT(0);
 END
 ");
+        dbContext.Database.ExecuteSqlRaw(@"
+IF COL_LENGTH('cm.ChangeRequest', 'ImpactTypeId') IS NULL
+BEGIN
+    ALTER TABLE [cm].[ChangeRequest]
+    ADD [ImpactTypeId] INT NULL;
+END
+IF OBJECT_ID('cm.ChangeTemplate', 'U') IS NULL
+BEGIN
+    CREATE TABLE [cm].[ChangeTemplate](
+        [TemplateId] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+        [Name] NVARCHAR(200) NOT NULL,
+        [Description] NVARCHAR(MAX) NULL,
+        [ImplementationSteps] NVARCHAR(MAX) NULL,
+        [BackoutPlan] NVARCHAR(MAX) NULL,
+        [ServiceSystem] NVARCHAR(200) NULL,
+        [Category] NVARCHAR(200) NULL,
+        [Environment] NVARCHAR(200) NULL,
+        [BusinessJustification] NVARCHAR(MAX) NULL,
+        [CreatedAt] DATETIME2 NOT NULL DEFAULT(GETUTCDATE()),
+        [CreatedBy] UNIQUEIDENTIFIER NOT NULL,
+        [IsActive] BIT NOT NULL DEFAULT(1)
+    );
+END
+
+IF COL_LENGTH('cm.ChangeTemplate', 'ChangeTypeId') IS NULL
+BEGIN
+    ALTER TABLE [cm].[ChangeTemplate] ADD [ChangeTypeId] INT NULL;
+END
+IF COL_LENGTH('cm.ChangeTemplate', 'RiskLevelId') IS NULL
+BEGIN
+    ALTER TABLE [cm].[ChangeTemplate] ADD [RiskLevelId] INT NULL;
+END
+IF NOT EXISTS (SELECT 1 FROM [audit].[EventType] WHERE [EventTypeId] = 6)
+BEGIN
+    INSERT INTO [audit].[EventType]([EventTypeId],[Name],[Description]) VALUES (6,'TemplateCreated','Template created');
+END
+IF NOT EXISTS (SELECT 1 FROM [audit].[EventType] WHERE [EventTypeId] = 7)
+BEGIN
+    INSERT INTO [audit].[EventType]([EventTypeId],[Name],[Description]) VALUES (7,'TemplateUpdated','Template updated');
+END
+");
     }
 
     var adminUpn = app.Configuration["SeedAdmin:Upn"] ?? "admin@local";

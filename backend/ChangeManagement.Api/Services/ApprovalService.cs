@@ -67,9 +67,10 @@ public class ApprovalService : IApprovalService
     private string ResolveActorUpn()
     {
         var user = _httpContextAccessor.HttpContext?.User;
-        return user?.FindFirstValue(ClaimTypes.Email)
+        return user?.FindFirstValue(ClaimTypes.Upn)
+               ?? user?.FindFirstValue(ClaimTypes.Email)
                ?? user?.Identity?.Name
-               ?? "system@local";
+               ?? "unknown@local";
     }
 
     private async Task<ChangeApproval?> CreateOrDecideAsync(Guid changeId, Guid cabUserId, int approvalStatusId, string comments, CancellationToken cancellationToken)

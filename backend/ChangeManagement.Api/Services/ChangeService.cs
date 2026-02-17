@@ -56,7 +56,8 @@ public class ChangeService : IChangeService
             existing.AssignedToUserId = changeRequest.AssignedToUserId;
             existing.PlannedStart = changeRequest.PlannedStart;
             existing.PlannedEnd = changeRequest.PlannedEnd;
-            existing.Description = changeRequest.Description;
+            existing.BusinessJustification = changeRequest.BusinessJustification;
+            existing.ImpactTypeId = changeRequest.ImpactTypeId;
             existing.UpdatedBy = changeRequest.UpdatedBy;
             payload = existing;
         }
@@ -76,9 +77,10 @@ public class ChangeService : IChangeService
     private string ResolveActorUpn()
     {
         var user = _httpContextAccessor.HttpContext?.User;
-        return user?.FindFirstValue(ClaimTypes.Email)
+        return user?.FindFirstValue(ClaimTypes.Upn)
+               ?? user?.FindFirstValue(ClaimTypes.Email)
                ?? user?.Identity?.Name
-               ?? "system@local";
+               ?? "unknown@local";
     }
 
     private Guid ResolveActorUserId()

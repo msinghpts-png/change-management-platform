@@ -56,6 +56,8 @@ public class TemplateService : ITemplateService
             Category = request.Category,
             Environment = request.Environment,
             BusinessJustification = request.BusinessJustification,
+            ChangeTypeId = request.ChangeTypeId,
+            RiskLevelId = request.RiskLevelId,
             CreatedAt = DateTime.UtcNow,
             CreatedBy = actorId,
             IsActive = request.IsActive ?? true
@@ -80,6 +82,8 @@ public class TemplateService : ITemplateService
         entity.Category = request.Category;
         entity.Environment = request.Environment;
         entity.BusinessJustification = request.BusinessJustification;
+        entity.ChangeTypeId = request.ChangeTypeId;
+        entity.RiskLevelId = request.RiskLevelId;
         if (request.IsActive.HasValue)
         {
             entity.IsActive = request.IsActive.Value;
@@ -113,6 +117,7 @@ public class TemplateService : ITemplateService
 
     private string ResolveActorUpn()
         => _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.Upn)
+           ?? _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.Email)
            ?? _httpContextAccessor.HttpContext?.User.Identity?.Name
-           ?? "system@local";
+           ?? "unknown@local";
 }

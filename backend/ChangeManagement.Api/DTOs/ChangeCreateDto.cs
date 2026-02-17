@@ -15,6 +15,7 @@ public class ChangeCreateDto
     public int? ChangeTypeId { get; set; }
     public int? PriorityId { get; set; }
     public int? RiskLevelId { get; set; }
+    public int? ImpactTypeId { get; set; }
     public Guid? RequestedByUserId { get; set; }
     public Guid? AssignedToUserId { get; set; }
 

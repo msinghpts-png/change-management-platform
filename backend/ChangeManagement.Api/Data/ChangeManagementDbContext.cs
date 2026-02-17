@@ -49,6 +49,7 @@ public class ChangeManagementDbContext : DbContext
             entity.HasIndex(e => e.ChangeNumber).IsUnique();
             entity.HasIndex(e => e.StatusId);
             entity.HasIndex(e => e.AssignedToUserId);
+            entity.Property(e => e.ImpactTypeId).HasDefaultValue(2);
 
             entity.HasOne(e => e.ChangeType).WithMany(e => e.ChangeRequests).HasForeignKey(e => e.ChangeTypeId);
             entity.HasOne(e => e.Priority).WithMany(e => e.ChangeRequests).HasForeignKey(e => e.PriorityId);

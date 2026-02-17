@@ -5,7 +5,7 @@ import type { Approval, ApprovalStatus, Attachment, ChangeCreateDto, ChangeReque
 import { labelForChangeType, pillForChangeType, pillForImpactLevel, pillForRiskLevel } from "../utils/trafficColors";
 
 type ViewTab = "Overview" | "Approvals" | "Tasks" | "Attachments";
-type FormTab = "Basic Info" | "Schedule" | "Plans" | "Risk & Impact";
+type FormTab = "Basic Info" | "Schedule" | "Plans" | "Risk & Impact" | "Attachments";
 
 const pillForStatus = (status?: string) => {
   const s = (status ?? "").toLowerCase();
@@ -44,7 +44,9 @@ const fallbackTemplates: ChangeTemplate[] = [
     environment: "Non-Production",
     businessJustification: "",
     backoutPlan: "",
-    isActive: true
+    isActive: true,
+    changeTypeId: 1,
+    riskLevelId: 1
   },
   {
     templateId: "00000000-0000-0000-0000-000000000002",
@@ -56,7 +58,9 @@ const fallbackTemplates: ChangeTemplate[] = [
     environment: "Non-Production",
     businessJustification: "",
     backoutPlan: "",
-    isActive: true
+    isActive: true,
+    changeTypeId: 1,
+    riskLevelId: 1
   },
   {
     templateId: "00000000-0000-0000-0000-000000000003",
@@ -68,7 +72,9 @@ const fallbackTemplates: ChangeTemplate[] = [
     environment: "Non-Production",
     businessJustification: "",
     backoutPlan: "",
-    isActive: true
+    isActive: true,
+    changeTypeId: 2,
+    riskLevelId: 2
   }
 ];
 
@@ -137,6 +143,8 @@ const ChangeDetailPage = () => {
 
   const [templateId, setTemplateId] = useState("");
   const [templates, setTemplates] = useState<ChangeTemplate[]>(fallbackTemplates);
+  const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
   const changeTypeId = changeTypeIdValue;
   const riskLevel = riskIdToLabel(riskLevelIdValue);
@@ -250,6 +258,8 @@ const ChangeDetailPage = () => {
     setService(tpl.serviceSystem ?? "");
     setEnvironment(tpl.environment ?? "Non-Production");
     setBusinessJustification(tpl.businessJustification ?? "");
+    if (tpl.changeTypeId) setChangeTypeIdValue(tpl.changeTypeId);
+    if (tpl.riskLevelId) setRiskLevelIdValue(tpl.riskLevelId);
   };
 
   const saveDraft = async (options?: { navigateOnCreate?: boolean }) => {
@@ -278,7 +288,7 @@ const ChangeDetailPage = () => {
         };
         const created = await apiClient.createChange(payload);
         if (options?.navigateOnCreate ?? true) {
-          nav(`/changes/${created.id}`);
+          nav("/changes?mine=true");
         }
         return created.id;
       } else if (apiClient.isValidId(id)) {
@@ -304,6 +314,9 @@ const ChangeDetailPage = () => {
         const updated = await apiClient.updateChange(id, payload);
         setItem(updated);
         await refreshRelatedData(id);
+        if (options?.navigateOnCreate ?? true) {
+          nav("/changes?mine=true");
+        }
         return id;
       }
     } catch (e) {
@@ -401,18 +414,29 @@ const ChangeDetailPage = () => {
     }
   };
 
-  const uploadAttachment = async (event: any) => {
-    if (!id || !event.target.files?.[0]) return;
-    setLoading(true);
+  const uploadAttachment = async () => {
+    if (!selectedAttachment) return;
+    setUploadingAttachment(true);
     setError(null);
     try {
-      await apiClient.uploadAttachment(id, event.target.files[0]);
-      await refreshRelatedData(id);
-      event.target.value = "";
+      let targetId = id;
+      if (!apiClient.isValidId(targetId)) {
+        targetId = await saveDraft({ navigateOnCreate: false });
+      }
+      if (!apiClient.isValidId(targetId)) {
+        setError("Save draft first before uploading.");
+        return;
+      }
+      await apiClient.uploadAttachment(targetId, selectedAttachment);
+      await refreshRelatedData(targetId);
+      setSelectedAttachment(null);
+      if (isNew) {
+        nav(`/changes/${targetId}`);
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setLoading(false);
+      setUploadingAttachment(false);
     }
   };
 
@@ -463,7 +487,7 @@ const ChangeDetailPage = () => {
         <div className="card">
           <div className="card-head">
             <div className="tabs" role="tablist" aria-label="Change form sections">
-              {(["Basic Info", "Schedule", "Plans", "Risk & Impact"] as FormTab[]).map((t) => (
+              {(["Basic Info", "Schedule", "Plans", "Risk & Impact", "Attachments"] as FormTab[]).map((t) => (
                 <button
                   key={t}
                   className={"tab " + (formTab === t ? "tab-active" : "")}
@@ -592,6 +616,31 @@ const ChangeDetailPage = () => {
                 <div />
               </div>
             ) : null}
+
+            {formTab === "Attachments" ? (
+              <div>
+                <div className="h3">Attachments</div>
+                <div className="small">Allowed: pdf, doc(x), xls(x), png, jpg. Max 5 MB.</div>
+                <input className="input" style={{ marginTop: 8 }} type="file" onChange={(e) => setSelectedAttachment(e.target.files?.[0] ?? null)} />
+                <div style={{ marginTop: 8 }}>
+                  <button className="btn btn-primary" disabled={!selectedAttachment || uploadingAttachment} onClick={uploadAttachment}>
+                    {uploadingAttachment ? "Uploading..." : "Upload Attachment"}
+                  </button>
+                </div>
+                <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+                  {attachments.map((attachment) => (
+                    <div key={attachment.id} className="row">
+                      <div className="row-left">
+                        <div className="h3">{attachment.fileName}</div>
+                        <div className="small">{Math.round(attachment.sizeBytes / 1024)} KB</div>
+                      </div>
+                      <a className="btn" href={`/api/changes/${id}/attachments/${attachment.id}/download`}>Download</a>
+                    </div>
+                  ))}
+                  {!attachments.length ? <div className="empty">No attachments uploaded.</div> : null}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="footer-actions">
@@ -613,7 +662,8 @@ const ChangeDetailPage = () => {
           <div className="card card-pad" style={{ marginTop: 12 }}>
             <div className="h3">Attachments</div>
             <div className="small">Allowed: pdf, doc(x), xls(x), png, jpg. Max 5 MB.</div>
-            <input className="input" style={{ marginTop: 8 }} type="file" onChange={uploadAttachment} />
+            <input className="input" style={{ marginTop: 8 }} type="file" onChange={(e) => setSelectedAttachment(e.target.files?.[0] ?? null)} />
+            <div style={{ marginTop: 8 }}><button className="btn btn-primary" disabled={!selectedAttachment || uploadingAttachment} onClick={uploadAttachment}>{uploadingAttachment ? "Uploading..." : "Upload Attachment"}</button></div>
             <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
               {attachments.map((attachment) => (
                 <div key={attachment.id} className="row">
@@ -740,7 +790,7 @@ const ChangeDetailPage = () => {
               </div>
               <div className="card-body">
                 <div className="small">Owner</div>
-                <div className="h3">{item?.requestedBy ?? "admin@example.com"}</div>
+                <div className="h3">{item?.requestedBy ?? "—"}</div>
               </div>
             </div>
           </div>
@@ -787,7 +837,8 @@ const ChangeDetailPage = () => {
         <div className="card card-pad">
           <div className="h3">Attachments</div>
           <div className="small">Allowed: pdf, doc(x), xls(x), png, jpg. Max 5 MB.</div>
-          <input className="input" style={{ marginTop: 8 }} type="file" onChange={uploadAttachment} />
+          <input className="input" style={{ marginTop: 8 }} type="file" onChange={(e) => setSelectedAttachment(e.target.files?.[0] ?? null)} />
+            <div style={{ marginTop: 8 }}><button className="btn btn-primary" disabled={!selectedAttachment || uploadingAttachment} onClick={uploadAttachment}>{uploadingAttachment ? "Uploading..." : "Upload Attachment"}</button></div>
           <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
             {attachments.map((attachment) => (
               <div key={attachment.id} className="row">

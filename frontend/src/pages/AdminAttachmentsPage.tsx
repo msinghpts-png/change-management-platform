@@ -32,13 +32,15 @@ const AdminAttachmentsPage = () => {
       <div style={{ height: 12 }} />
       <div className="card card-pad">
         <table style={{ width: "100%" }}>
-          <thead><tr><th>Change</th><th>File</th><th>Path</th><th>Size</th><th /></tr></thead>
+          <thead><tr><th>Change</th><th>File</th><th>Path</th><th>Uploader</th><th>Uploaded At</th><th>Size</th><th /></tr></thead>
           <tbody>
             {items.map((x) => (
               <tr key={x.id}>
                 <td>{x.changeNumber}</td>
                 <td>{x.fileName}</td>
                 <td>{x.filePath}</td>
+                <td>{x.uploadedBy ?? "—"}</td>
+                <td>{x.uploadedAt ? new Date(x.uploadedAt).toLocaleString() : "—"}</td>
                 <td>{Math.round((x.sizeBytes ?? 0) / 1024)} KB</td>
                 <td><button className="btn" onClick={() => remove(x.id)}>Delete</button></td>
               </tr>

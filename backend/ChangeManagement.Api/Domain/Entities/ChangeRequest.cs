@@ -10,6 +10,7 @@ public class ChangeRequest
     public int PriorityId { get; set; }
     public int StatusId { get; set; }
     public int RiskLevelId { get; set; }
+    public int? ImpactTypeId { get; set; }
     public Guid RequestedByUserId { get; set; }
     public Guid? AssignedToUserId { get; set; }
     public DateTime? PlannedStart { get; set; }

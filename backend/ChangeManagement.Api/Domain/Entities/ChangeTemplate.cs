@@ -11,6 +11,8 @@ public class ChangeTemplate
     public string? Category { get; set; }
     public string? Environment { get; set; }
     public string? BusinessJustification { get; set; }
+    public int? ChangeTypeId { get; set; }
+    public int? RiskLevelId { get; set; }
     public DateTime CreatedAt { get; set; }
     public Guid? CreatedBy { get; set; }
     public bool IsActive { get; set; } = true;

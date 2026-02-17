@@ -17,6 +17,7 @@ public class ChangeRequestDto
     public int PriorityId { get; set; }
     public int StatusId { get; set; }
     public int RiskLevelId { get; set; }
+    public int? ImpactTypeId { get; set; }
     public string? Status { get; set; }
     public string? Priority { get; set; }
     public string? RiskLevel { get; set; }

@@ -65,7 +65,7 @@ const normalizeChange = (item: any): ChangeRequest => ({
 
 export const apiClient = {
   isValidId,
-  getChanges: async () => (await request<any[]>("/changes")).map(normalizeChange),
+  getChanges: async (requestedByUserId?: string) => (await request<any[]>(`/changes${requestedByUserId ? `?requestedByUserId=${encodeURIComponent(requestedByUserId)}` : ""}`)).map(normalizeChange),
   getChangeById: async (id: string) => {
     if (!isValidId(id)) throw new Error("Invalid change id");
     return normalizeChange(await request<any>(`/changes/${id}`));
@@ -170,7 +170,18 @@ export const apiClient = {
   exportDatabase: () => request<DatabaseBackup[]>("/admin/database/backups"),
   importDatabase: (_file: File) => Promise.resolve(),
   runMigrations: () => request<{ message: string }>("/admin/database/migrate", { method: "POST" }),
-  seedDatabase: () => Promise.resolve(),
+  seedDatabase: () => request<{ message: string }>("/admin/demo-data", { method: "POST" }),
+
+  getAuditEvents: () => request<any[]>("/admin/audit"),
+
+  getAllAttachments: (changeNumber?: string) => request<any[]>(`/admin/attachments${changeNumber ? `?changeNumber=${encodeURIComponent(changeNumber)}` : ""}`),
+  deleteAdminAttachment: (attachmentId: string) => request<void>(`/admin/attachments/${attachmentId}`, { method: "DELETE" }),
+
+  resetUserPassword: (id: string, newPassword: string) => request<{ message: string }>(`/admin/users/${id}/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newPassword })
+    }),
 
   getAuditEvents: () => request<any[]>("/admin/audit"),
 

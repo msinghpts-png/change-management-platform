@@ -52,11 +52,16 @@ public class AttachmentService : IAttachmentService
             return (null, "File type is not allowed.");
         }
 
-        var rootPath = Path.Combine(_environment.ContentRootPath, "attachments", changeId.ToString());
+        var rootPath = Path.Combine(_environment.ContentRootPath, "data", "attachments", changeId.ToString());
         Directory.CreateDirectory(rootPath);
 
         var fileId = Guid.NewGuid();
-        var storedPath = Path.Combine(rootPath, $"{fileId:N}{extension}");
+        var safeName = Path.GetFileName(file.FileName);
+        var storedPath = Path.Combine(rootPath, safeName);
+        if (File.Exists(storedPath))
+        {
+            storedPath = Path.Combine(rootPath, $"{fileId:N}_{safeName}");
+        }
 
         await using var stream = File.Create(storedPath);
         await file.CopyToAsync(stream, cancellationToken);
@@ -81,9 +86,10 @@ public class AttachmentService : IAttachmentService
     private string ResolveActorUpn()
     {
         var user = _httpContextAccessor.HttpContext?.User;
-        return user?.FindFirstValue(ClaimTypes.Email)
+        return user?.FindFirstValue(ClaimTypes.Upn)
+               ?? user?.FindFirstValue(ClaimTypes.Email)
                ?? user?.Identity?.Name
-               ?? "system@local";
+               ?? "unknown@local";
     }
 
     public Task<bool> DeleteAsync(Guid attachmentId, CancellationToken cancellationToken) => _attachmentRepository.DeleteAsync(attachmentId, cancellationToken);

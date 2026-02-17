@@ -62,5 +62,19 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             });
             db.SaveChanges();
         }
+
+        if (!db.ChangeTemplates.Any())
+        {
+            db.ChangeTemplates.Add(new ChangeTemplate
+            {
+                TemplateId = Guid.NewGuid(),
+                Name = "Test Template",
+                Description = "Template for tests",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = userId
+            });
+            db.SaveChanges();
+        }
     }
 }
