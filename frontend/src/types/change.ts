@@ -91,12 +91,22 @@ export type ChangeRequest = {
   priorityId?: number;
   statusId?: number;
   status: ChangeRequestStatus;
+  approvalRequired?: boolean;
+  approvalStrategy?: "Any" | "Majority" | "All" | string;
+  approverUserIds?: string[];
+  approvals?: Approval[];
   priority: ChangePriority;
   riskLevel?: RiskLevel;
   impactLevel?: ImpactLevel;
   impactTypeId?: number;
   service?: string;
   requestedBy?: string;
+  requestedByUserId?: string;
+  owner?: string;
+  requestedByDisplay?: string;
+  executor?: string;
+  implementationGroup?: string;
+  assignedToUserId?: string;
   plannedStart?: string;
   plannedEnd?: string;
   createdAt?: string;
@@ -124,6 +134,10 @@ export type ChangeCreateDto = {
   impactLevel?: ImpactLevel;
   impactTypeId?: number;
   requestedByUserId?: string;
+  approvalRequired?: boolean;
+  approvalStrategy?: "Any" | "Majority" | "All" | string;
+  approverUserIds?: string[];
+  implementationGroup?: string;
   plannedStart?: string;
   plannedEnd?: string;
 };
@@ -148,6 +162,10 @@ export type ChangeUpdateDto = {
   plannedEnd?: string;
   status?: ChangeRequestStatus;
   updatedBy?: string;
+  approvalRequired?: boolean;
+  approvalStrategy?: "Any" | "Majority" | "All" | string;
+  approverUserIds?: string[];
+  implementationGroup?: string;
 };
 
 export type ApprovalDecisionDto = {

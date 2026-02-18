@@ -11,10 +11,10 @@ public class ChangeRepository : IChangeRepository
     public ChangeRepository(ChangeManagementDbContext dbContext) => _dbContext = dbContext;
 
     public Task<List<ChangeRequest>> GetAllAsync(CancellationToken cancellationToken) =>
-        BaseQuery().AsNoTracking().ToListAsync(cancellationToken);
+        BaseQuery().Where(c => c.DeletedAt == null).AsNoTracking().ToListAsync(cancellationToken);
 
     public Task<ChangeRequest?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
-        BaseQuery().FirstOrDefaultAsync(c => c.ChangeRequestId == id, cancellationToken);
+        BaseQuery().FirstOrDefaultAsync(c => c.ChangeRequestId == id && c.DeletedAt == null, cancellationToken);
 
     public async Task<ChangeRequest> CreateAsync(ChangeRequest changeRequest, CancellationToken cancellationToken)
     {
@@ -40,7 +40,9 @@ public class ChangeRepository : IChangeRepository
         .Include(c => c.RiskLevel)
         .Include(c => c.RequestedByUser)
         .Include(c => c.AssignedToUser)
-        .Include(c => c.ChangeApprovals)
+        .Include(c => c.ChangeApprovals).ThenInclude(a => a.ApprovalStatus)
+        .Include(c => c.ChangeApprovals).ThenInclude(a => a.ApproverUser)
+        .Include(c => c.ChangeApprovers).ThenInclude(a => a.ApproverUser)
         .Include(c => c.ChangeAttachments)
         .Include(c => c.ChangeTasks);
 }

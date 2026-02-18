@@ -3,17 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiClient } from "../services/apiClient";
 import type { ChangeRequest, DashboardStats } from "../types/change";
 import { labelForChangeType, pillForChangeType } from "../utils/trafficColors";
-
-const pillForStatus = (status?: string) => {
-  const s = (status ?? "").toLowerCase();
-  if (s.includes("approved")) return "pill pill-green";
-  if (s.includes("closed") || s.includes("complete")) return "pill pill-green";
-  if (s.includes("pending")) return "pill pill-amber";
-  if (s.includes("inprogress") || s.includes("in progress") || s.includes("implementation"))
-    return "pill pill-cyan";
-  if (s.includes("rejected")) return "pill pill-red";
-  return "pill";
-};
+import { getStatusPillClass } from "../ui/pills";
 
 const pillForPriority = (priority?: string) => {
   const p = (priority ?? "").toLowerCase();
@@ -172,7 +162,7 @@ const DashboardPage = () => {
                       <div className="h3">{c.title}</div>
                       <div className="small">{fmtDate(c.plannedStart)}</div>
                     </div>
-                    <span className={pillForStatus(c.status)}>{c.status ?? "Scheduled"}</span>
+                    <span className={getStatusPillClass(c.status)}>{c.status ?? "Scheduled"}</span>
                   </div>
                 </li>
               ))}
@@ -212,7 +202,7 @@ const DashboardPage = () => {
                       {fmtDate(c.createdAt)}
                     </div>
                   </div>
-                  <span className={pillForStatus(c.status)}>{c.status ?? "—"}</span>
+                  <span className={getStatusPillClass(c.status)}>{c.status ?? "—"}</span>
                 </div>
               </li>
             ))}

@@ -14,6 +14,7 @@ public class ChangeManagementDbContext : DbContext
     public DbSet<ChangeTask> ChangeTasks => Set<ChangeTask>();
     public DbSet<ChangeApproval> ChangeApprovals => Set<ChangeApproval>();
     public DbSet<ChangeAttachment> ChangeAttachments => Set<ChangeAttachment>();
+    public DbSet<ChangeApprover> ChangeApprovers => Set<ChangeApprover>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
     public DbSet<EventType> EventTypes => Set<EventType>();
     public DbSet<ChangeType> ChangeTypes => Set<ChangeType>();
@@ -50,6 +51,10 @@ public class ChangeManagementDbContext : DbContext
             entity.HasIndex(e => e.StatusId);
             entity.HasIndex(e => e.AssignedToUserId);
             entity.Property(e => e.ImpactTypeId).HasDefaultValue(2);
+            entity.Property(e => e.ApprovalRequired).HasDefaultValue(false);
+            entity.Property(e => e.ApprovalStrategy).HasMaxLength(20).HasDefaultValue("Any");
+            entity.Property(e => e.ImplementationGroup).HasMaxLength(200);
+            entity.Property(e => e.DeletedReason).HasMaxLength(400);
 
             entity.HasOne(e => e.ChangeType).WithMany(e => e.ChangeRequests).HasForeignKey(e => e.ChangeTypeId);
             entity.HasOne(e => e.Priority).WithMany(e => e.ChangeRequests).HasForeignKey(e => e.PriorityId);
@@ -57,6 +62,10 @@ public class ChangeManagementDbContext : DbContext
             entity.HasOne(e => e.RiskLevel).WithMany(e => e.ChangeRequests).HasForeignKey(e => e.RiskLevelId);
             entity.HasOne(e => e.RequestedByUser).WithMany(e => e.RequestedChanges).HasForeignKey(e => e.RequestedByUserId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(e => e.AssignedToUser).WithMany(e => e.AssignedChanges).HasForeignKey(e => e.AssignedToUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.ApprovalRequesterUser).WithMany(e => e.ApprovalRequestedChanges).HasForeignKey(e => e.ApprovalRequesterUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.SubmittedByUser).WithMany(e => e.SubmittedChanges).HasForeignKey(e => e.SubmittedByUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.DeletedByUser).WithMany(e => e.DeletedChanges).HasForeignKey(e => e.DeletedByUserId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.ImpactLevel).WithMany().HasForeignKey(e => e.ImpactLevelId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ChangeTask>(entity =>
@@ -75,6 +84,17 @@ public class ChangeManagementDbContext : DbContext
             entity.HasOne(e => e.ChangeRequest).WithMany(e => e.ChangeApprovals).HasForeignKey(e => e.ChangeRequestId);
             entity.HasOne(e => e.ApprovalStatus).WithMany(e => e.ChangeApprovals).HasForeignKey(e => e.ApprovalStatusId);
             entity.HasOne(e => e.ApproverUser).WithMany(e => e.Approvals).HasForeignKey(e => e.ApproverUserId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+
+
+        modelBuilder.Entity<ChangeApprover>(entity =>
+        {
+            entity.ToTable("ChangeApprover", "cm");
+            entity.HasKey(e => e.ChangeApproverId);
+            entity.HasIndex(e => new { e.ChangeId, e.ApproverUserId }).IsUnique();
+            entity.HasOne(e => e.ChangeRequest).WithMany(e => e.ChangeApprovers).HasForeignKey(e => e.ChangeId);
+            entity.HasOne(e => e.ApproverUser).WithMany(e => e.ChangeApproverSelections).HasForeignKey(e => e.ApproverUserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ChangeAttachment>(entity =>
@@ -133,9 +153,14 @@ public class ChangeManagementDbContext : DbContext
         modelBuilder.Entity<ChangeStatus>().HasData(
             new ChangeStatus { StatusId = 1, Name = "Draft", IsTerminal = false },
             new ChangeStatus { StatusId = 2, Name = "Submitted", IsTerminal = false },
-            new ChangeStatus { StatusId = 3, Name = "Approved", IsTerminal = false },
-            new ChangeStatus { StatusId = 4, Name = "Rejected", IsTerminal = true },
-            new ChangeStatus { StatusId = 5, Name = "Completed", IsTerminal = true });
+            new ChangeStatus { StatusId = 3, Name = "PendingApproval", IsTerminal = false },
+            new ChangeStatus { StatusId = 4, Name = "Approved", IsTerminal = false },
+            new ChangeStatus { StatusId = 5, Name = "Rejected", IsTerminal = true },
+            new ChangeStatus { StatusId = 6, Name = "Scheduled", IsTerminal = false },
+            new ChangeStatus { StatusId = 7, Name = "InImplementation", IsTerminal = false },
+            new ChangeStatus { StatusId = 8, Name = "Completed", IsTerminal = true },
+            new ChangeStatus { StatusId = 9, Name = "Closed", IsTerminal = true },
+            new ChangeStatus { StatusId = 10, Name = "Cancelled", IsTerminal = true });
 
         modelBuilder.Entity<RiskLevel>().HasData(
             new RiskLevel { RiskLevelId = 1, Name = "Low", Score = 1 },

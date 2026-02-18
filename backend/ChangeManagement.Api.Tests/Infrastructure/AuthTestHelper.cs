@@ -18,6 +18,22 @@ internal static class AuthTestHelper
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", payload!.Token);
     }
 
+    public static async Task AuthenticateAsCabAsync(HttpClient client)
+    {
+        var response = await client.PostAsJsonAsync("/api/auth/login", new { upn = "cab@local", password = "Admin123!" });
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<LoginPayload>();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", payload!.Token);
+    }
+
+    public static async Task AuthenticateAsExecutorAsync(HttpClient client)
+    {
+        var response = await client.PostAsJsonAsync("/api/auth/login", new { upn = "executor@local", password = "Admin123!" });
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<LoginPayload>();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", payload!.Token);
+    }
+
     private sealed class LoginPayload
     {
         public string Token { get; set; } = string.Empty;
