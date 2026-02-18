@@ -112,6 +112,7 @@ builder.Services.AddScoped<IChangeRepository, ChangeRepository>();
 builder.Services.AddScoped<IChangeService, ChangeService>();
 builder.Services.AddScoped<IApprovalRepository, ApprovalRepository>();
 builder.Services.AddScoped<IApprovalService, ApprovalService>();
+builder.Services.AddScoped<IChangeWorkflowService, ChangeWorkflowService>();
 builder.Services.AddScoped<IChangeAttachmentRepository, ChangeAttachmentRepository>();
 builder.Services.AddScoped<IAttachmentService, AttachmentService>();
 builder.Services.AddScoped<IChangeTaskRepository, ChangeTaskRepository>();
