@@ -1,11 +1,17 @@
 const normalize = (value?: string) => (value ?? "").trim().toLowerCase();
 
+const CHANGE_TYPE_STANDARD = 1;
+const CHANGE_TYPE_NORMAL = 2;
+const CHANGE_TYPE_EMERGENCY = 3;
+
 export const getStatusPillClass = (status?: string) => {
   const s = normalize(status);
-  if (s.includes("rejected") || s.includes("cancel")) return "pill pill-red";
+  if (s.includes("cancel")) return "pill pill-red";
+  if (s.includes("rejected")) return "pill pill-red";
   if (s.includes("approved") || s.includes("closed") || s.includes("completed")) return "pill pill-green";
-  if (s.includes("pending") || s.includes("submitted")) return "pill pill-amber";
-  if (s.includes("inimplementation") || s.includes("in progress") || s.includes("inprogress") || s.includes("scheduled")) return "pill pill-cyan";
+  if (s.includes("pendingapproval") || s.includes("pending") || s.includes("submitted")) return "pill pill-amber";
+  if (s.includes("scheduled") || s.includes("inimplementation") || s.includes("in progress") || s.includes("inprogress")) return "pill pill-cyan";
+  if (s.includes("draft")) return "pill";
   return "pill";
 };
 
@@ -24,13 +30,15 @@ export const getImpactPillClass = (impact?: string) => {
 };
 
 export const getChangeTypePillClass = (changeTypeId?: number) => {
-  if (changeTypeId === 3) return "pill pill-red";
-  if (changeTypeId === 1) return "pill pill-blue";
-  return "pill pill-green";
+  if (changeTypeId === CHANGE_TYPE_EMERGENCY) return "pill pill-red";
+  if (changeTypeId === CHANGE_TYPE_STANDARD) return "pill pill-blue";
+  if (changeTypeId === CHANGE_TYPE_NORMAL) return "pill pill-green";
+  return "pill";
 };
 
 export const getChangeTypeLabel = (changeTypeId?: number) => {
-  if (changeTypeId === 1) return "Standard";
-  if (changeTypeId === 3) return "Emergency";
+  if (changeTypeId === CHANGE_TYPE_STANDARD) return "Standard";
+  if (changeTypeId === CHANGE_TYPE_EMERGENCY) return "Emergency";
+  if (changeTypeId === CHANGE_TYPE_NORMAL) return "Normal";
   return "Normal";
 };

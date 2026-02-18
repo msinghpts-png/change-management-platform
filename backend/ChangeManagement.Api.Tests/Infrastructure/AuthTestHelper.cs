@@ -5,30 +5,15 @@ namespace ChangeManagement.Api.Tests.Infrastructure;
 
 internal static class AuthTestHelper
 {
-    public static async Task AuthenticateAsAdminAsync(HttpClient client)
-    {
-        var response = await client.PostAsJsonAsync("/api/auth/login", new
-        {
-            upn = "admin@local",
-            password = "Admin123!"
-        });
-        response.EnsureSuccessStatusCode();
+    public static Task AuthenticateAsAdminAsync(HttpClient client) => AuthenticateAsync(client, "admin@local");
 
-        var payload = await response.Content.ReadFromJsonAsync<LoginPayload>();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", payload!.Token);
-    }
+    public static Task AuthenticateAsCabAsync(HttpClient client) => AuthenticateAsync(client, "cab@local");
 
-    public static async Task AuthenticateAsCabAsync(HttpClient client)
-    {
-        var response = await client.PostAsJsonAsync("/api/auth/login", new { upn = "cab@local", password = "Admin123!" });
-        response.EnsureSuccessStatusCode();
-        var payload = await response.Content.ReadFromJsonAsync<LoginPayload>();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", payload!.Token);
-    }
+    public static Task AuthenticateAsExecutorAsync(HttpClient client) => AuthenticateAsync(client, "executor@local");
 
-    public static async Task AuthenticateAsExecutorAsync(HttpClient client)
+    private static async Task AuthenticateAsync(HttpClient client, string upn)
     {
-        var response = await client.PostAsJsonAsync("/api/auth/login", new { upn = "executor@local", password = "Admin123!" });
+        var response = await client.PostAsJsonAsync("/api/auth/login", new { upn, password = "Admin123!" });
         response.EnsureSuccessStatusCode();
         var payload = await response.Content.ReadFromJsonAsync<LoginPayload>();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", payload!.Token);

@@ -153,12 +153,11 @@ export const apiClient = {
       body: JSON.stringify({ approver: payload.approver, comments: payload.comment ?? "" })
     }),
 
-  submitChange: (changeId: string, payload?: { approverUserIds?: string[]; approvalStrategy?: string; reason?: string }) =>
-    request<ChangeRequest>(`/changes/${changeId}/submit`, {
+  submitChange: async (changeId: string, payload?: { approverUserIds?: string[]; approvalStrategy?: string; reason?: string }) => normalizeChange(await request<any>(`/changes/${changeId}/submit`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload ?? {})
-    }),
+    })),
 
   approveChange: (changeId: string, comments?: string) => request<any>(`/changes/${changeId}/approve`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ comments: comments ?? "" }) }).then(normalizeChange),
   rejectChange: (changeId: string, comments?: string) => request<any>(`/changes/${changeId}/reject`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ comments: comments ?? "" }) }).then(normalizeChange),

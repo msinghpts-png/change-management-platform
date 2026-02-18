@@ -63,12 +63,15 @@ export type DashboardStats = {
 
 export type ChangeRequestStatus =
   | "Draft"
+  | "Submitted"
   | "PendingApproval"
   | "Approved"
-  | "InProgress"
+  | "Rejected"
+  | "Scheduled"
+  | "InImplementation"
   | "Completed"
   | "Closed"
-  | "Rejected"
+  | "Cancelled"
   | string;
 
 export type ChangePriority = "P1" | "P2" | "P3" | "P4" | string;

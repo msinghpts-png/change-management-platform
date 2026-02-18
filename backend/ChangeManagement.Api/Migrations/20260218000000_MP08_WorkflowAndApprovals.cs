@@ -26,14 +26,14 @@ public partial class MP08_WorkflowAndApprovals : Migration
             columns: table => new
             {
                 ChangeApproverId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                ChangeId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                ChangeRequestId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                 ApproverUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
                 CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
             },
             constraints: table =>
             {
                 table.PrimaryKey("PK_ChangeApprover", x => x.ChangeApproverId);
-                table.ForeignKey(name: "FK_ChangeApprover_ChangeRequest_ChangeId", column: x => x.ChangeId, principalSchema: "cm", principalTable: "ChangeRequest", principalColumn: "ChangeRequestId", onDelete: ReferentialAction.Cascade);
+                table.ForeignKey(name: "FK_ChangeApprover_ChangeRequest_ChangeRequestId", column: x => x.ChangeRequestId, principalSchema: "cm", principalTable: "ChangeRequest", principalColumn: "ChangeRequestId", onDelete: ReferentialAction.Cascade);
                 table.ForeignKey(name: "FK_ChangeApprover_User_ApproverUserId", column: x => x.ApproverUserId, principalSchema: "cm", principalTable: "User", principalColumn: "UserId", onDelete: ReferentialAction.Restrict);
             });
 
@@ -43,7 +43,7 @@ public partial class MP08_WorkflowAndApprovals : Migration
         migrationBuilder.CreateIndex(name: "IX_ChangeRequest_ImpactLevelId", schema: "cm", table: "ChangeRequest", column: "ImpactLevelId");
 
         migrationBuilder.CreateIndex(name: "IX_ChangeApprover_ApproverUserId", schema: "cm", table: "ChangeApprover", column: "ApproverUserId");
-        migrationBuilder.CreateIndex(name: "IX_ChangeApprover_ChangeId_ApproverUserId", schema: "cm", table: "ChangeApprover", columns: new[] { "ChangeId", "ApproverUserId" }, unique: true);
+        migrationBuilder.CreateIndex(name: "IX_ChangeApprover_ChangeRequestId_ApproverUserId", schema: "cm", table: "ChangeApprover", columns: new[] { "ChangeRequestId", "ApproverUserId" }, unique: true);
 
         migrationBuilder.CreateIndex(name: "IX_ChangeApproval_ChangeRequestId_ApproverUserId", schema: "cm", table: "ChangeApproval", columns: new[] { "ChangeRequestId", "ApproverUserId" }, unique: true);
 
@@ -72,6 +72,10 @@ WHEN NOT MATCHED THEN INSERT(StatusId,Name,IsTerminal) VALUES(s.StatusId,s.Name,
         migrationBuilder.DropForeignKey(name: "FK_ChangeRequest_RiskLevel_ImpactLevelId", schema: "cm", table: "ChangeRequest");
         migrationBuilder.DropTable(name: "ChangeApprover", schema: "cm");
         migrationBuilder.DropIndex(name: "IX_ChangeApproval_ChangeRequestId_ApproverUserId", schema: "cm", table: "ChangeApproval");
+        migrationBuilder.DropIndex(name: "IX_ChangeRequest_ApprovalRequesterUserId", schema: "cm", table: "ChangeRequest");
+        migrationBuilder.DropIndex(name: "IX_ChangeRequest_SubmittedByUserId", schema: "cm", table: "ChangeRequest");
+        migrationBuilder.DropIndex(name: "IX_ChangeRequest_DeletedByUserId", schema: "cm", table: "ChangeRequest");
+        migrationBuilder.DropIndex(name: "IX_ChangeRequest_ImpactLevelId", schema: "cm", table: "ChangeRequest");
         migrationBuilder.DropColumn(name: "ApprovalRequired", schema: "cm", table: "ChangeRequest");
         migrationBuilder.DropColumn(name: "ApprovalStrategy", schema: "cm", table: "ChangeRequest");
         migrationBuilder.DropColumn(name: "ApprovalRequesterUserId", schema: "cm", table: "ChangeRequest");

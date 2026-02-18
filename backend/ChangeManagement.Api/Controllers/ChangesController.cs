@@ -95,7 +95,7 @@ public class ChangesController : ControllerBase
                 entity.ChangeApprovers.Add(new ChangeApprover
                 {
                     ChangeApproverId = Guid.NewGuid(),
-                    ChangeId = entity.ChangeRequestId,
+                    ChangeRequestId = entity.ChangeRequestId,
                     ApproverUserId = approverUserId,
                     CreatedAt = DateTime.UtcNow
                 });
@@ -128,12 +128,12 @@ public class ChangesController : ControllerBase
         existing.RiskLevelId = request.RiskLevelId > 0 ? request.RiskLevelId : existing.RiskLevelId;
         existing.ImpactTypeId = request.ImpactTypeId ?? existing.ImpactTypeId;
         existing.ImpactLevelId = request.ImpactTypeId ?? existing.ImpactLevelId;
-        existing.AssignedToUserId = request.AssignedToUserId;
-        existing.PlannedStart = request.PlannedStart;
-        existing.PlannedEnd = request.PlannedEnd;
-        existing.ActualStart = request.ActualStart;
-        existing.ActualEnd = request.ActualEnd;
-        existing.UpdatedBy = request.UpdatedBy == Guid.Empty ? existing.UpdatedBy : request.UpdatedBy;
+        existing.AssignedToUserId = request.AssignedToUserId ?? existing.AssignedToUserId;
+        existing.PlannedStart = request.PlannedStart ?? existing.PlannedStart;
+        existing.PlannedEnd = request.PlannedEnd ?? existing.PlannedEnd;
+        existing.ActualStart = request.ActualStart ?? existing.ActualStart;
+        existing.ActualEnd = request.ActualEnd ?? existing.ActualEnd;
+        existing.UpdatedBy = ResolveActorUserId();
         existing.ApprovalRequired = existing.ChangeTypeId != 2 || request.ApprovalRequired == true;
         existing.ApprovalStrategy = string.IsNullOrWhiteSpace(request.ApprovalStrategy) ? existing.ApprovalStrategy : request.ApprovalStrategy;
         existing.ImplementationGroup = request.ImplementationGroup ?? existing.ImplementationGroup;
@@ -146,7 +146,7 @@ public class ChangesController : ControllerBase
                 existing.ChangeApprovers.Add(new ChangeApprover
                 {
                     ChangeApproverId = Guid.NewGuid(),
-                    ChangeId = existing.ChangeRequestId,
+                    ChangeRequestId = existing.ChangeRequestId,
                     ApproverUserId = approverUserId,
                     CreatedAt = DateTime.UtcNow
                 });
@@ -244,11 +244,11 @@ public class ChangesController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    public async Task<ActionResult<ChangeRequestDto>> Delete(string id, [FromBody] WorkflowActionRequestDto? request, CancellationToken cancellationToken)
+    public async Task<ActionResult<ChangeRequestDto>> Delete(string id, [FromQuery] string? reason, CancellationToken cancellationToken)
     {
         if (!User.IsInRole("Admin")) return Forbid();
         if (!TryParseId(id, out var changeId, out var badRequest)) return badRequest;
-        var updated = await _workflow.SoftDeleteAsync(changeId, ResolveActorUserId(), request?.Reason, cancellationToken);
+        var updated = await _workflow.SoftDeleteAsync(changeId, ResolveActorUserId(), reason, cancellationToken);
         return updated is null ? NotFound() : Ok(ToDto(updated));
     }
 
@@ -384,16 +384,4 @@ public class ChangesController : ControllerBase
         await _dbContext.SaveChangesAsync(cancellationToken);
         return adminId;
     }
-}
-
-public class SubmitChangeRequestDto
-{
-    public List<Guid> ApproverUserIds { get; set; } = new();
-    public string? ApprovalStrategy { get; set; }
-    public string? Reason { get; set; }
-}
-
-public class WorkflowActionRequestDto
-{
-    public string? Reason { get; set; }
 }

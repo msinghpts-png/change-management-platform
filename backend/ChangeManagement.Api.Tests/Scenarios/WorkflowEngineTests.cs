@@ -29,8 +29,8 @@ public class WorkflowEngineTests : IClassFixture<CustomWebApplicationFactory>
         var createResponse = await _client.PostAsJsonAsync("/api/changes", new { Title = "submit-invalid" });
         createResponse.EnsureSuccessStatusCode();
 
-        var created = await createResponse.Content.ReadFromJsonAsync<Dictionary<string, object>>();
-        var changeId = Guid.Parse(created!["changeRequestId"].ToString()!);
+        var created = await createResponse.Content.ReadFromJsonAsync<ChangeCreatedResponse>();
+        var changeId = created!.ChangeRequestId;
 
         var submit = await _client.PostAsJsonAsync($"/api/changes/{changeId}/submit", new { approverUserIds = new[] { "22222222-2222-2222-2222-222222222222" } });
         Assert.Equal(HttpStatusCode.BadRequest, submit.StatusCode);
@@ -39,8 +39,26 @@ public class WorkflowEngineTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task NonCab_CannotApprove()
     {
+        await AuthTestHelper.AuthenticateAsAdminAsync(_client);
+        var createResponse = await _client.PostAsJsonAsync("/api/changes", new
+        {
+            Title = "approval-role-check",
+            Description = "desc",
+            BackoutPlan = "rollback",
+            ChangeTypeId = 2,
+            PriorityId = 2,
+            RiskLevelId = 2,
+            PlannedStart = DateTime.UtcNow.AddDays(1)
+        });
+        createResponse.EnsureSuccessStatusCode();
+
+        var created = await createResponse.Content.ReadFromJsonAsync<ChangeCreatedResponse>();
+        var createdId = created!.ChangeRequestId;
+
         await AuthTestHelper.AuthenticateAsExecutorAsync(_client);
-        var response = await _client.PostAsJsonAsync($"/api/changes/{Guid.NewGuid()}/approve", new { comments = "no" });
+        var response = await _client.PostAsJsonAsync($"/api/changes/{createdId}/approve", new { comments = "no" });
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    private sealed record ChangeCreatedResponse(Guid ChangeRequestId);
 }

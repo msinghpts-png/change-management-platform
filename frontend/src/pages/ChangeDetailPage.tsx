@@ -115,6 +115,16 @@ const ChangeDetailPage = () => {
   const [approvalComment, setApprovalComment] = useState("");
   const [decisionComment, setDecisionComment] = useState("");
 
+  const authUserRole = (() => {
+    try {
+      const raw = localStorage.getItem("authUser");
+      const parsed = raw ? JSON.parse(raw) : null;
+      return typeof parsed?.role === "string" ? parsed.role : "";
+    } catch {
+      return "";
+    }
+  })();
+
   // Form fields (kept in UI; backend DTO is smaller)
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Application");
@@ -394,6 +404,29 @@ const ChangeDetailPage = () => {
       await apiClient.decideApproval(id, approvalId, { status, comment: decisionComment.trim() || undefined });
       const refreshed = await apiClient.getChangeById(id);
       setItem(refreshed);
+      setDecisionComment("");
+      await refreshRelatedData(id);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  const handleBannerDecision = async (action: "approve" | "reject") => {
+    if (!apiClient.isValidId(id)) {
+      setError("Invalid change request id.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const updated = action === "approve"
+        ? await apiClient.approveChange(id, decisionComment.trim() || "Approved")
+        : await apiClient.rejectChange(id, decisionComment.trim() || "Rejected");
+      setItem(updated);
       setDecisionComment("");
       await refreshRelatedData(id);
     } catch (e) {
@@ -743,11 +776,11 @@ Emergency: urgent; CAB approval required" style={{ cursor: "help" }}>ⓘ</span><
             <div className="h3">Approval Required</div>
             <div className="small">This change request is awaiting approval decision.</div>
           </div>
-          {(["CAB", "Admin"].includes((JSON.parse(localStorage.getItem("authUser") || "{}").role || ""))) ? (
+          {(["CAB", "Admin"].includes(authUserRole)) ? (
             <div style={{ display: "flex", gap: 8 }}>
               <button className="btn" type="button">Request Info</button>
-              <button className="btn" type="button" onClick={() => { if (id) { apiClient.rejectChange(id, decisionComment || "Rejected").then(setItem).catch((e: Error) => setError(e.message)); } }}>Reject</button>
-              <button className="btn btn-primary" type="button" onClick={() => { if (id) { apiClient.approveChange(id, decisionComment || "Approved").then(setItem).catch((e: Error) => setError(e.message)); } }}>Approve</button>
+              <button className="btn" type="button" disabled={loading} onClick={() => { void handleBannerDecision("reject"); }}>Reject</button>
+              <button className="btn btn-primary" type="button" disabled={loading} onClick={() => { void handleBannerDecision("approve"); }}>Approve</button>
             </div>
           ) : (
             <div className="small">Approval is pending CAB/Admin review.</div>

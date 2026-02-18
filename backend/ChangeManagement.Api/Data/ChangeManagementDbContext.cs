@@ -92,8 +92,8 @@ public class ChangeManagementDbContext : DbContext
         {
             entity.ToTable("ChangeApprover", "cm");
             entity.HasKey(e => e.ChangeApproverId);
-            entity.HasIndex(e => new { e.ChangeId, e.ApproverUserId }).IsUnique();
-            entity.HasOne(e => e.ChangeRequest).WithMany(e => e.ChangeApprovers).HasForeignKey(e => e.ChangeId);
+            entity.HasIndex(e => new { e.ChangeRequestId, e.ApproverUserId }).IsUnique();
+            entity.HasOne(e => e.ChangeRequest).WithMany(e => e.ChangeApprovers).HasForeignKey(e => e.ChangeRequestId);
             entity.HasOne(e => e.ApproverUser).WithMany(e => e.ChangeApproverSelections).HasForeignKey(e => e.ApproverUserId).OnDelete(DeleteBehavior.Restrict);
         });
 

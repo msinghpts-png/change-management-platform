@@ -79,7 +79,7 @@ public class ChangeWorkflowService : IChangeWorkflowService
                 change.ChangeApprovers.Add(new ChangeApprover
                 {
                     ChangeApproverId = Guid.NewGuid(),
-                    ChangeId = change.ChangeRequestId,
+                    ChangeRequestId = change.ChangeRequestId,
                     ApproverUserId = approverId,
                     CreatedAt = DateTime.UtcNow
                 });
@@ -164,12 +164,13 @@ public class ChangeWorkflowService : IChangeWorkflowService
     {
         var change = await _changeRepository.GetByIdAsync(changeId, cancellationToken);
         if (change is null || change.DeletedAt.HasValue || (change.StatusId != Submitted && change.StatusId != PendingApproval)) return null;
+        var previousStatus = change.StatusId;
         change.StatusId = Draft;
         change.UpdatedAt = DateTime.UtcNow;
         change.UpdatedBy = actorUserId;
         var updated = await _changeRepository.UpdateAsync(change, cancellationToken);
         if (updated is null) return null;
-        await LogTransitionAsync(updated, actorUserId, "RevertToDraft", reason ?? "Reverted", new { from = change.StatusId, to = Draft }, cancellationToken);
+        await LogTransitionAsync(updated, actorUserId, "RevertToDraft", reason ?? "Reverted", new { from = previousStatus, to = Draft }, cancellationToken);
         return updated;
     }
 
@@ -219,7 +220,8 @@ public class ChangeWorkflowService : IChangeWorkflowService
     public async Task<ChangeRequest?> CancelAsync(Guid changeId, Guid actorUserId, string? reason, CancellationToken cancellationToken)
     {
         var change = await _changeRepository.GetByIdAsync(changeId, cancellationToken);
-        if (change is null || change.DeletedAt.HasValue || change.StatusId == Closed) return null;
+        if (change is null || change.DeletedAt.HasValue) return null;
+        if (change.Status?.IsTerminal == true || change.StatusId == Cancelled || change.StatusId == Rejected || change.StatusId == Completed || change.StatusId == Closed) return null;
         change.StatusId = Cancelled;
         change.UpdatedAt = DateTime.UtcNow;
         change.UpdatedBy = actorUserId;
@@ -267,6 +269,7 @@ public class ChangeWorkflowService : IChangeWorkflowService
         var approvals = change.ChangeApprovals.ToList();
         var total = approvals.Count;
         var approved = approvals.Count(x => x.ApprovalStatusId == 2);
+        if (total == 0) return PendingApproval;
         if (approved == 0) return PendingApproval;
         var strategy = NormalizeStrategy(change.ApprovalStrategy);
         if (strategy == "All") return approved == total ? Approved : PendingApproval;
