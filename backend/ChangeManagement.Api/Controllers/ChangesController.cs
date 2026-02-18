@@ -171,7 +171,8 @@ public class ChangesController : ControllerBase
 
         try
         {
-            var updated = await _workflow.SubmitAsync(changeId, actorId, request?.ApproverUserIds ?? Array.Empty<Guid>(), request?.ApprovalStrategy, request?.Reason, cancellationToken);
+            var approverIds = (IReadOnlyCollection<Guid>)(request?.ApproverUserIds ?? new List<Guid>());
+            var updated = await _workflow.SubmitAsync(changeId, actorId, approverIds, request?.ApprovalStrategy, request?.Reason, cancellationToken);
             if (updated is null) return BadRequest(new { message = "Only Draft changes can be submitted for approval." });
             return Ok(ToDto(updated));
         }
