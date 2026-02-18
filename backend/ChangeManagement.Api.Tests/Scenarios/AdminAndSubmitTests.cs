@@ -44,7 +44,11 @@ public class AdminAndSubmitTests : IClassFixture<CustomWebApplicationFactory>
         var created = await createResponse.Content.ReadFromJsonAsync<Dictionary<string, object>>();
         var changeId = Guid.Parse(created!["changeRequestId"].ToString()!);
 
-        var submitResponse = await _client.PostAsync($"/api/changes/{changeId}/submit", content: null);
+        var submitResponse = await _client.PostAsJsonAsync($"/api/changes/{changeId}/submit", new
+        {
+            approverUserIds = new[] { "22222222-2222-2222-2222-222222222222" },
+            approvalStrategy = "Any"
+        });
         submitResponse.EnsureSuccessStatusCode();
     }
 }
