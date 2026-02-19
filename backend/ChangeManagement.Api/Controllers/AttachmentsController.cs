@@ -26,27 +26,25 @@ public class AttachmentsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<AttachmentDto>> Upload(Guid changeId, [FromForm] IFormFile? file, CancellationToken cancellationToken)
     {
-        try
+        Guid? uploadedBy = null;
+        var actorValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (Guid.TryParse(actorValue, out var actorGuid) && actorGuid != Guid.Empty)
         {
-            Guid? uploadedBy = null;
-            var actorValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (Guid.TryParse(actorValue, out var actorGuid) && actorGuid != Guid.Empty)
-            {
-                uploadedBy = actorGuid;
-            }
-
-            if (file is null)
-            {
-                return BadRequest("File is required.");
-            }
-
-            var result = await _attachmentService.UploadAsync(changeId, file, uploadedBy, cancellationToken);
-            return result.Attachment is null ? BadRequest(result.Error) : Ok(result.Attachment.ToDto());
+            uploadedBy = actorGuid;
         }
-        catch (Exception ex)
+
+        if (file is null)
         {
-            return Problem(title: "Attachment upload failed", detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+            return BadRequest("File is required.");
         }
+
+        var result = await _attachmentService.UploadAsync(changeId, file, uploadedBy, cancellationToken);
+        if (result.Attachment is null)
+        {
+            return BadRequest(result.Error);
+        }
+
+        return CreatedAtAction(nameof(List), new { changeId }, result.Attachment.ToDto());
     }
 
     [HttpGet("{attachmentId:guid}/download")]
