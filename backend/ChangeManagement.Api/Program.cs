@@ -112,6 +112,7 @@ builder.Services.AddScoped<IChangeRepository, ChangeRepository>();
 builder.Services.AddScoped<IChangeService, ChangeService>();
 builder.Services.AddScoped<IApprovalRepository, ApprovalRepository>();
 builder.Services.AddScoped<IApprovalService, ApprovalService>();
+builder.Services.AddScoped<IChangeWorkflowService, ChangeWorkflowService>();
 builder.Services.AddScoped<IChangeAttachmentRepository, ChangeAttachmentRepository>();
 builder.Services.AddScoped<IAttachmentService, AttachmentService>();
 builder.Services.AddScoped<IChangeTaskRepository, ChangeTaskRepository>();
@@ -125,10 +126,10 @@ app.UseExceptionHandler(exceptionApp =>
 {
     exceptionApp.Run(async context =>
     {
-        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-        context.Response.ContentType = "application/json";
-
         var feature = context.Features.Get<IExceptionHandlerFeature>();
+        var statusCode = feature?.Error is UnauthorizedAccessException ? StatusCodes.Status401Unauthorized : StatusCodes.Status500InternalServerError;
+        context.Response.StatusCode = statusCode;
+        context.Response.ContentType = "application/json";
         var errorMessage = feature?.Error?.Message ?? "An unexpected error occurred.";
 
         var payload = JsonSerializer.Serialize(new
@@ -205,6 +206,36 @@ IF COL_LENGTH('cm.ChangeTemplate', 'RiskLevelId') IS NULL
 BEGIN
     ALTER TABLE [cm].[ChangeTemplate] ADD [RiskLevelId] INT NULL;
 END
+
+IF OBJECT_ID('cm.ChangeApprover', 'U') IS NOT NULL AND COL_LENGTH('cm.ChangeApprover', 'ChangeRequestId') IS NULL
+BEGIN
+    ALTER TABLE [cm].[ChangeApprover] ADD [ChangeRequestId] UNIQUEIDENTIFIER NULL;
+    IF COL_LENGTH('cm.ChangeApprover', 'ChangeId') IS NOT NULL
+    BEGIN
+        UPDATE [cm].[ChangeApprover] SET [ChangeRequestId] = [ChangeId] WHERE [ChangeRequestId] IS NULL;
+    END
+
+    IF EXISTS (SELECT 1 FROM [cm].[ChangeApprover] WHERE [ChangeRequestId] IS NULL)
+    BEGIN
+        THROW 50001, 'ChangeApprover contains NULL ChangeRequestId values that cannot be auto-corrected.', 1;
+    END
+
+    ALTER TABLE [cm].[ChangeApprover] ALTER COLUMN [ChangeRequestId] UNIQUEIDENTIFIER NOT NULL;
+END
+
+IF OBJECT_ID('cm.ChangeApprover', 'U') IS NOT NULL
+AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_ChangeApprover_ChangeRequest_ChangeRequestId')
+BEGIN
+    ALTER TABLE [cm].[ChangeApprover] WITH CHECK ADD CONSTRAINT [FK_ChangeApprover_ChangeRequest_ChangeRequestId]
+        FOREIGN KEY([ChangeRequestId]) REFERENCES [cm].[ChangeRequest]([ChangeRequestId]);
+END
+
+IF OBJECT_ID('cm.ChangeApprover', 'U') IS NOT NULL
+AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ChangeApprover_ChangeRequestId_ApproverUserId' AND object_id = OBJECT_ID('[cm].[ChangeApprover]'))
+BEGIN
+    CREATE UNIQUE INDEX [IX_ChangeApprover_ChangeRequestId_ApproverUserId] ON [cm].[ChangeApprover]([ChangeRequestId],[ApproverUserId]);
+END
+
 IF NOT EXISTS (SELECT 1 FROM [audit].[EventType] WHERE [EventTypeId] = 6)
 BEGIN
     INSERT INTO [audit].[EventType]([EventTypeId],[Name],[Description]) VALUES (6,'TemplateCreated','Template created');
