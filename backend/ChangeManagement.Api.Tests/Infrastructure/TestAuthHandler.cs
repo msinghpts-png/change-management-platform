@@ -23,8 +23,11 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        var authorization = Request.Headers.Authorization.FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(authorization) || !authorization.StartsWith(SchemeName, StringComparison.OrdinalIgnoreCase))
+        var hasTestHeaders = !string.IsNullOrEmpty(Request.Headers[UserIdHeader])
+                             || !string.IsNullOrEmpty(Request.Headers[UserNameHeader])
+                             || !string.IsNullOrEmpty(Request.Headers[RoleHeader]);
+
+        if (!hasTestHeaders)
         {
             return Task.FromResult(AuthenticateResult.NoResult());
         }

@@ -15,7 +15,7 @@ internal static class AuthTestHelper
 
     private static Task AuthenticateAsync(HttpClient client, string userId, string userName, string role)
     {
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthHandler.SchemeName);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthHandler.SchemeName, "enabled");
 
         if (client.DefaultRequestHeaders.Contains(TestAuthHandler.UserIdHeader))
             client.DefaultRequestHeaders.Remove(TestAuthHandler.UserIdHeader);
