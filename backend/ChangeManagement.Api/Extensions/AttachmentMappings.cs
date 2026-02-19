@@ -14,7 +14,7 @@ public static class AttachmentMappings
             ChangeRequestId = attachment.ChangeRequestId,
             FileName = attachment.FileName,
             FileUrl = attachment.FileUrl,
-            FilePath = attachment.FileUrl,
+            FilePath = string.IsNullOrWhiteSpace(attachment.FilePath) ? attachment.FileUrl : attachment.FilePath,
             FileSizeBytes = attachment.FileSizeBytes,
             UploadedAt = attachment.UploadedAt,
             UploadedBy = attachment.UploadedBy
