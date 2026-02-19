@@ -1,33 +1,42 @@
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using ChangeManagement.Api.DTOs.Auth;
 
 namespace ChangeManagement.Api.Tests.Infrastructure;
 
 internal static class AuthTestHelper
 {
     public static Task AuthenticateAsAdminAsync(HttpClient client) =>
-        AuthenticateAsync(client, "11111111-1111-1111-1111-111111111111", "admin@local", "Admin");
+        AuthenticateAsync(client, "admin@local", "Admin123!");
 
     public static Task AuthenticateAsCabAsync(HttpClient client) =>
-        AuthenticateAsync(client, "22222222-2222-2222-2222-222222222222", "cab@local", "CAB");
+        AuthenticateAsync(client, "cab@local", "Admin123!");
 
     public static Task AuthenticateAsExecutorAsync(HttpClient client) =>
-        AuthenticateAsync(client, "33333333-3333-3333-3333-333333333333", "executor@local", "Executor");
+        AuthenticateAsync(client, "executor@local", "Admin123!");
 
-    private static Task AuthenticateAsync(HttpClient client, string userId, string userName, string role)
+    private static async Task AuthenticateAsync(HttpClient client, string upn, string password)
     {
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthHandler.SchemeName);
+        client.DefaultRequestHeaders.Authorization = null;
 
-        if (client.DefaultRequestHeaders.Contains(TestAuthHandler.UserIdHeader))
-            client.DefaultRequestHeaders.Remove(TestAuthHandler.UserIdHeader);
-        if (client.DefaultRequestHeaders.Contains(TestAuthHandler.UserNameHeader))
-            client.DefaultRequestHeaders.Remove(TestAuthHandler.UserNameHeader);
-        if (client.DefaultRequestHeaders.Contains(TestAuthHandler.RoleHeader))
-            client.DefaultRequestHeaders.Remove(TestAuthHandler.RoleHeader);
+        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequestDto
+        {
+            Upn = upn,
+            Password = password
+        });
 
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserIdHeader, userId);
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserNameHeader, userName);
-        client.DefaultRequestHeaders.Add(TestAuthHandler.RoleHeader, role);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"Test login failed for {upn}. Status: {(int)response.StatusCode} Body: {body}");
+        }
 
-        return Task.CompletedTask;
+        var payload = await response.Content.ReadFromJsonAsync<LoginResponseDto>();
+        if (string.IsNullOrWhiteSpace(payload?.Token))
+        {
+            throw new InvalidOperationException($"Test login succeeded for {upn} but token was missing.");
+        }
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", payload.Token);
     }
 }

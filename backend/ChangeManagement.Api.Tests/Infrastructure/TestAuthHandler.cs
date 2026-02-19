@@ -24,7 +24,11 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         var authorization = Request.Headers.Authorization.FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(authorization) || !authorization.StartsWith(SchemeName, StringComparison.OrdinalIgnoreCase))
+        var hasTestHeaders = Request.Headers.ContainsKey(UserIdHeader)
+            || Request.Headers.ContainsKey(UserNameHeader)
+            || Request.Headers.ContainsKey(RoleHeader);
+
+        if (!hasTestHeaders && (string.IsNullOrWhiteSpace(authorization) || !authorization.StartsWith(SchemeName, StringComparison.OrdinalIgnoreCase)))
         {
             return Task.FromResult(AuthenticateResult.NoResult());
         }
