@@ -448,6 +448,29 @@ const ChangeDetailPage = () => {
     }
   };
 
+
+  const handleBannerDecision = async (action: "approve" | "reject") => {
+    if (!apiClient.isValidId(id)) {
+      setError("Invalid change request id.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const updated = action === "approve"
+        ? await apiClient.approveChange(id, decisionComment.trim() || "Approved")
+        : await apiClient.rejectChange(id, decisionComment.trim() || "Rejected");
+      setItem(updated);
+      setDecisionComment("");
+      await refreshRelatedData(id);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const addTask = async () => {
     if (!apiClient.isValidId(id) || !taskTitle.trim()) return;
     setLoading(true);
@@ -615,7 +638,7 @@ Emergency: urgent; CAB approval required" style={{ cursor: "help" }}>ⓘ</span><
 
                 <div style={{ gridColumn: "1 / -1" }}>
                   <div className="label">Business Justification *</div>
-                  <textarea className="textarea" value={businessJustification} onChange={(e) => setBusinessJustification(e.target.value)} placeholder="Why is this change needed? What business value does it provide?" />
+                  <textarea className="textarea" value={implementationWindowNotes} onChange={(e) => setImplementationWindowNotes(e.target.value)} placeholder="Why is this change needed? What business value does it provide?" />
                 </div>
               </div>
             ) : null}
