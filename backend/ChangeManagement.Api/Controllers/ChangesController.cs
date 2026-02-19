@@ -54,6 +54,10 @@ public class ChangesController : ControllerBase
         var priorityId = await ResolvePriorityIdAsync(request, cancellationToken);
         var riskLevelId = await ResolveRiskLevelIdAsync(request, cancellationToken);
 
+        if (changeTypeId <= 0) return BadRequest(new { message = "Invalid ChangeTypeId." });
+        if (priorityId <= 0) return BadRequest(new { message = "Invalid PriorityId." });
+        if (riskLevelId <= 0) return BadRequest(new { message = "Invalid RiskLevelId." });
+
         var requestedByUserId = await ResolveRequestedByUserIdAsync(request, cancellationToken);
         if (request.AssignedToUserId.HasValue && !await _dbContext.Users.AnyAsync(user => user.UserId == request.AssignedToUserId.Value, cancellationToken))
         {
@@ -78,7 +82,7 @@ public class ChangesController : ControllerBase
             StatusId = 1,
             RiskLevelId = riskLevelId,
             ImpactTypeId = request.ImpactTypeId,
-            ImpactLevelId = request.ImpactTypeId,
+            ImpactLevelId = request.ImpactLevelId,
             RequestedByUserId = requestedByUserId,
             AssignedToUserId = request.AssignedToUserId,
             PlannedStart = request.PlannedStart,
@@ -123,18 +127,36 @@ public class ChangesController : ControllerBase
         existing.Category = request.Category ?? existing.Category;
         existing.Environment = request.Environment ?? existing.Environment;
         existing.BusinessJustification = request.BusinessJustification ?? existing.BusinessJustification;
-        existing.ChangeTypeId = request.ChangeTypeId > 0 ? request.ChangeTypeId : existing.ChangeTypeId;
-        existing.PriorityId = request.PriorityId > 0 ? request.PriorityId : existing.PriorityId;
-        existing.RiskLevelId = request.RiskLevelId > 0 ? request.RiskLevelId : existing.RiskLevelId;
+        if (request.ChangeTypeId > 0)
+        {
+            var resolved = await ResolveChangeTypeIdAsync(new ChangeCreateDto { ChangeTypeId = request.ChangeTypeId }, cancellationToken);
+            if (resolved <= 0) return BadRequest(new { message = "Invalid ChangeTypeId." });
+            existing.ChangeTypeId = resolved;
+        }
+        if (request.PriorityId > 0)
+        {
+            var resolved = await ResolvePriorityIdAsync(new ChangeCreateDto { PriorityId = request.PriorityId }, cancellationToken);
+            if (resolved <= 0) return BadRequest(new { message = "Invalid PriorityId." });
+            existing.PriorityId = resolved;
+        }
+        if (request.RiskLevelId > 0)
+        {
+            var resolved = await ResolveRiskLevelIdAsync(new ChangeCreateDto { RiskLevelId = request.RiskLevelId }, cancellationToken);
+            if (resolved <= 0) return BadRequest(new { message = "Invalid RiskLevelId." });
+            existing.RiskLevelId = resolved;
+        }
         existing.ImpactTypeId = request.ImpactTypeId ?? existing.ImpactTypeId;
-        existing.ImpactLevelId = request.ImpactTypeId ?? existing.ImpactLevelId;
+        existing.ImpactLevelId = request.ImpactLevelId ?? existing.ImpactLevelId;
         existing.AssignedToUserId = request.AssignedToUserId ?? existing.AssignedToUserId;
         existing.PlannedStart = request.PlannedStart ?? existing.PlannedStart;
         existing.PlannedEnd = request.PlannedEnd ?? existing.PlannedEnd;
         existing.ActualStart = request.ActualStart ?? existing.ActualStart;
         existing.ActualEnd = request.ActualEnd ?? existing.ActualEnd;
         existing.UpdatedBy = ResolveActorUserId();
-        existing.ApprovalRequired = existing.ChangeTypeId != 2 || request.ApprovalRequired == true;
+        if (request.ApprovalRequired.HasValue)
+        {
+            existing.ApprovalRequired = existing.ChangeTypeId != 2 || request.ApprovalRequired.Value;
+        }
         existing.ApprovalStrategy = string.IsNullOrWhiteSpace(request.ApprovalStrategy) ? existing.ApprovalStrategy : request.ApprovalStrategy;
         existing.ImplementationGroup = request.ImplementationGroup ?? existing.ImplementationGroup;
 
@@ -167,14 +189,20 @@ public class ChangesController : ControllerBase
     public async Task<ActionResult<ChangeRequestDto>> SubmitForApproval(string id, [FromBody] SubmitChangeRequestDto? request, CancellationToken cancellationToken)
     {
         if (!TryParseId(id, out var changeId, out var badRequest)) return badRequest;
-        var actorId = ResolveActorUserId();
-
         try
         {
+            var actorId = ResolveActorUserId();
             var approverIds = (IReadOnlyCollection<Guid>)(request?.ApproverUserIds ?? new List<Guid>());
             var updated = await _workflow.SubmitAsync(changeId, actorId, approverIds, request?.ApprovalStrategy, request?.Reason, cancellationToken);
-            if (updated is null) return BadRequest(new { message = "Only Draft changes can be submitted for approval." });
             return Ok(ToDto(updated));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Unauthorized();
         }
         catch (InvalidOperationException ex)
         {
@@ -273,7 +301,7 @@ public class ChangesController : ControllerBase
             return actorUserId;
         }
 
-        return Guid.Parse("11111111-1111-1111-1111-111111111111");
+        throw new UnauthorizedAccessException("Authenticated actor is required.");
     }
 
     private static ChangeRequestDto ToDto(ChangeRequest change) => new()
@@ -297,9 +325,9 @@ public class ChangesController : ControllerBase
         Status = change.Status?.Name,
         Priority = change.Priority?.Name,
         RiskLevel = change.RiskLevel?.Name,
-        ImpactLevel = change.ImpactLevel?.Name ?? (change.ImpactTypeId == 1 ? "Low" : change.ImpactTypeId == 3 ? "High" : "Medium"),
+        ImpactLevel = change.ImpactLevel?.Name,
         RequestedBy = change.RequestedByUser?.Upn,
-        RequestedByUserId = change.RequestedByUserId,
+        RequestedByUserId = change.RequestedByUserId == Guid.Empty ? null : change.RequestedByUserId,
         AssignedToUserId = change.AssignedToUserId,
         Owner = change.RequestedByUser?.DisplayName ?? change.RequestedByUser?.Upn,
         RequestedByDisplay = change.RequestedByUser?.DisplayName ?? change.RequestedByUser?.Upn,
@@ -324,7 +352,11 @@ public class ChangesController : ControllerBase
 
     private async Task<int> ResolveChangeTypeIdAsync(ChangeCreateDto request, CancellationToken cancellationToken)
     {
-        if (request.ChangeTypeId.HasValue && request.ChangeTypeId.Value > 0) return request.ChangeTypeId.Value;
+        if (request.ChangeTypeId.HasValue && request.ChangeTypeId.Value > 0)
+        {
+            var exists = await _dbContext.ChangeTypes.AnyAsync(x => x.ChangeTypeId == request.ChangeTypeId.Value, cancellationToken);
+            return exists ? request.ChangeTypeId.Value : 0;
+        }
         if (!string.IsNullOrWhiteSpace(request.ChangeType))
         {
             var normalized = request.ChangeType.Trim().ToLowerInvariant();
@@ -337,7 +369,11 @@ public class ChangesController : ControllerBase
 
     private async Task<int> ResolvePriorityIdAsync(ChangeCreateDto request, CancellationToken cancellationToken)
     {
-        if (request.PriorityId.HasValue && request.PriorityId.Value > 0) return request.PriorityId.Value;
+        if (request.PriorityId.HasValue && request.PriorityId.Value > 0)
+        {
+            var exists = await _dbContext.ChangePriorities.AnyAsync(x => x.PriorityId == request.PriorityId.Value, cancellationToken);
+            return exists ? request.PriorityId.Value : 0;
+        }
         if (!string.IsNullOrWhiteSpace(request.Priority))
         {
             var normalized = request.Priority.Trim().ToLowerInvariant();
@@ -350,7 +386,11 @@ public class ChangesController : ControllerBase
 
     private async Task<int> ResolveRiskLevelIdAsync(ChangeCreateDto request, CancellationToken cancellationToken)
     {
-        if (request.RiskLevelId.HasValue && request.RiskLevelId.Value > 0) return request.RiskLevelId.Value;
+        if (request.RiskLevelId.HasValue && request.RiskLevelId.Value > 0)
+        {
+            var exists = await _dbContext.RiskLevels.AnyAsync(x => x.RiskLevelId == request.RiskLevelId.Value, cancellationToken);
+            return exists ? request.RiskLevelId.Value : 0;
+        }
         if (!string.IsNullOrWhiteSpace(request.RiskLevel))
         {
             var normalized = request.RiskLevel.Trim().ToLowerInvariant();

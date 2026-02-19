@@ -11,7 +11,16 @@ public class ChangeRepository : IChangeRepository
     public ChangeRepository(ChangeManagementDbContext dbContext) => _dbContext = dbContext;
 
     public Task<List<ChangeRequest>> GetAllAsync(CancellationToken cancellationToken) =>
-        BaseQuery().Where(c => c.DeletedAt == null).AsNoTracking().ToListAsync(cancellationToken);
+        _dbContext.ChangeRequests
+            .Where(c => c.DeletedAt == null)
+            .Include(c => c.ChangeType)
+            .Include(c => c.Priority)
+            .Include(c => c.Status)
+            .Include(c => c.RiskLevel)
+            .Include(c => c.RequestedByUser)
+            .Include(c => c.AssignedToUser)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
 
     public Task<ChangeRequest?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         BaseQuery().FirstOrDefaultAsync(c => c.ChangeRequestId == id && c.DeletedAt == null, cancellationToken);
@@ -42,7 +51,9 @@ public class ChangeRepository : IChangeRepository
 
     private void ReconcileApprovers(ChangeRequest existing, ChangeRequest incoming)
     {
-        var incomingByUser = incoming.ChangeApprovers.ToDictionary(a => a.ApproverUserId, a => a);
+        var incomingByUser = incoming.ChangeApprovers
+            .GroupBy(a => a.ApproverUserId)
+            .ToDictionary(g => g.Key, g => g.Last());
 
         var toRemove = existing.ChangeApprovers.Where(a => !incomingByUser.ContainsKey(a.ApproverUserId)).ToList();
         foreach (var item in toRemove) _dbContext.ChangeApprovers.Remove(item);
@@ -69,7 +80,9 @@ public class ChangeRepository : IChangeRepository
 
     private void ReconcileApprovals(ChangeRequest existing, ChangeRequest incoming)
     {
-        var incomingByUser = incoming.ChangeApprovals.ToDictionary(a => a.ApproverUserId, a => a);
+        var incomingByUser = incoming.ChangeApprovals
+            .GroupBy(a => a.ApproverUserId)
+            .ToDictionary(g => g.Key, g => g.Last());
 
         var toRemove = existing.ChangeApprovals.Where(a => !incomingByUser.ContainsKey(a.ApproverUserId)).ToList();
         foreach (var item in toRemove) _dbContext.ChangeApprovals.Remove(item);

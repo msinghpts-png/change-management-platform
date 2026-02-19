@@ -126,10 +126,10 @@ app.UseExceptionHandler(exceptionApp =>
 {
     exceptionApp.Run(async context =>
     {
-        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-        context.Response.ContentType = "application/json";
-
         var feature = context.Features.Get<IExceptionHandlerFeature>();
+        var statusCode = feature?.Error is UnauthorizedAccessException ? StatusCodes.Status401Unauthorized : StatusCodes.Status500InternalServerError;
+        context.Response.StatusCode = statusCode;
+        context.Response.ContentType = "application/json";
         var errorMessage = feature?.Error?.Message ?? "An unexpected error occurred.";
 
         var payload = JsonSerializer.Serialize(new
@@ -214,6 +214,12 @@ BEGIN
     BEGIN
         UPDATE [cm].[ChangeApprover] SET [ChangeRequestId] = [ChangeId] WHERE [ChangeRequestId] IS NULL;
     END
+
+    IF EXISTS (SELECT 1 FROM [cm].[ChangeApprover] WHERE [ChangeRequestId] IS NULL)
+    BEGIN
+        THROW 50001, 'ChangeApprover contains NULL ChangeRequestId values that cannot be auto-corrected.', 1;
+    END
+
     ALTER TABLE [cm].[ChangeApprover] ALTER COLUMN [ChangeRequestId] UNIQUEIDENTIFIER NOT NULL;
 END
 

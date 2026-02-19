@@ -119,7 +119,7 @@ const ChangeDetailPage = () => {
     try {
       const raw = localStorage.getItem("authUser");
       const parsed = raw ? JSON.parse(raw) : null;
-      return typeof parsed?.role === "string" ? parsed.role : "";
+      return typeof parsed?.role === "string" ? parsed.role.toLowerCase() : "";
     } catch {
       return "";
     }
@@ -209,7 +209,7 @@ const ChangeDetailPage = () => {
         setService(data.serviceSystem ?? data.service ?? "");
         setCategory(data.category ?? "Application");
         setEnvironment(data.environment ?? "Non-Production");
-        setDowntimeRequired(false);
+        setDowntimeRequired(Boolean((data as any).downtimeRequired));
         setChangeTypeIdValue(data.changeTypeId ?? 2);
         setPriority(data.priority ?? "P3");
         setRiskLevelIdValue(data.riskLevelId ?? (data.riskLevel?.toLowerCase() === "low" ? 1 : data.riskLevel?.toLowerCase() === "high" ? 3 : 2));
@@ -800,7 +800,7 @@ Emergency: urgent; CAB approval required" style={{ cursor: "help" }}>ⓘ</span><
             <div className="h3">Approval Required</div>
             <div className="small">This change request is awaiting approval decision.</div>
           </div>
-          {(["CAB", "Admin"].includes(authUserRole)) ? (
+          {(["cab", "admin"].includes(authUserRole)) ? (
             <div style={{ display: "flex", gap: 8 }}>
               <button className="btn" type="button">Request Info</button>
               <button className="btn" type="button" disabled={loading} onClick={() => { void handleBannerDecision("reject"); }}>Reject</button>
@@ -879,7 +879,7 @@ Emergency: urgent; CAB approval required" style={{ cursor: "help" }}>ⓘ</span><
                 <div className="small">Planned End</div>
                 <div className="h3">{fmtDT(item?.plannedEnd)}</div>
                 <div style={{ height: 10 }} />
-                <div className="pill pill-amber">⚠ Downtime Required</div>
+                {downtimeRequired ? <div className="pill pill-amber">⚠ Downtime Required</div> : null}
               </div>
             </div>
 

@@ -1,22 +1,10 @@
 using System.Security.Claims;
 using System.Text.Json;
 using ChangeManagement.Api.Domain.Entities;
+using ChangeManagement.Api.DTOs;
 using ChangeManagement.Api.Repositories;
 
 namespace ChangeManagement.Api.Services;
-
-public interface IChangeWorkflowService
-{
-    Task<ChangeRequest?> SubmitAsync(Guid changeId, Guid actorUserId, IReadOnlyCollection<Guid> approverUserIds, string? approvalStrategy, string? reason, CancellationToken cancellationToken);
-    Task<ChangeRequest?> ApproveAsync(Guid changeId, Guid actorUserId, string? comments, CancellationToken cancellationToken);
-    Task<ChangeRequest?> RejectAsync(Guid changeId, Guid actorUserId, string? comments, CancellationToken cancellationToken);
-    Task<ChangeRequest?> RevertToDraftAsync(Guid changeId, Guid actorUserId, string? reason, CancellationToken cancellationToken);
-    Task<ChangeRequest?> StartAsync(Guid changeId, Guid actorUserId, bool isAdmin, CancellationToken cancellationToken);
-    Task<ChangeRequest?> CompleteAsync(Guid changeId, Guid actorUserId, bool isAdmin, CancellationToken cancellationToken);
-    Task<ChangeRequest?> CloseAsync(Guid changeId, Guid actorUserId, CancellationToken cancellationToken);
-    Task<ChangeRequest?> CancelAsync(Guid changeId, Guid actorUserId, string? reason, CancellationToken cancellationToken);
-    Task<ChangeRequest?> SoftDeleteAsync(Guid changeId, Guid actorUserId, string? reason, CancellationToken cancellationToken);
-}
 
 public class ChangeWorkflowService : IChangeWorkflowService
 {
@@ -47,7 +35,8 @@ public class ChangeWorkflowService : IChangeWorkflowService
     public async Task<ChangeRequest?> SubmitAsync(Guid changeId, Guid actorUserId, IReadOnlyCollection<Guid> approverUserIds, string? approvalStrategy, string? reason, CancellationToken cancellationToken)
     {
         var change = await _changeRepository.GetByIdAsync(changeId, cancellationToken);
-        if (change is null || change.DeletedAt.HasValue || change.StatusId != Draft) return null;
+        if (change is null || change.DeletedAt.HasValue) throw new KeyNotFoundException("Change request not found.");
+        if (change.StatusId != Draft) throw new InvalidOperationException("Only Draft changes can be submitted for approval.");
 
         var validationError = ValidateSubmitRequirements(change);
         if (!string.IsNullOrWhiteSpace(validationError)) throw new InvalidOperationException(validationError);
@@ -96,7 +85,7 @@ public class ChangeWorkflowService : IChangeWorkflowService
         }
         else
         {
-            change.StatusId = Submitted;
+            change.StatusId = Approved;
         }
 
         var updated = await _changeRepository.UpdateAsync(change, cancellationToken);
@@ -149,7 +138,7 @@ public class ChangeWorkflowService : IChangeWorkflowService
         approval.ApprovedAt = DateTime.UtcNow;
         approval.Comments = comments ?? string.Empty;
 
-        change.StatusId = Rejected;
+        change.StatusId = EvaluateStatus(change);
         change.UpdatedAt = DateTime.UtcNow;
         change.UpdatedBy = actorUserId;
 
@@ -221,7 +210,7 @@ public class ChangeWorkflowService : IChangeWorkflowService
     {
         var change = await _changeRepository.GetByIdAsync(changeId, cancellationToken);
         if (change is null || change.DeletedAt.HasValue) return null;
-        if (change.Status?.IsTerminal == true || change.StatusId == Cancelled || change.StatusId == Rejected || change.StatusId == Completed || change.StatusId == Closed) return null;
+        if (change.StatusId == Cancelled || change.StatusId == Rejected || change.StatusId == Completed || change.StatusId == Closed) return null;
         change.StatusId = Cancelled;
         change.UpdatedAt = DateTime.UtcNow;
         change.UpdatedBy = actorUserId;
@@ -248,9 +237,9 @@ public class ChangeWorkflowService : IChangeWorkflowService
 
     private static string NormalizeStrategy(string strategy)
     {
-        if (string.Equals(strategy, "All", StringComparison.OrdinalIgnoreCase)) return "All";
-        if (string.Equals(strategy, "Majority", StringComparison.OrdinalIgnoreCase)) return "Majority";
-        return "Any";
+        if (string.Equals(strategy, ApprovalStrategies.All, StringComparison.OrdinalIgnoreCase)) return ApprovalStrategies.All;
+        if (string.Equals(strategy, ApprovalStrategies.Majority, StringComparison.OrdinalIgnoreCase)) return ApprovalStrategies.Majority;
+        return ApprovalStrategies.Any;
     }
 
     private static string? ValidateSubmitRequirements(ChangeRequest change)
@@ -269,12 +258,27 @@ public class ChangeWorkflowService : IChangeWorkflowService
         var approvals = change.ChangeApprovals.ToList();
         var total = approvals.Count;
         var approved = approvals.Count(x => x.ApprovalStatusId == 2);
+        var rejected = approvals.Count(x => x.ApprovalStatusId == 3);
         if (total == 0) return PendingApproval;
-        if (approved == 0) return PendingApproval;
+
         var strategy = NormalizeStrategy(change.ApprovalStrategy);
-        if (strategy == "All") return approved == total ? Approved : PendingApproval;
-        if (strategy == "Majority") return approved > total / 2.0 ? Approved : PendingApproval;
-        return Approved;
+        if (strategy == ApprovalStrategies.All)
+        {
+            if (approved == total) return Approved;
+            if (rejected == total) return Rejected;
+            return PendingApproval;
+        }
+
+        if (strategy == ApprovalStrategies.Majority)
+        {
+            if (rejected > total / 2.0) return Rejected;
+            if (approved > total / 2.0) return Approved;
+            return PendingApproval;
+        }
+
+        if (rejected > 0) return Rejected;
+        if (approved > 0) return Approved;
+        return PendingApproval;
     }
 
     private async Task LogTransitionAsync(ChangeRequest change, Guid actorUserId, string reason, string details, object transitionDetails, CancellationToken cancellationToken)
@@ -285,6 +289,6 @@ public class ChangeWorkflowService : IChangeWorkflowService
             ?? "unknown@local";
 
         await _audit.LogAsync(4, actorUserId, actorUpn, "cm", "ChangeRequest", change.ChangeRequestId, change.ChangeNumber.ToString(), reason,
-            JsonSerializer.Serialize(new { details, transitionDetails }), cancellationToken);
+            JsonSerializer.Serialize(new TransitionAuditDto { Details = details, TransitionDetails = transitionDetails }), cancellationToken);
     }
 }

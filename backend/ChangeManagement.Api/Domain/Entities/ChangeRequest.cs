@@ -12,7 +12,7 @@ public class ChangeRequest
     public int RiskLevelId { get; set; }
     public int? ImpactTypeId { get; set; }
     public bool ApprovalRequired { get; set; }
-    public string ApprovalStrategy { get; set; } = "Any";
+    public string ApprovalStrategy { get; set; } = ApprovalStrategies.Any;
     public Guid? ApprovalRequesterUserId { get; set; }
     public DateTime? SubmittedAt { get; set; }
     public Guid? SubmittedByUserId { get; set; }

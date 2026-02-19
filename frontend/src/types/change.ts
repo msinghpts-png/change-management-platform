@@ -110,6 +110,8 @@ export type ChangeRequest = {
   executor?: string;
   implementationGroup?: string;
   assignedToUserId?: string;
+  downtimeRequired?: boolean;
+  stakeholdersNotified?: boolean;
   plannedStart?: string;
   plannedEnd?: string;
   createdAt?: string;

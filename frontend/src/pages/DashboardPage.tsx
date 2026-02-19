@@ -93,7 +93,7 @@ const DashboardPage = () => {
             <div>
               <div className="stat-kicker">In Implementation</div>
               <div className="stat-value">
-                {changes.filter((c) => getStatusPillClass(c.status) === "pill pill-cyan" && (c.status ?? "").toLowerCase().includes("inimplementation")).length}
+                {changes.filter((c) => (c.status ?? "").toLowerCase().includes("inimplementation")).length}
               </div>
             </div>
             <div className="pill pill-cyan">▶</div>

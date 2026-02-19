@@ -322,7 +322,7 @@ a:hover{ text-decoration: none; }
   height: 22px;
   display:inline-block;
 }
-.switch input{ opacity:0; width:0; height:0; }
+.switch input{ opacity:0; }
 .switch-slider{
   position:absolute;
   inset:0;
@@ -343,4 +343,5 @@ a:hover{ text-decoration: none; }
   box-shadow:0 1px 3px rgba(0,0,0,.2);
 }
 .switch input:checked + .switch-slider{ background: var(--primary); }
+.switch input:focus-visible + .switch-slider{ box-shadow: 0 0 0 3px rgba(37,99,235,.35); }
 .switch input:checked + .switch-slider::before{ transform: translateX(16px); }

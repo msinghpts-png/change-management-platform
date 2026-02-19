@@ -11,7 +11,6 @@ export const getStatusPillClass = (status?: string) => {
   if (s.includes("approved") || s.includes("closed") || s.includes("completed")) return "pill pill-green";
   if (s.includes("pendingapproval") || s.includes("pending") || s.includes("submitted")) return "pill pill-amber";
   if (s.includes("scheduled") || s.includes("inimplementation") || s.includes("in progress") || s.includes("inprogress")) return "pill pill-cyan";
-  if (s.includes("draft")) return "pill";
   return "pill";
 };
 

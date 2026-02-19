@@ -31,7 +31,7 @@ public class ChangeRequestDto
     public string? RequestedByDisplay { get; set; }
     public string? Executor { get; set; }
     public string? ImplementationGroup { get; set; }
-    public Guid RequestedByUserId { get; set; }
+    public Guid? RequestedByUserId { get; set; }
     public Guid? AssignedToUserId { get; set; }
     public DateTime? PlannedStart { get; set; }
     public DateTime? PlannedEnd { get; set; }

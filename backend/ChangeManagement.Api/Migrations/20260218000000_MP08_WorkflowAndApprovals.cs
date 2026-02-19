@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace ChangeManagement.Api.Migrations;
 
 [Migration("20260218000000_MP08_WorkflowAndApprovals")]
-public partial class MP08_WorkflowAndApprovals : Migration
+public partial class MP08WorkflowAndApprovals : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
@@ -45,12 +45,35 @@ public partial class MP08_WorkflowAndApprovals : Migration
         migrationBuilder.CreateIndex(name: "IX_ChangeApprover_ApproverUserId", schema: "cm", table: "ChangeApprover", column: "ApproverUserId");
         migrationBuilder.CreateIndex(name: "IX_ChangeApprover_ChangeRequestId_ApproverUserId", schema: "cm", table: "ChangeApprover", columns: new[] { "ChangeRequestId", "ApproverUserId" }, unique: true);
 
+        migrationBuilder.Sql(@"
+;WITH Dedup AS (
+    SELECT [ChangeApprovalId], ROW_NUMBER() OVER (
+        PARTITION BY [ChangeRequestId], [ApproverUserId]
+        ORDER BY [ApprovedAt] DESC, [ChangeApprovalId] DESC
+    ) AS rn
+    FROM [cm].[ChangeApproval]
+)
+DELETE FROM [cm].[ChangeApproval]
+WHERE [ChangeApprovalId] IN (SELECT [ChangeApprovalId] FROM Dedup WHERE rn > 1);
+");
+
         migrationBuilder.CreateIndex(name: "IX_ChangeApproval_ChangeRequestId_ApproverUserId", schema: "cm", table: "ChangeApproval", columns: new[] { "ChangeRequestId", "ApproverUserId" }, unique: true);
 
         migrationBuilder.AddForeignKey(name: "FK_ChangeRequest_User_ApprovalRequesterUserId", schema: "cm", table: "ChangeRequest", column: "ApprovalRequesterUserId", principalSchema: "cm", principalTable: "User", principalColumn: "UserId", onDelete: ReferentialAction.Restrict);
         migrationBuilder.AddForeignKey(name: "FK_ChangeRequest_User_SubmittedByUserId", schema: "cm", table: "ChangeRequest", column: "SubmittedByUserId", principalSchema: "cm", principalTable: "User", principalColumn: "UserId", onDelete: ReferentialAction.Restrict);
         migrationBuilder.AddForeignKey(name: "FK_ChangeRequest_User_DeletedByUserId", schema: "cm", table: "ChangeRequest", column: "DeletedByUserId", principalSchema: "cm", principalTable: "User", principalColumn: "UserId", onDelete: ReferentialAction.Restrict);
         migrationBuilder.AddForeignKey(name: "FK_ChangeRequest_RiskLevel_ImpactLevelId", schema: "cm", table: "ChangeRequest", column: "ImpactLevelId", principalSchema: "ref", principalTable: "RiskLevel", principalColumn: "RiskLevelId", onDelete: ReferentialAction.Restrict);
+
+        migrationBuilder.Sql(@"
+UPDATE [cm].[ChangeRequest]
+SET [StatusId] = CASE [StatusId]
+    WHEN 3 THEN 4
+    WHEN 4 THEN 5
+    WHEN 5 THEN 8
+    ELSE [StatusId]
+END
+WHERE [StatusId] IN (3,4,5);
+");
 
         migrationBuilder.Sql(@"
 MERGE [ref].[ChangeStatus] AS t
@@ -76,6 +99,22 @@ WHEN NOT MATCHED THEN INSERT(StatusId,Name,IsTerminal) VALUES(s.StatusId,s.Name,
         migrationBuilder.DropIndex(name: "IX_ChangeRequest_SubmittedByUserId", schema: "cm", table: "ChangeRequest");
         migrationBuilder.DropIndex(name: "IX_ChangeRequest_DeletedByUserId", schema: "cm", table: "ChangeRequest");
         migrationBuilder.DropIndex(name: "IX_ChangeRequest_ImpactLevelId", schema: "cm", table: "ChangeRequest");
+        migrationBuilder.Sql(@"
+UPDATE [cm].[ChangeRequest]
+SET [StatusId] = CASE [StatusId]
+    WHEN 4 THEN 3
+    WHEN 5 THEN 4
+    WHEN 8 THEN 5
+    ELSE [StatusId]
+END
+WHERE [StatusId] IN (4,5,8);
+
+DELETE FROM [ref].[ChangeStatus] WHERE [StatusId] IN (6,7,8,9,10);
+UPDATE [ref].[ChangeStatus] SET [Name]='Approved',[IsTerminal]=0 WHERE [StatusId]=3;
+UPDATE [ref].[ChangeStatus] SET [Name]='Rejected',[IsTerminal]=1 WHERE [StatusId]=4;
+UPDATE [ref].[ChangeStatus] SET [Name]='Completed',[IsTerminal]=1 WHERE [StatusId]=5;
+");
+
         migrationBuilder.DropColumn(name: "ApprovalRequired", schema: "cm", table: "ChangeRequest");
         migrationBuilder.DropColumn(name: "ApprovalStrategy", schema: "cm", table: "ChangeRequest");
         migrationBuilder.DropColumn(name: "ApprovalRequesterUserId", schema: "cm", table: "ChangeRequest");
