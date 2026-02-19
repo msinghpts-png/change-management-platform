@@ -5,15 +5,16 @@ namespace ChangeManagement.Api.Tests.Infrastructure;
 
 internal static class AuthTestHelper
 {
-    public static async Task AuthenticateAsAdminAsync(HttpClient client)
-    {
-        var response = await client.PostAsJsonAsync("/api/auth/login", new
-        {
-            upn = "admin@local",
-            password = "Admin123!"
-        });
-        response.EnsureSuccessStatusCode();
+    public static Task AuthenticateAsAdminAsync(HttpClient client) => AuthenticateAsync(client, "admin@local");
 
+    public static Task AuthenticateAsCabAsync(HttpClient client) => AuthenticateAsync(client, "cab@local");
+
+    public static Task AuthenticateAsExecutorAsync(HttpClient client) => AuthenticateAsync(client, "executor@local");
+
+    private static async Task AuthenticateAsync(HttpClient client, string upn)
+    {
+        var response = await client.PostAsJsonAsync("/api/auth/login", new { upn, password = "Admin123!" });
+        response.EnsureSuccessStatusCode();
         var payload = await response.Content.ReadFromJsonAsync<LoginPayload>();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", payload!.Token);
     }

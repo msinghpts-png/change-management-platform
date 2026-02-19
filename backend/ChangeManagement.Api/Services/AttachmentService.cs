@@ -22,14 +22,16 @@ public class AttachmentService : IAttachmentService
     private readonly IAuditService _audit;
     private readonly IWebHostEnvironment _environment;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IConfiguration _configuration;
 
-    public AttachmentService(IChangeAttachmentRepository attachmentRepository, IChangeRepository changeRepository, IAuditService audit, IWebHostEnvironment environment, IHttpContextAccessor httpContextAccessor)
+    public AttachmentService(IChangeAttachmentRepository attachmentRepository, IChangeRepository changeRepository, IAuditService audit, IWebHostEnvironment environment, IHttpContextAccessor httpContextAccessor, IConfiguration configuration)
     {
         _attachmentRepository = attachmentRepository;
         _changeRepository = changeRepository;
         _audit = audit;
         _environment = environment;
         _httpContextAccessor = httpContextAccessor;
+        _configuration = configuration;
     }
 
     public Task<List<ChangeAttachment>> GetForChangeAsync(Guid changeId, CancellationToken cancellationToken) => _attachmentRepository.GetByChangeIdAsync(changeId, cancellationToken);
@@ -52,7 +54,7 @@ public class AttachmentService : IAttachmentService
             return (null, "File type is not allowed.");
         }
 
-        var rootPath = Path.Combine(_environment.ContentRootPath, "attachments", changeId.ToString());
+        var rootPath = Path.Combine(ResolveAttachmentRoot(), changeId.ToString());
         Directory.CreateDirectory(rootPath);
 
         var fileId = Guid.NewGuid();
@@ -87,6 +89,30 @@ public class AttachmentService : IAttachmentService
         var actor = created.UploadedBy ?? change.CreatedBy;
         await _audit.LogAsync(5, actor, ResolveActorUpn(), "cm", "ChangeAttachment", created.ChangeAttachmentId, change.ChangeNumber.ToString(), "AttachmentUpload", created.FileName, cancellationToken);
         return (created, null);
+    }
+
+
+    private string ResolveAttachmentRoot()
+    {
+        var configured = _configuration["AttachmentStorage:RootPath"];
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return configured;
+        }
+
+        var envPath = Environment.GetEnvironmentVariable("ATTACHMENT_STORAGE_ROOT");
+        if (!string.IsNullOrWhiteSpace(envPath))
+        {
+            return envPath;
+        }
+
+        var dockerVolumePath = "/app/uploads";
+        if (Directory.Exists(dockerVolumePath))
+        {
+            return dockerVolumePath;
+        }
+
+        return Path.Combine(_environment.ContentRootPath, "attachments");
     }
 
     private string ResolveActorUpn()

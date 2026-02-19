@@ -3,19 +3,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiClient } from "../services/apiClient";
 import type { ChangeRequest } from "../types/change";
 import { labelForChangeType, pillForChangeType, pillForImpactLevel, pillForRiskLevel } from "../utils/trafficColors";
+import { getStatusPillClass } from "../ui/pills";
 
 type FilterKey = "All" | "Draft" | "Pending" | "Approved" | "In Progress" | "Closed";
-
-const pillForStatus = (status?: string) => {
-  const s = (status ?? "").toLowerCase();
-  if (s.includes("approved")) return "pill pill-green";
-  if (s.includes("closed") || s.includes("complete")) return "pill pill-green";
-  if (s.includes("pending")) return "pill pill-amber";
-  if (s.includes("inprogress") || s.includes("in progress") || s.includes("implementation"))
-    return "pill pill-cyan";
-  if (s.includes("rejected")) return "pill pill-red";
-  return "pill";
-};
 
 const pillForPriority = (priority?: string) => {
   const p = (priority ?? "").toLowerCase();
@@ -165,7 +155,7 @@ const ChangeListPage = () => {
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
-                  <span className={pillForStatus(c.status)}>{c.status ?? "—"}</span>
+                  <span className={getStatusPillClass(c.status)}>{c.status ?? "—"}</span>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                     {c.riskLevel ? <span className="pill pill-amber">Risk: {c.riskLevel}</span> : null}
                     {c.impactLevel ? <span className="pill pill-amber">Impact: {c.impactLevel}</span> : null}
