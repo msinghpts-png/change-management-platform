@@ -59,11 +59,8 @@ public class AttachmentService : IAttachmentService
 
         var fileId = Guid.NewGuid();
         var safeName = Path.GetFileName(file.FileName);
-        var storedPath = Path.Combine(rootPath, safeName);
-        if (File.Exists(storedPath))
-        {
-            storedPath = Path.Combine(rootPath, $"{fileId:N}_{safeName}");
-        }
+        var storedFileName = $"{fileId}_{safeName}";
+        var storedPath = Path.Combine(rootPath, storedFileName);
 
         await using var stream = File.Create(storedPath);
         await file.CopyToAsync(stream, cancellationToken);
@@ -80,6 +77,7 @@ public class AttachmentService : IAttachmentService
             ChangeRequestId = changeId,
             FileName = Path.GetFileName(file.FileName),
             FileUrl = storedPath,
+            FilePath = storedPath,
             UploadedAt = DateTime.UtcNow,
             UploadedBy = resolvedUploader,
             FileSizeBytes = file.Length
@@ -106,8 +104,8 @@ public class AttachmentService : IAttachmentService
             return envPath;
         }
 
-        var dockerVolumePath = "/app/uploads";
-        if (Directory.Exists(dockerVolumePath))
+        var dockerVolumePath = "/data/attachments";
+        if (Directory.Exists(dockerVolumePath) || dockerVolumePath.StartsWith("/data/", StringComparison.Ordinal))
         {
             return dockerVolumePath;
         }
@@ -128,7 +126,8 @@ public class AttachmentService : IAttachmentService
 
     public async Task<byte[]?> ReadFileAsync(ChangeAttachment attachment, CancellationToken cancellationToken)
     {
-        if (!File.Exists(attachment.FileUrl)) return null;
-        return await File.ReadAllBytesAsync(attachment.FileUrl, cancellationToken);
+        var path = string.IsNullOrWhiteSpace(attachment.FilePath) ? attachment.FileUrl : attachment.FilePath;
+        if (!File.Exists(path)) return null;
+        return await File.ReadAllBytesAsync(path, cancellationToken);
     }
 }
