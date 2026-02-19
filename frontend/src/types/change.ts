@@ -63,12 +63,15 @@ export type DashboardStats = {
 
 export type ChangeRequestStatus =
   | "Draft"
+  | "Submitted"
   | "PendingApproval"
   | "Approved"
-  | "InProgress"
+  | "Rejected"
+  | "Scheduled"
+  | "InImplementation"
   | "Completed"
   | "Closed"
-  | "Rejected"
+  | "Cancelled"
   | string;
 
 export type ChangePriority = "P1" | "P2" | "P3" | "P4" | string;
@@ -91,12 +94,25 @@ export type ChangeRequest = {
   priorityId?: number;
   statusId?: number;
   status: ChangeRequestStatus;
+  approvalRequired?: boolean;
+  approvalStrategy?: "Any" | "Majority" | "All";
+  approverUserIds?: string[];
+  approvals?: Approval[];
   priority: ChangePriority;
   riskLevel?: RiskLevel;
   impactLevel?: ImpactLevel;
   impactTypeId?: number;
   service?: string;
   requestedBy?: string;
+  requestedByUserId?: string;
+  changeRequestId?: string;
+  owner?: string;
+  requestedByDisplay?: string;
+  executor?: string;
+  implementationGroup?: string;
+  assignedToUserId?: string;
+  downtimeRequired?: boolean;
+  stakeholdersNotified?: boolean;
   plannedStart?: string;
   plannedEnd?: string;
   createdAt?: string;
@@ -124,6 +140,14 @@ export type ChangeCreateDto = {
   impactLevel?: ImpactLevel;
   impactTypeId?: number;
   requestedByUserId?: string;
+  changeRequestId?: string;
+  approvalRequired?: boolean;
+  approvalStrategy?: "Any" | "Majority" | "All";
+  approverUserIds?: string[];
+  implementationGroup?: string;
+  implementationWindowNotes?: string;
+  downtimeRequired?: boolean;
+  stakeholdersNotified?: boolean;
   plannedStart?: string;
   plannedEnd?: string;
 };
@@ -148,6 +172,13 @@ export type ChangeUpdateDto = {
   plannedEnd?: string;
   status?: ChangeRequestStatus;
   updatedBy?: string;
+  approvalRequired?: boolean;
+  approvalStrategy?: "Any" | "Majority" | "All";
+  approverUserIds?: string[];
+  implementationGroup?: string;
+  implementationWindowNotes?: string;
+  downtimeRequired?: boolean;
+  stakeholdersNotified?: boolean;
 };
 
 export type ApprovalDecisionDto = {

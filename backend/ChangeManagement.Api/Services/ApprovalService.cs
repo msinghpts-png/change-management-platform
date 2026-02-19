@@ -57,8 +57,8 @@ public class ApprovalService : IApprovalService
         approval.ApprovedAt = DateTime.UtcNow;
         await _repository.SaveAsync(cancellationToken);
 
-        if (approvalStatusId == 2) change.StatusId = 3;
-        if (approvalStatusId == 3) change.StatusId = 4;
+        if (approvalStatusId == 2) change.StatusId = 4;
+        if (approvalStatusId == 3) change.StatusId = 5;
 
         var updatedChange = await _changeService.UpdateAsync(change, cancellationToken);
         if (updatedChange is null)

@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ChangeManagement.Api.DTOs;
 
 public class ChangeUpdateDto
@@ -15,7 +17,16 @@ public class ChangeUpdateDto
     public int StatusId { get; set; }
     public int RiskLevelId { get; set; }
     public int? ImpactTypeId { get; set; }
+    public int? ImpactLevelId { get; set; }
     public Guid? AssignedToUserId { get; set; }
+    public bool? ApprovalRequired { get; set; }
+    [RegularExpression("^(Any|Majority|All)$", ErrorMessage = "ApprovalStrategy must be one of: Any, Majority, All.")]
+    public string? ApprovalStrategy { get; set; }
+    public List<Guid>? ApproverUserIds { get; set; }
+    public string? ImplementationGroup { get; set; }
+    public string? ImplementationWindowNotes { get; set; }
+    public bool? DowntimeRequired { get; set; }
+    public bool? StakeholdersNotified { get; set; }
     public DateTime? PlannedStart { get; set; }
     public DateTime? PlannedEnd { get; set; }
     public DateTime? ActualStart { get; set; }

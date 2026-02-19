@@ -38,12 +38,19 @@ const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
       throw new Error("Unauthorized. Please sign in again.");
     }
 
+    if (response.status === 500) {
+      window.dispatchEvent(new CustomEvent("app:error", { detail: "Something went wrong. Please try again." }));
+      throw new Error("Something went wrong. Please try again.");
+    }
+
     throw new Error(`Request failed: ${response.status}`);
   }
 
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 };
+
+const isEnrichedChangePayload = (item: any): boolean => Boolean(item && (item.title || item.status || item.changeTypeId || item.priority));
 
 const normalizeAttachment = (item: any): Attachment => ({
   id: item.id ?? item.changeAttachmentId,
@@ -71,10 +78,22 @@ const normalizeChange = (item: any): ChangeRequest => ({
   priorityId: item.priorityId,
   statusId: item.statusId,
   status: item.status ?? "Draft",
+  approvalRequired: item.approvalRequired,
+  approvalStrategy: item.approvalStrategy ?? "Any",
+  approverUserIds: item.approverUserIds ?? [],
+  approvals: item.approvals ?? [],
   priority: item.priority ?? "P3",
   riskLevel: item.riskLevel,
   impactTypeId: item.impactTypeId,
   requestedBy: item.requestedBy,
+  requestedByUserId: item.requestedByUserId,
+  owner: item.owner,
+  requestedByDisplay: item.requestedByDisplay,
+  executor: item.executor,
+  implementationGroup: item.implementationGroup,
+  assignedToUserId: item.assignedToUserId,
+  downtimeRequired: item.downtimeRequired,
+  stakeholdersNotified: item.stakeholdersNotified,
   plannedStart: item.plannedStart,
   plannedEnd: item.plannedEnd,
   createdAt: item.createdAt,
@@ -131,11 +150,24 @@ export const apiClient = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     }),
-  createChange: async (payload: ChangeCreateDto) => normalizeChange(await request<any>("/changes", {
+  createChange: async (payload: ChangeCreateDto) => {
+    const created = await request<any>("/changes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
-    })),
+    });
+
+    if (isEnrichedChangePayload(created)) {
+      return normalizeChange(created);
+    }
+
+    const createdId = created?.changeRequestId ?? created?.id;
+    if (isValidId(createdId)) {
+      return normalizeChange(await request<any>(`/changes/${createdId}`));
+    }
+
+    return normalizeChange(created);
+  },
 
   createApproval: (changeId: string, payload: { approver: string; comment?: string }) =>
     request<Approval>(`/changes/${changeId}/approvals`, {
@@ -144,10 +176,19 @@ export const apiClient = {
       body: JSON.stringify({ approver: payload.approver, comments: payload.comment ?? "" })
     }),
 
-  submitChange: (changeId: string) =>
-    request<ChangeRequest>(`/changes/${changeId}/submit`, {
-      method: "POST"
-    }),
+  submitChange: async (changeId: string, payload?: { approverUserIds?: string[]; approvalStrategy?: string; reason?: string }) => normalizeChange(await request<any>(`/changes/${changeId}/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload ?? {})
+    })),
+
+  approveChange: (changeId: string, comments?: string) => request<any>(`/changes/${changeId}/approve`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ comments: comments ?? "" }) }).then(normalizeChange),
+  rejectChange: (changeId: string, comments?: string) => request<any>(`/changes/${changeId}/reject`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ comments: comments ?? "" }) }).then(normalizeChange),
+  revertToDraft: (changeId: string, reason?: string) => request<any>(`/changes/${changeId}/revert-to-draft`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: reason ?? "" }) }).then(normalizeChange),
+  startChange: (changeId: string) => request<any>(`/changes/${changeId}/start`, { method: "POST" }).then(normalizeChange),
+  completeChange: (changeId: string) => request<any>(`/changes/${changeId}/complete`, { method: "POST" }).then(normalizeChange),
+  closeChange: (changeId: string) => request<any>(`/changes/${changeId}/close`, { method: "POST" }).then(normalizeChange),
+  cancelChange: (changeId: string, reason?: string) => request<any>(`/changes/${changeId}/cancel`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: reason ?? "" }) }).then(normalizeChange),
 
   updateChange: async (id: string, payload: ChangeUpdateDto) => normalizeChange(await request<any>(`/changes/${id}`, {
       method: "PUT",
@@ -173,6 +214,11 @@ export const apiClient = {
     });
 
     if (!response.ok) {
+      if (response.status === 500) {
+        window.dispatchEvent(new CustomEvent("app:error", { detail: "Something went wrong. Please try again." }));
+        throw new Error("Something went wrong. Please try again.");
+      }
+
       throw new Error(`Request failed: ${response.status}`);
     }
 
@@ -186,6 +232,11 @@ export const apiClient = {
     });
 
     if (!response.ok) {
+      if (response.status === 500) {
+        window.dispatchEvent(new CustomEvent("app:error", { detail: "Something went wrong. Please try again." }));
+        throw new Error("Something went wrong. Please try again.");
+      }
+
       throw new Error(`Request failed: ${response.status}`);
     }
 

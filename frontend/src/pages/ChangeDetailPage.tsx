@@ -1,22 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiClient } from "../services/apiClient";
 import type { Approval, ApprovalStatus, Attachment, ChangeCreateDto, ChangeRequest, ChangeTask, ChangeTemplate, ChangeUpdateDto } from "../types/change";
 import { labelForChangeType, pillForChangeType, pillForImpactLevel, pillForRiskLevel } from "../utils/trafficColors";
+import { getStatusPillClass } from "../ui/pills";
 
 type ViewTab = "Overview" | "Approvals" | "Tasks" | "Attachments";
-type FormTab = "Basic Info" | "Schedule" | "Plans" | "Risk & Impact" | "Attachments";
-
-const pillForStatus = (status?: string) => {
-  const s = (status ?? "").toLowerCase();
-  if (s.includes("approved")) return "pill pill-green";
-  if (s.includes("closed") || s.includes("complete")) return "pill pill-green";
-  if (s.includes("pending")) return "pill pill-amber";
-  if (s.includes("inprogress") || s.includes("in progress") || s.includes("implementation"))
-    return "pill pill-cyan";
-  if (s.includes("rejected")) return "pill pill-red";
-  return "pill";
-};
+type FormTab = "Basic Info" | "Schedule" | "Plans" | "Risk & Impact" | "Approvals" | "Attachments";
 
 const pillForPriority = (priority?: string) => {
   const p = (priority ?? "").toLowerCase();
@@ -109,6 +99,7 @@ const ChangeDetailPage = () => {
   const [formTab, setFormTab] = useState<FormTab>("Basic Info");
 
   const [loading, setLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [item, setItem] = useState<ChangeRequest | null>(null);
@@ -119,8 +110,21 @@ const ChangeDetailPage = () => {
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDescription, setTaskDescription] = useState("");
   const [approverEmail, setApproverEmail] = useState("");
+  const [approvalRequired, setApprovalRequired] = useState(false);
+  const [approvalStrategy, setApprovalStrategy] = useState<"Any" | "Majority" | "All">("Any");
+  const [implementationGroup, setImplementationGroup] = useState("");
   const [approvalComment, setApprovalComment] = useState("");
   const [decisionComment, setDecisionComment] = useState("");
+
+  const authUserRole = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("authUser");
+      const parsed = raw ? JSON.parse(raw) : null;
+      return typeof parsed?.role === "string" ? parsed.role.toLowerCase() : "";
+    } catch {
+      return "";
+    }
+  }, []);
 
   // Form fields (kept in UI; backend DTO is smaller)
   const [title, setTitle] = useState("");
@@ -131,6 +135,7 @@ const ChangeDetailPage = () => {
   const [businessJustification, setBusinessJustification] = useState("");
   const [implementationSteps, setImplementationSteps] = useState("");
   const [backoutPlan, setBackoutPlan] = useState("");
+  const [implementationWindowNotes, setImplementationWindowNotes] = useState("");
 
   const [changeTypeIdValue, setChangeTypeIdValue] = useState(2);
   const [priority, setPriority] = useState("P3");
@@ -140,6 +145,7 @@ const ChangeDetailPage = () => {
   const [plannedStart, setPlannedStart] = useState("");
   const [plannedEnd, setPlannedEnd] = useState("");
   const [downtimeRequired, setDowntimeRequired] = useState(false);
+  const [stakeholdersNotified, setStakeholdersNotified] = useState(false);
 
   const [templateId, setTemplateId] = useState("");
   const [templates, setTemplates] = useState<ChangeTemplate[]>(fallbackTemplates);
@@ -187,15 +193,15 @@ const ChangeDetailPage = () => {
     if (!id) return;
     if (!apiClient.isValidId(id)) {
       setError("Invalid change request id.");
+      setIsSaving(false);
       return;
     }
 
-    setLoading(true);
-    apiClient
-      .getChangeById(id)
-      .then((data) => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const data = await apiClient.getChangeById(id);
         setItem(data);
-        const descriptionBlob = data.description ?? "";
         setTitle(data.title ?? "");
         setDescription(data.description ?? "");
         setBusinessJustification(data.businessJustification ?? "");
@@ -204,20 +210,25 @@ const ChangeDetailPage = () => {
         setService(data.serviceSystem ?? data.service ?? "");
         setCategory(data.category ?? "Application");
         setEnvironment(data.environment ?? "Non-Production");
-        setDowntimeRequired(false);
+        setDowntimeRequired(Boolean((data as any).downtimeRequired));
         setChangeTypeIdValue(data.changeTypeId ?? 2);
         setPriority(data.priority ?? "P3");
         setRiskLevelIdValue(data.riskLevelId ?? (data.riskLevel?.toLowerCase() === "low" ? 1 : data.riskLevel?.toLowerCase() === "high" ? 3 : 2));
         setImpactTypeIdValue(data.impactTypeId ?? (data.impactLevel?.toLowerCase() === "low" ? 1 : data.impactLevel?.toLowerCase() === "high" ? 3 : 2));
         setPlannedStart(data.plannedStart ? data.plannedStart.slice(0, 16) : "");
         setPlannedEnd(data.plannedEnd ? data.plannedEnd.slice(0, 16) : "");
-        refreshRelatedData(id).catch(() => void 0);
+        setApprovalRequired(Boolean(data.approvalRequired));
+        setApprovalStrategy((data.approvalStrategy as "Any" | "Majority" | "All") ?? "Any");
+        setImplementationGroup(data.implementationGroup ?? "");
+        await refreshRelatedData(id);
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
         setLoading(false);
-      })
-      .catch((err: Error) => {
-        setError(err.message);
-        setLoading(false);
-      });
+      }
+    };
+
+    void load();
   }, [id]);
 
   useEffect(() => {
@@ -241,6 +252,9 @@ const ChangeDetailPage = () => {
     priority !== (item.priority ?? "P3") ||
     riskLevelIdValue !== (item.riskLevelId ?? ((item.riskLevel ?? "Medium").toLowerCase() === "low" ? 1 : (item.riskLevel ?? "Medium").toLowerCase() === "high" ? 3 : 2)) ||
     impactTypeIdValue !== (item.impactTypeId ?? ((item.impactLevel ?? "Medium").toLowerCase() === "low" ? 1 : (item.impactLevel ?? "Medium").toLowerCase() === "high" ? 3 : 2)) ||
+    approvalRequired !== (item.approvalRequired ?? false) ||
+    approvalStrategy !== ((item.approvalStrategy as "Any" | "Majority" | "All" | undefined) ?? "Any") ||
+    implementationGroup !== (item.implementationGroup ?? "") ||
     plannedStart !== (item.plannedStart ? item.plannedStart.slice(0, 16) : "") ||
     plannedEnd !== (item.plannedEnd ? item.plannedEnd.slice(0, 16) : "")
   );
@@ -263,7 +277,10 @@ const ChangeDetailPage = () => {
   };
 
   const saveDraft = async (options?: { navigateOnCreate?: boolean }) => {
+    if (isSaving) return null;
+
     setError(null);
+    setIsSaving(true);
     setLoading(true);
     try {
       if (isNew) {
@@ -287,7 +304,13 @@ const ChangeDetailPage = () => {
           impactTypeId: impactTypeIdValue,
           requestedByUserId: authUser?.id,
           plannedStart: plannedStart ? new Date(plannedStart).toISOString() : undefined,
-          plannedEnd: plannedEnd ? new Date(plannedEnd).toISOString() : undefined
+          plannedEnd: plannedEnd ? new Date(plannedEnd).toISOString() : undefined,
+          approvalRequired: changeTypeId !== 2 ? true : approvalRequired,
+          approvalStrategy,
+          implementationGroup,
+          implementationWindowNotes,
+          downtimeRequired,
+          stakeholdersNotified
         };
         const created = await apiClient.createChange(payload);
         if (options?.navigateOnCreate ?? true) {
@@ -312,19 +335,26 @@ const ChangeDetailPage = () => {
           impactLevel,
           impactTypeId: impactTypeIdValue,
           plannedStart: plannedStart ? new Date(plannedStart).toISOString() : undefined,
-          plannedEnd: plannedEnd ? new Date(plannedEnd).toISOString() : undefined
+          plannedEnd: plannedEnd ? new Date(plannedEnd).toISOString() : undefined,
+          approvalRequired: changeTypeId !== 2 ? true : approvalRequired,
+          approvalStrategy,
+          implementationGroup,
+          implementationWindowNotes,
+          downtimeRequired,
+          stakeholdersNotified
         };
         const updated = await apiClient.updateChange(id, payload);
         setItem(updated);
         await refreshRelatedData(id);
         if (options?.navigateOnCreate ?? true) {
-          nav("/changes?mine=true");
+          nav(`/changes/${updated.id}`);
         }
-        return id;
+        return updated.id;
       }
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      setIsSaving(false);
       setLoading(false);
     }
 
@@ -332,24 +362,27 @@ const ChangeDetailPage = () => {
   };
 
   const submitForApproval = async () => {
+    setIsSaving(true);
     setError(null);
 
     let targetId: string | null = id ?? null;
     if (formIsDirty) {
       targetId = await saveDraft({ navigateOnCreate: false });
       if (!apiClient.isValidId(targetId)) {
+        setIsSaving(false);
         return;
       }
     }
 
     if (!apiClient.isValidId(targetId)) {
       setError("Invalid change request id.");
+      setIsSaving(false);
       return;
     }
 
     setLoading(true);
     try {
-      const submitted = await apiClient.submitChange(targetId);
+      const submitted = await apiClient.submitChange(targetId, { approvalStrategy });
       setItem(submitted);
       const refreshed = await apiClient.getChangeById(targetId);
       setItem(refreshed);
@@ -361,12 +394,17 @@ const ChangeDetailPage = () => {
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      setIsSaving(false);
       setLoading(false);
     }
   };
 
   const submitApproval = async () => {
-    if (!id || !approverEmail.trim()) return;
+    setIsSaving(true);
+    if (!id || !approverEmail.trim()) {
+      setIsSaving(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -377,13 +415,16 @@ const ChangeDetailPage = () => {
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      setIsSaving(false);
       setLoading(false);
     }
   };
 
   const decideApproval = async (approvalId: string, status: ApprovalStatus) => {
+    setIsSaving(true);
     if (!apiClient.isValidId(id)) {
       setError("Invalid change request id.");
+      setIsSaving(false);
       return;
     }
     setLoading(true);
@@ -397,12 +438,43 @@ const ChangeDetailPage = () => {
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      setIsSaving(false);
+      setLoading(false);
+    }
+  };
+
+
+  const handleBannerDecision = async (action: "approve" | "reject") => {
+    setIsSaving(true);
+    if (!apiClient.isValidId(id)) {
+      setError("Invalid change request id.");
+      setIsSaving(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const updated = action === "approve"
+        ? await apiClient.approveChange(id, decisionComment.trim() || "Approved")
+        : await apiClient.rejectChange(id, decisionComment.trim() || "Rejected");
+      setItem(updated);
+      setDecisionComment("");
+      await refreshRelatedData(id);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsSaving(false);
       setLoading(false);
     }
   };
 
   const addTask = async () => {
-    if (!apiClient.isValidId(id) || !taskTitle.trim()) return;
+    setIsSaving(true);
+    if (!apiClient.isValidId(id) || !taskTitle.trim()) {
+      setIsSaving(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -413,6 +485,7 @@ const ChangeDetailPage = () => {
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      setIsSaving(false);
       setLoading(false);
     }
   };
@@ -420,6 +493,7 @@ const ChangeDetailPage = () => {
   const downloadAttachment = async (attachmentId: string, fileName: string) => {
     if (!apiClient.isValidId(id)) {
       setError("Invalid change request id.");
+      setIsSaving(false);
       return;
     }
 
@@ -503,7 +577,7 @@ const ChangeDetailPage = () => {
         <div className="card">
           <div className="card-head">
             <div className="tabs" role="tablist" aria-label="Change form sections">
-              {(["Basic Info", "Schedule", "Plans", "Risk & Impact", "Attachments"] as FormTab[]).map((t) => (
+              {(["Basic Info", "Schedule", "Plans", "Risk & Impact", "Approvals", "Attachments"] as FormTab[]).map((t) => (
                 <button
                   key={t}
                   className={"tab " + (formTab === t ? "tab-active" : "")}
@@ -525,7 +599,9 @@ const ChangeDetailPage = () => {
                 </div>
 
                 <div>
-                  <div className="label">Change Type *</div>
+                  <div className="label">Change Type * <span title="Normal: DR / non-production / recurring monthly patching
+Standard: requires CAB approval; scheduled change
+Emergency: urgent; CAB approval required" style={{ cursor: "help" }}>ⓘ</span></div>
                   <select className="select" value={changeTypeIdValue} onChange={(e) => setChangeTypeIdValue(Number(e.target.value))}>
                     <option value={2}>Normal</option>
                     <option value={1}>Standard</option>
@@ -573,17 +649,43 @@ const ChangeDetailPage = () => {
             {formTab === "Schedule" ? (
               <div className="form-grid">
                 <div>
-                  <div className="label">Planned Start</div>
+                  <div className="label">Change Owner</div>
+                  <input className="input" value={item?.owner ?? item?.requestedBy ?? ""} readOnly />
+                </div>
+                <div>
+                  <div className="label">Implementation Group</div>
+                  <input className="input" value={implementationGroup} onChange={(e) => setImplementationGroup(e.target.value)} placeholder="Team or group name" />
+                </div>
+                <div>
+                  <div className="label">Planned Start *</div>
                   <input className="input" type="datetime-local" value={plannedStart} onChange={(e) => setPlannedStart(e.target.value)} />
                 </div>
                 <div>
-                  <div className="label">Planned End</div>
+                  <div className="label">Planned End *</div>
                   <input className="input" type="datetime-local" value={plannedEnd} onChange={(e) => setPlannedEnd(e.target.value)} />
                 </div>
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 700 }}>
+                  <div className="label">Implementation Window Notes</div>
+                  <textarea className="textarea" value={implementationWindowNotes} onChange={(e) => setImplementationWindowNotes(e.target.value)} placeholder="Any specific timing requirements, maintenance windows, etc." />
+                </div>
+                <div className="switch-card">
+                  <div>
+                    <div className="h3">Downtime Required</div>
+                    <div className="small">Will this change cause service interruption?</div>
+                  </div>
+                  <label className="switch">
                     <input type="checkbox" checked={downtimeRequired} onChange={(e) => setDowntimeRequired(e.target.checked)} />
-                    Downtime required
+                    <span className="switch-slider" />
+                  </label>
+                </div>
+                <div className="switch-card">
+                  <div>
+                    <div className="h3">Stakeholders Notified</div>
+                    <div className="small">Have affected parties been informed?</div>
+                  </div>
+                  <label className="switch">
+                    <input type="checkbox" checked={stakeholdersNotified} onChange={(e) => setStakeholdersNotified(e.target.checked)} />
+                    <span className="switch-slider" />
                   </label>
                 </div>
               </div>
@@ -607,10 +709,10 @@ const ChangeDetailPage = () => {
                 <div>
                   <div className="label">Priority</div>
                   <select className="select" value={priority} onChange={(e) => setPriority(e.target.value)}>
-                    <option>P1</option>
-                    <option>P2</option>
-                    <option>P3</option>
-                    <option>P4</option>
+                    <option value="P1">P1 - Critical</option>
+                    <option value="P2">P2 - High</option>
+                    <option value="P3">P3 - Medium</option>
+                    <option value="P4">P4 - Low</option>
                   </select>
                 </div>
                 <div>
@@ -630,6 +732,26 @@ const ChangeDetailPage = () => {
                   </select>
                 </div>
                 <div />
+              </div>
+            ) : null}
+
+            {formTab === "Approvals" ? (
+              <div className="form-grid">
+                <div>
+                  <div className="label">Approval Required</div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <input type="checkbox" checked={changeTypeId !== 2 ? true : approvalRequired} disabled={changeTypeId !== 2} onChange={(e) => setApprovalRequired(e.target.checked)} />
+                    {changeTypeId !== 2 ? "Required for Standard/Emergency" : "Require CAB approval"}
+                  </label>
+                </div>
+                <div>
+                  <div className="label">Approval Strategy</div>
+                  <select className="select" value={approvalStrategy} onChange={(e) => setApprovalStrategy(e.target.value as "Any" | "Majority" | "All")}>
+                    <option value="Any">Any</option>
+                    <option value="Majority">Majority</option>
+                    <option value="All">All</option>
+                  </select>
+                </div>
               </div>
             ) : null}
 
@@ -660,7 +782,7 @@ const ChangeDetailPage = () => {
           </div>
 
           <div className="footer-actions">
-            <button className="btn" onClick={() => { void saveDraft(); }} disabled={loading}>
+            <button className="btn" onClick={() => { void saveDraft(); }} disabled={loading || isSaving}>
               💾 Save Draft
             </button>
             <button type="button" className="btn btn-primary" onClick={submitForApproval} disabled={isSubmitDisabled}>
@@ -690,7 +812,7 @@ const ChangeDetailPage = () => {
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <span className="mono">{item?.changeNumber ?? "CHG-000000"}</span>
-            <span className={pillForStatus(item?.status)}>{item?.status ?? "—"}</span>
+            <span className={getStatusPillClass(item?.status)}>{item?.status ?? "—"}</span>
           </div>
 
           <h1 className="page-title" style={{ marginTop: 10 }}>{item?.title}</h1>
@@ -707,6 +829,26 @@ const ChangeDetailPage = () => {
           ▶ Start Implementation
         </button>
       </div>
+
+
+      {((item?.status ?? "").toLowerCase().includes("pendingapproval") || (item?.status ?? "").toLowerCase().includes("pending")) ? (
+        <div className="card card-pad" style={{ background: "#fefce8", borderColor: "#facc15", marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+          <div>
+            <div className="h3">Approval Required</div>
+            <div className="small">This change request is awaiting approval decision.</div>
+          </div>
+          {(["cab", "admin"].includes(authUserRole)) ? (
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input className="input" style={{ minWidth: 220 }} placeholder="Decision comment" value={decisionComment} onChange={(e) => setDecisionComment(e.target.value)} />
+              <button className="btn" type="button">Request Info</button>
+              <button className="btn" type="button" disabled={loading || isSaving} onClick={() => { void handleBannerDecision("reject"); }}>Reject</button>
+              <button className="btn btn-primary" type="button" disabled={loading || isSaving} onClick={() => { void handleBannerDecision("approve"); }}>Approve</button>
+            </div>
+          ) : (
+            <div className="small">Approval is pending CAB/Admin review.</div>
+          )}
+        </div>
+      ) : null}
 
       <div className="tabs" style={{ marginBottom: 14 }}>
         {viewTabs.map((t) => (
@@ -775,7 +917,7 @@ const ChangeDetailPage = () => {
                 <div className="small">Planned End</div>
                 <div className="h3">{fmtDT(item?.plannedEnd)}</div>
                 <div style={{ height: 10 }} />
-                <div className="pill pill-amber">⚠ Downtime Required</div>
+                {downtimeRequired ? <div className="pill pill-amber">⚠ Downtime Required</div> : null}
               </div>
             </div>
 
@@ -785,7 +927,16 @@ const ChangeDetailPage = () => {
               </div>
               <div className="card-body">
                 <div className="small">Owner</div>
-                <div className="h3">{item?.requestedBy ?? "—"}</div>
+                <div className="h3">{item?.owner ?? item?.requestedBy ?? "—"}</div>
+                <div style={{ height: 8 }} />
+                <div className="small">Requested By</div>
+                <div className="h3">{item?.requestedByDisplay ?? item?.requestedBy ?? "—"}</div>
+                <div style={{ height: 8 }} />
+                <div className="small">Executor</div>
+                <div className="h3">{item?.executor ?? "—"}</div>
+                <div style={{ height: 8 }} />
+                <div className="small">Implementation Group</div>
+                <div className="h3">{item?.implementationGroup ?? "—"}</div>
               </div>
             </div>
           </div>
@@ -814,7 +965,7 @@ const ChangeDetailPage = () => {
                     <div className="small">{fmtDT(approval.decisionAt)}</div>
                   </div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <span className={pillForStatus(approval.status)}>{approval.status}</span>
+                    <span className={getStatusPillClass(approval.status)}>{approval.status}</span>
                     {approval.status === "Pending" ? (<>
                       <button className="btn" onClick={() => decideApproval(approval.id, "Approved")}>Approve</button>
                       <button className="btn" onClick={() => decideApproval(approval.id, "Rejected")}>Reject</button>
@@ -869,7 +1020,7 @@ const ChangeDetailPage = () => {
                     <div className="small">{task.description ?? "No description"}</div>
                   </div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <span className={pillForStatus(task.status)}>{task.status ?? "Pending"}</span>
+                    <span className={getStatusPillClass(task.status)}>{task.status ?? "Pending"}</span>
                     <span className="small">Due: {fmtDT(task.dueAt)}</span>
                   </div>
                 </div>

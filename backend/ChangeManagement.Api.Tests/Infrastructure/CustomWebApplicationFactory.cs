@@ -64,6 +64,43 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             db.SaveChanges();
         }
 
+        var addedUsers = false;
+
+        var cabId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        if (!db.Users.Any(u => u.UserId == cabId))
+        {
+            db.Users.Add(new User
+            {
+                UserId = cabId,
+                Upn = "cab@local",
+                DisplayName = "Cab Tester",
+                Role = "CAB",
+                IsActive = true,
+                PasswordHash = PasswordHasher.Hash("Admin123!")
+            });
+            addedUsers = true;
+        }
+
+        var executorId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+        if (!db.Users.Any(u => u.UserId == executorId))
+        {
+            db.Users.Add(new User
+            {
+                UserId = executorId,
+                Upn = "executor@local",
+                DisplayName = "Executor Tester",
+                Role = "Executor",
+                IsActive = true,
+                PasswordHash = PasswordHasher.Hash("Admin123!")
+            });
+            addedUsers = true;
+        }
+
+        if (addedUsers)
+        {
+            db.SaveChanges();
+        }
+
         if (!db.ChangeTemplates.Any())
         {
             db.ChangeTemplates.Add(new ChangeTemplate

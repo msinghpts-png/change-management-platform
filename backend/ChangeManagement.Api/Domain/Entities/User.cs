@@ -11,8 +11,12 @@ public class User
 
     public ICollection<ChangeRequest> RequestedChanges { get; set; } = new List<ChangeRequest>();
     public ICollection<ChangeRequest> AssignedChanges { get; set; } = new List<ChangeRequest>();
+    public ICollection<ChangeRequest> ApprovalRequestedChanges { get; set; } = new List<ChangeRequest>();
+    public ICollection<ChangeRequest> SubmittedChanges { get; set; } = new List<ChangeRequest>();
+    public ICollection<ChangeRequest> DeletedChanges { get; set; } = new List<ChangeRequest>();
     public ICollection<ChangeTask> AssignedTasks { get; set; } = new List<ChangeTask>();
     public ICollection<ChangeApproval> Approvals { get; set; } = new List<ChangeApproval>();
+    public ICollection<ChangeApprover> ChangeApproverSelections { get; set; } = new List<ChangeApprover>();
     public ICollection<ChangeAttachment> UploadedAttachments { get; set; } = new List<ChangeAttachment>();
     public ICollection<ChangeTemplate> CreatedTemplates { get; set; } = new List<ChangeTemplate>();
 }
