@@ -32,7 +32,7 @@ public class AdminAndSubmitTests : IClassFixture<CustomWebApplicationFactory>
             Title = "submit-no-attachment",
             Description = "impact description",
             BackoutPlan = "rollback",
-            ChangeTypeId = 1,
+            ChangeTypeId = 2, // Normal type avoids CAB approver setup required by Standard (type 1).
             PriorityId = 2,
             RiskLevelId = 2,
             ImpactTypeId = 2,
@@ -44,7 +44,7 @@ public class AdminAndSubmitTests : IClassFixture<CustomWebApplicationFactory>
         var created = await createResponse.Content.ReadFromJsonAsync<Dictionary<string, object>>();
         var changeId = Guid.Parse(created!["changeRequestId"].ToString()!);
 
-        var submitResponse = await _client.PostAsync($"/api/changes/{changeId}/submit", content: null);
+        var submitResponse = await _client.PostAsJsonAsync($"/api/changes/{changeId}/submit", new { });
         submitResponse.EnsureSuccessStatusCode();
     }
 }
