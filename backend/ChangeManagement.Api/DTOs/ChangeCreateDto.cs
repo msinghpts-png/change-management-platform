@@ -18,6 +18,10 @@ public class ChangeCreateDto
     public int? ImpactTypeId { get; set; }
     public Guid? RequestedByUserId { get; set; }
     public Guid? AssignedToUserId { get; set; }
+    public bool? ApprovalRequired { get; set; }
+    public string? ApprovalStrategy { get; set; }
+    public List<Guid>? ApproverUserIds { get; set; }
+    public string? ImplementationGroup { get; set; }
 
     // Legacy UI compatibility fields
     public string? ChangeType { get; set; }

@@ -11,6 +11,16 @@ public class ChangeRequest
     public int StatusId { get; set; }
     public int RiskLevelId { get; set; }
     public int? ImpactTypeId { get; set; }
+    public bool ApprovalRequired { get; set; }
+    public string ApprovalStrategy { get; set; } = "Any";
+    public Guid? ApprovalRequesterUserId { get; set; }
+    public DateTime? SubmittedAt { get; set; }
+    public Guid? SubmittedByUserId { get; set; }
+    public string? ImplementationGroup { get; set; }
+    public int? ImpactLevelId { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public Guid? DeletedByUserId { get; set; }
+    public string? DeletedReason { get; set; }
     public Guid RequestedByUserId { get; set; }
     public Guid? AssignedToUserId { get; set; }
     public DateTime? PlannedStart { get; set; }
@@ -34,8 +44,13 @@ public class ChangeRequest
     public RiskLevel? RiskLevel { get; set; }
     public User? RequestedByUser { get; set; }
     public User? AssignedToUser { get; set; }
+    public User? ApprovalRequesterUser { get; set; }
+    public User? SubmittedByUser { get; set; }
+    public User? DeletedByUser { get; set; }
+    public RiskLevel? ImpactLevel { get; set; }
 
     public ICollection<ChangeTask> ChangeTasks { get; set; } = new List<ChangeTask>();
     public ICollection<ChangeApproval> ChangeApprovals { get; set; } = new List<ChangeApproval>();
+    public ICollection<ChangeApprover> ChangeApprovers { get; set; } = new List<ChangeApprover>();
     public ICollection<ChangeAttachment> ChangeAttachments { get; set; } = new List<ChangeAttachment>();
 }
