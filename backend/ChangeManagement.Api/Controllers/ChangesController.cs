@@ -339,15 +339,15 @@ public class ChangesController : ControllerBase
         ImplementationGroup = change.ImplementationGroup,
         ApprovalRequired = change.ApprovalRequired,
         ApprovalStrategy = change.ApprovalStrategy,
-        ApproverUserIds = change.ChangeApprovers.Select(x => x.ApproverUserId).ToList(),
-        Approvals = change.ChangeApprovals.Select(a => new ApprovalDecisionItemDto
+        ApproverUserIds = change.ChangeApprovers?.Select(x => x.ApproverUserId).ToList() ?? new List<Guid>(),
+        Approvals = change.ChangeApprovals?.Select(a => new ApprovalDecisionItemDto
         {
             ApproverUserId = a.ApproverUserId,
             Approver = a.ApproverUser?.DisplayName ?? a.ApproverUser?.Upn ?? string.Empty,
             Status = a.ApprovalStatus?.Name ?? "Pending",
             Comments = a.Comments,
             DecisionAt = a.ApprovedAt
-        }).ToList(),
+        }).ToList() ?? new List<ApprovalDecisionItemDto>(),
         PlannedStart = change.PlannedStart,
         PlannedEnd = change.PlannedEnd,
         CreatedAt = change.CreatedAt,

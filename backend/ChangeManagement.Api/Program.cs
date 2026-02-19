@@ -207,6 +207,47 @@ BEGIN
     ALTER TABLE [cm].[ChangeTemplate] ADD [RiskLevelId] INT NULL;
 END
 
+IF COL_LENGTH('cm.ChangeRequest', 'ApprovalRequired') IS NULL
+BEGIN
+    ALTER TABLE [cm].[ChangeRequest] ADD [ApprovalRequired] BIT NOT NULL CONSTRAINT [DF_ChangeRequest_ApprovalRequired] DEFAULT(0);
+END
+IF COL_LENGTH('cm.ChangeRequest', 'ApprovalStrategy') IS NULL
+BEGIN
+    ALTER TABLE [cm].[ChangeRequest] ADD [ApprovalStrategy] NVARCHAR(20) NOT NULL CONSTRAINT [DF_ChangeRequest_ApprovalStrategy] DEFAULT('Any');
+END
+IF COL_LENGTH('cm.ChangeRequest', 'ApprovalRequesterUserId') IS NULL
+BEGIN
+    ALTER TABLE [cm].[ChangeRequest] ADD [ApprovalRequesterUserId] UNIQUEIDENTIFIER NULL;
+END
+IF COL_LENGTH('cm.ChangeRequest', 'SubmittedAt') IS NULL
+BEGIN
+    ALTER TABLE [cm].[ChangeRequest] ADD [SubmittedAt] DATETIME2 NULL;
+END
+IF COL_LENGTH('cm.ChangeRequest', 'SubmittedByUserId') IS NULL
+BEGIN
+    ALTER TABLE [cm].[ChangeRequest] ADD [SubmittedByUserId] UNIQUEIDENTIFIER NULL;
+END
+IF COL_LENGTH('cm.ChangeRequest', 'ImplementationGroup') IS NULL
+BEGIN
+    ALTER TABLE [cm].[ChangeRequest] ADD [ImplementationGroup] NVARCHAR(200) NULL;
+END
+IF COL_LENGTH('cm.ChangeRequest', 'ImpactLevelId') IS NULL
+BEGIN
+    ALTER TABLE [cm].[ChangeRequest] ADD [ImpactLevelId] INT NULL;
+END
+IF COL_LENGTH('cm.ChangeRequest', 'DeletedAt') IS NULL
+BEGIN
+    ALTER TABLE [cm].[ChangeRequest] ADD [DeletedAt] DATETIME2 NULL;
+END
+IF COL_LENGTH('cm.ChangeRequest', 'DeletedByUserId') IS NULL
+BEGIN
+    ALTER TABLE [cm].[ChangeRequest] ADD [DeletedByUserId] UNIQUEIDENTIFIER NULL;
+END
+IF COL_LENGTH('cm.ChangeRequest', 'DeletedReason') IS NULL
+BEGIN
+    ALTER TABLE [cm].[ChangeRequest] ADD [DeletedReason] NVARCHAR(400) NULL;
+END
+
 IF OBJECT_ID('cm.ChangeApprover', 'U') IS NOT NULL AND COL_LENGTH('cm.ChangeApprover', 'ChangeRequestId') IS NULL
 BEGIN
     ALTER TABLE [cm].[ChangeApprover] ADD [ChangeRequestId] UNIQUEIDENTIFIER NULL;
