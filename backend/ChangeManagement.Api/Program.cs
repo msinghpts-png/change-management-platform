@@ -113,6 +113,7 @@ builder.Services.AddScoped<IChangeService, ChangeService>();
 builder.Services.AddScoped<IApprovalRepository, ApprovalRepository>();
 builder.Services.AddScoped<IApprovalService, ApprovalService>();
 builder.Services.AddScoped<IChangeWorkflowService, ChangeWorkflowService>();
+builder.Services.AddScoped<IWorkflowService, WorkflowService>();
 builder.Services.AddScoped<IChangeAttachmentRepository, ChangeAttachmentRepository>();
 builder.Services.AddScoped<IAttachmentService, AttachmentService>();
 builder.Services.AddScoped<IChangeTaskRepository, ChangeTaskRepository>();
@@ -145,8 +146,9 @@ app.UseExceptionHandler(exceptionApp =>
 var skipDatabaseInitialization = app.Environment.IsEnvironment("Testing") || app.Configuration.GetValue<bool>("SkipDatabaseInitialization");
 if (!skipDatabaseInitialization)
 {
-    using var scope = app.Services.CreateScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<ChangeManagementDbContext>();
+    using (var scope = app.Services.CreateScope())
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<ChangeManagementDbContext>();
     var providerName = dbContext.Database.ProviderName ?? string.Empty;
     var isInMemory = string.Equals(providerName, "Microsoft.EntityFrameworkCore.InMemory", StringComparison.Ordinal);
     var isSqlite = string.Equals(providerName, "Microsoft.EntityFrameworkCore.Sqlite", StringComparison.Ordinal);
@@ -213,7 +215,7 @@ BEGIN
 END
 IF COL_LENGTH('cm.ChangeRequest', 'ApprovalStrategy') IS NULL
 BEGIN
-    ALTER TABLE [cm].[ChangeRequest] ADD [ApprovalStrategy] NVARCHAR(20) NOT NULL CONSTRAINT [DF_ChangeRequest_ApprovalStrategy] DEFAULT('Any');
+    ALTER TABLE [cm].[ChangeRequest] ADD [ApprovalStrategy] NVARCHAR(50) NULL;
 END
 IF COL_LENGTH('cm.ChangeRequest', 'ApprovalRequesterUserId') IS NULL
 BEGIN
@@ -341,6 +343,7 @@ END
     }
 
     dbContext.SaveChanges();
+    }
 }
 
 if (app.Environment.IsDevelopment())

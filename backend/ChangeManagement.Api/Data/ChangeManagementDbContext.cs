@@ -52,7 +52,7 @@ public class ChangeManagementDbContext : DbContext
             entity.HasIndex(e => e.AssignedToUserId);
             entity.Property(e => e.ImpactTypeId).HasDefaultValue(2);
             entity.Property(e => e.ApprovalRequired).HasDefaultValue(false);
-            entity.Property(e => e.ApprovalStrategy).HasMaxLength(20).HasDefaultValue("Any");
+            entity.Property(e => e.ApprovalStrategy).HasMaxLength(50);
             entity.Property(e => e.ImplementationGroup).HasMaxLength(200);
             entity.Property(e => e.DeletedReason).HasMaxLength(400);
 
