@@ -98,5 +98,7 @@ END
 
     protected override void Down(MigrationBuilder migrationBuilder)
     {
+        // Intentionally left empty: this Down() is a reconciliation migration rollback boundary.
+        // The Up() path is additive/idempotent across drifted environments, and selective teardown is unsafe.
     }
 }

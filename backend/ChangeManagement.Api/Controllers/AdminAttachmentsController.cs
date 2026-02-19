@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using ChangeManagement.Api.Data;
+using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -47,7 +48,7 @@ public class AdminAttachmentsController : ControllerBase
             changeRequestId = x.ChangeRequestId,
             changeNumber = x.ChangeRequest == null ? string.Empty : $"CHG-{x.ChangeRequest.ChangeNumber:D6}",
             fileName = x.FileName,
-            filePath = x.FileUrl,
+            filePath = ResolveAttachmentPath(x),
             sizeBytes = x.FileSizeBytes,
             uploadedAt = x.UploadedAt,
             uploadedBy = x.UploadedByUser?.Upn
@@ -75,6 +76,14 @@ public class AdminAttachmentsController : ControllerBase
         await _audit.LogAsync(5, actorId, actorUpn, "cm", "ChangeAttachment", attachment.ChangeAttachmentId, attachment.ChangeRequest?.ChangeNumber.ToString() ?? string.Empty, "AttachmentDelete", attachment.FileName, cancellationToken);
 
         return NoContent();
+    }
+
+
+    private static string ResolveAttachmentPath(ChangeAttachment attachment)
+    {
+        var filePathProperty = attachment.GetType().GetProperty("FilePath");
+        var filePathValue = filePathProperty?.GetValue(attachment) as string;
+        return string.IsNullOrWhiteSpace(filePathValue) ? attachment.FileUrl : filePathValue;
     }
 
     private Guid ResolveActorUserId()

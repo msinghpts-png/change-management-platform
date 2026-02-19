@@ -105,7 +105,7 @@ public class AttachmentService : IAttachmentService
         }
 
         var dockerVolumePath = "/data/attachments";
-        if (Directory.Exists(dockerVolumePath) || dockerVolumePath.StartsWith("/data/", StringComparison.Ordinal))
+        if (Directory.Exists(dockerVolumePath))
         {
             return dockerVolumePath;
         }

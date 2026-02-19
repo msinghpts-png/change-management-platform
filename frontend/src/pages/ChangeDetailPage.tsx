@@ -101,6 +101,7 @@ const ChangeDetailPage = () => {
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [item, setItem] = useState<ChangeRequest | null>(null);
 
@@ -237,6 +238,12 @@ const ChangeDetailPage = () => {
     }).catch(() => void 0);
   }, []);
 
+  useEffect(() => {
+    if (!successMessage) return;
+    const timeout = window.setTimeout(() => setSuccessMessage(null), 2500);
+    return () => window.clearTimeout(timeout);
+  }, [successMessage]);
+
   const formIsDirty = Boolean(
     isNew ||
     !item ||
@@ -308,7 +315,7 @@ const ChangeDetailPage = () => {
         };
         const created = await apiClient.createChange(payload);
         if (options?.navigateOnCreate ?? true) {
-          alert("Draft saved.");
+          setSuccessMessage("Draft saved.");
           nav("/changes?mine=true");
         }
         return created.id;
@@ -339,7 +346,7 @@ const ChangeDetailPage = () => {
         setItem(updated);
         await refreshRelatedData(id);
         if (options?.navigateOnCreate ?? true) {
-          alert("Draft saved.");
+          setSuccessMessage("Draft saved.");
           nav("/changes?mine=true");
         }
         return updated.id;
@@ -534,6 +541,7 @@ const ChangeDetailPage = () => {
         </div>
 
         {error ? <div className="card card-pad" style={{ borderColor: "rgba(220,38,38,.35)" }}>{error}</div> : null}
+        {successMessage ? <div className="card card-pad" style={{ borderColor: "rgba(16,185,129,.35)", background: "rgba(16,185,129,.08)" }}>{successMessage}</div> : null}
 
         <div className="card card-pad" style={{ borderStyle: "dashed" }}>
           <div className="row">
@@ -621,7 +629,7 @@ Emergency: urgent; CAB approval required" style={{ cursor: "help" }}>ⓘ</span><
 
                 <div style={{ gridColumn: "1 / -1" }}>
                   <div className="label">Business Justification *</div>
-                  <textarea className="textarea" value={implementationWindowNotes} onChange={(e) => setImplementationWindowNotes(e.target.value)} placeholder="Why is this change needed? What business value does it provide?" />
+                  <textarea className="textarea" value={businessJustification} onChange={(e) => setBusinessJustification(e.target.value)} placeholder="Why is this change needed? What business value does it provide?" />
                 </div>
               </div>
             ) : null}
