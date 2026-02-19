@@ -235,7 +235,7 @@ public class ChangeWorkflowService : IChangeWorkflowService
         return updated;
     }
 
-    private static string NormalizeStrategy(string strategy)
+    private static string NormalizeStrategy(string? strategy)
     {
         if (string.Equals(strategy, ApprovalStrategies.All, StringComparison.OrdinalIgnoreCase)) return ApprovalStrategies.All;
         if (string.Equals(strategy, ApprovalStrategies.Majority, StringComparison.OrdinalIgnoreCase)) return ApprovalStrategies.Majority;

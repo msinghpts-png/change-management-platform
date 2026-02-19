@@ -20,6 +20,8 @@ public class AuditEventTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task CreateChange_WritesAuditEvent()
     {
+        await AuthTestHelper.AuthenticateAsAdminAsync(_client);
+
         var payload = new
         {
             Title = "audit-test",

@@ -115,6 +115,7 @@ const ChangeDetailPage = () => {
   const [implementationGroup, setImplementationGroup] = useState("");
   const [approvalComment, setApprovalComment] = useState("");
   const [decisionComment, setDecisionComment] = useState("");
+  const [isDecisionSubmitting, setIsDecisionSubmitting] = useState(false);
 
   const authUserRole = (() => {
     try {
@@ -432,6 +433,7 @@ const ChangeDetailPage = () => {
     }
 
     setLoading(true);
+    setIsDecisionSubmitting(true);
     setError(null);
     try {
       const updated = action === "approve"
@@ -444,32 +446,11 @@ const ChangeDetailPage = () => {
       setError((e as Error).message);
     } finally {
       setIsSaving(false);
+      setIsDecisionSubmitting(false);
       setLoading(false);
     }
   };
 
-
-  const handleBannerDecision = async (action: "approve" | "reject") => {
-    if (!apiClient.isValidId(id)) {
-      setError("Invalid change request id.");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const updated = action === "approve"
-        ? await apiClient.approveChange(id, decisionComment.trim() || "Approved")
-        : await apiClient.rejectChange(id, decisionComment.trim() || "Rejected");
-      setItem(updated);
-      setDecisionComment("");
-      await refreshRelatedData(id);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const addTask = async () => {
     if (!apiClient.isValidId(id) || !taskTitle.trim()) return;
@@ -837,8 +818,8 @@ Emergency: urgent; CAB approval required" style={{ cursor: "help" }}>ⓘ</span><
           {(["cab", "admin"].includes(authUserRole)) ? (
             <div style={{ display: "flex", gap: 8 }}>
               <button className="btn" type="button">Request Info</button>
-              <button className="btn" type="button" disabled={loading} onClick={() => { void handleBannerDecision("reject"); }}>Reject</button>
-              <button className="btn btn-primary" type="button" disabled={loading} onClick={() => { void handleBannerDecision("approve"); }}>Approve</button>
+              <button className="btn" type="button" disabled={loading || isDecisionSubmitting} onClick={() => { void handleBannerDecision("reject"); }}>Reject</button>
+              <button className="btn btn-primary" type="button" disabled={loading || isDecisionSubmitting} onClick={() => { void handleBannerDecision("approve"); }}>Approve</button>
             </div>
           ) : (
             <div className="small">Approval is pending CAB/Admin review.</div>

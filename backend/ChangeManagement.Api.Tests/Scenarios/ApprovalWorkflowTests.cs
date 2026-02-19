@@ -12,6 +12,8 @@ public class ApprovalWorkflowTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task ApprovalDecision_CanBeRecorded()
     {
+        await AuthTestHelper.AuthenticateAsAdminAsync(_client);
+
         var createResponse = await _client.PostAsJsonAsync("/api/changes", new
         {
             Title = "approval-test",
