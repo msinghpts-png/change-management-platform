@@ -99,6 +99,7 @@ const ChangeDetailPage = () => {
   const [formTab, setFormTab] = useState<FormTab>("Basic Info");
 
   const [loading, setLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [item, setItem] = useState<ChangeRequest | null>(null);
@@ -195,12 +196,11 @@ const ChangeDetailPage = () => {
       return;
     }
 
-    setLoading(true);
-    apiClient
-      .getChangeById(id)
-      .then((data) => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const data = await apiClient.getChangeById(id);
         setItem(data);
-        const descriptionBlob = data.description ?? "";
         setTitle(data.title ?? "");
         setDescription(data.description ?? "");
         setBusinessJustification(data.businessJustification ?? "");
@@ -219,13 +219,15 @@ const ChangeDetailPage = () => {
         setApprovalRequired(Boolean(data.approvalRequired));
         setApprovalStrategy((data.approvalStrategy as "Any" | "Majority" | "All") ?? "Any");
         setImplementationGroup(data.implementationGroup ?? "");
-        refreshRelatedData(id).catch(() => void 0);
+        await refreshRelatedData(id);
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
         setLoading(false);
-      })
-      .catch((err: Error) => {
-        setError(err.message);
-        setLoading(false);
-      });
+      }
+    };
+
+    void load();
   }, [id]);
 
   useEffect(() => {
@@ -271,7 +273,10 @@ const ChangeDetailPage = () => {
   };
 
   const saveDraft = async (options?: { navigateOnCreate?: boolean }) => {
+    if (isSaving) return null;
+
     setError(null);
+    setIsSaving(true);
     setLoading(true);
     try {
       if (isNew) {
@@ -332,13 +337,14 @@ const ChangeDetailPage = () => {
         setItem(updated);
         await refreshRelatedData(id);
         if (options?.navigateOnCreate ?? true) {
-          nav("/changes?mine=true");
+          nav(`/changes/${updated.id}`);
         }
-        return id;
+        return updated.id;
       }
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      setIsSaving(false);
       setLoading(false);
     }
 
@@ -375,6 +381,7 @@ const ChangeDetailPage = () => {
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      setIsSaving(false);
       setLoading(false);
     }
   };
@@ -391,6 +398,7 @@ const ChangeDetailPage = () => {
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      setIsSaving(false);
       setLoading(false);
     }
   };
@@ -411,6 +419,31 @@ const ChangeDetailPage = () => {
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      setIsSaving(false);
+      setLoading(false);
+    }
+  };
+
+
+  const handleBannerDecision = async (action: "approve" | "reject") => {
+    if (!apiClient.isValidId(id)) {
+      setError("Invalid change request id.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const updated = action === "approve"
+        ? await apiClient.approveChange(id, decisionComment.trim() || "Approved")
+        : await apiClient.rejectChange(id, decisionComment.trim() || "Rejected");
+      setItem(updated);
+      setDecisionComment("");
+      await refreshRelatedData(id);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsSaving(false);
       setLoading(false);
     }
   };
@@ -450,6 +483,7 @@ const ChangeDetailPage = () => {
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      setIsSaving(false);
       setLoading(false);
     }
   };
@@ -745,7 +779,7 @@ Emergency: urgent; CAB approval required" style={{ cursor: "help" }}>ⓘ</span><
           </div>
 
           <div className="footer-actions">
-            <button className="btn" onClick={() => { void saveDraft(); }} disabled={loading}>
+            <button className="btn" onClick={() => { void saveDraft(); }} disabled={loading || isSaving}>
               💾 Save Draft
             </button>
             <button type="button" className="btn btn-primary" onClick={submitForApproval} disabled={isSubmitDisabled}>

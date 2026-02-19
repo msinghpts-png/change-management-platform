@@ -5,6 +5,10 @@ using ChangeManagement.Api.DTOs;
 using ChangeManagement.Api.Security;
 using ChangeManagement.Api.Services;
 using Microsoft.AspNetCore.Mvc;
+<<<<<<< codex/implement-mp-08-workflow-engine-refactor-icr7li
+using Microsoft.Data.SqlClient;
+=======
+>>>>>>> main
 using Microsoft.EntityFrameworkCore;
 
 namespace ChangeManagement.Api.Controllers;
@@ -17,13 +21,19 @@ public class ChangesController : ControllerBase
     private readonly IChangeWorkflowService _workflow;
     private readonly ChangeManagementDbContext _dbContext;
     private readonly ILogger<ChangesController> _logger;
+    private readonly IHostEnvironment _environment;
 
+<<<<<<< codex/implement-mp-08-workflow-engine-refactor-icr7li
+    public ChangesController(IChangeService changeService, IChangeWorkflowService workflow, ChangeManagementDbContext dbContext, ILogger<ChangesController> logger, IHostEnvironment environment)
+=======
     public ChangesController(IChangeService changeService, IChangeWorkflowService workflow, ChangeManagementDbContext dbContext, ILogger<ChangesController> logger)
+>>>>>>> main
     {
         _changeService = changeService;
         _workflow = workflow;
         _dbContext = dbContext;
         _logger = logger;
+        _environment = environment;
     }
 
     [HttpGet]
@@ -43,6 +53,44 @@ public class ChangesController : ControllerBase
     {
         if (!TryParseId(id, out var guidResult, out var badRequest)) return badRequest;
 
+<<<<<<< codex/implement-mp-08-workflow-engine-refactor-icr7li
+        try
+        {
+            var change = await _dbContext.ChangeRequests
+                .AsSplitQuery()
+                .Include(c => c.ChangeType)
+                .Include(c => c.Priority)
+                .Include(c => c.Status)
+                .Include(c => c.RiskLevel)
+                .Include(c => c.ImpactLevel)
+                .Include(c => c.RequestedByUser)
+                .Include(c => c.AssignedToUser)
+                .Include(c => c.ChangeApprovals).ThenInclude(a => a.ApprovalStatus)
+                .Include(c => c.ChangeApprovals).ThenInclude(a => a.ApproverUser)
+                .Include(c => c.ChangeApprovers).ThenInclude(a => a.ApproverUser)
+                .Include(c => c.ChangeAttachments)
+                .Include(c => c.ChangeTasks)
+                .FirstOrDefaultAsync(c => c.ChangeRequestId == guidResult && c.DeletedAt == null, cancellationToken);
+
+            return change is null ? NotFound() : Ok(ToDto(change));
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(ex, "Database error loading change {ChangeRequestId}", guidResult);
+            var detail = _environment.IsDevelopment() ? ex.Message : null;
+            return Problem(title: "Unable to load change request.", detail: detail, statusCode: StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<object>> CreateChange([FromBody] ChangeCreateDto request, CancellationToken cancellationToken)
+    {
+        if (request.ChangeRequestId.HasValue && request.ChangeRequestId.Value != Guid.Empty)
+        {
+            return BadRequest(new { message = "ChangeRequestId must not be supplied by client." });
+        }
+
+=======
         var change = await _changeService.GetByIdAsync(guidResult, cancellationToken);
         return change is null ? NotFound() : Ok(ToDto(change));
     }
@@ -50,6 +98,7 @@ public class ChangesController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ChangeRequestDto>> CreateChange([FromBody] ChangeCreateDto request, CancellationToken cancellationToken)
     {
+>>>>>>> main
         var changeTypeId = await ResolveChangeTypeIdAsync(request, cancellationToken);
         var priorityId = await ResolvePriorityIdAsync(request, cancellationToken);
         var riskLevelId = await ResolveRiskLevelIdAsync(request, cancellationToken);
@@ -108,7 +157,7 @@ public class ChangesController : ControllerBase
 
         var created = await _changeService.CreateAsync(entity, cancellationToken);
         _logger.LogInformation("Created change {ChangeRequestId}", created.ChangeRequestId);
-        return CreatedAtAction(nameof(GetChangeById), new { id = created.ChangeRequestId }, ToDto(created));
+        return Ok(new { changeRequestId = created.ChangeRequestId });
     }
 
     [HttpPut("{id}")]
@@ -134,6 +183,7 @@ public class ChangesController : ControllerBase
             existing.ChangeTypeId = resolved;
         }
         if (request.PriorityId > 0)
+<<<<<<< codex/implement-mp-08-workflow-engine-refactor-icr7li
         {
             var resolved = await ResolvePriorityIdAsync(new ChangeCreateDto { PriorityId = request.PriorityId }, cancellationToken);
             if (resolved <= 0) return BadRequest(new { message = "Invalid PriorityId." });
@@ -155,6 +205,29 @@ public class ChangesController : ControllerBase
         existing.UpdatedBy = ResolveActorUserId();
         if (request.ApprovalRequired.HasValue)
         {
+=======
+        {
+            var resolved = await ResolvePriorityIdAsync(new ChangeCreateDto { PriorityId = request.PriorityId }, cancellationToken);
+            if (resolved <= 0) return BadRequest(new { message = "Invalid PriorityId." });
+            existing.PriorityId = resolved;
+        }
+        if (request.RiskLevelId > 0)
+        {
+            var resolved = await ResolveRiskLevelIdAsync(new ChangeCreateDto { RiskLevelId = request.RiskLevelId }, cancellationToken);
+            if (resolved <= 0) return BadRequest(new { message = "Invalid RiskLevelId." });
+            existing.RiskLevelId = resolved;
+        }
+        existing.ImpactTypeId = request.ImpactTypeId ?? existing.ImpactTypeId;
+        existing.ImpactLevelId = request.ImpactLevelId ?? existing.ImpactLevelId;
+        existing.AssignedToUserId = request.AssignedToUserId ?? existing.AssignedToUserId;
+        existing.PlannedStart = request.PlannedStart ?? existing.PlannedStart;
+        existing.PlannedEnd = request.PlannedEnd ?? existing.PlannedEnd;
+        existing.ActualStart = request.ActualStart ?? existing.ActualStart;
+        existing.ActualEnd = request.ActualEnd ?? existing.ActualEnd;
+        existing.UpdatedBy = ResolveActorUserId();
+        if (request.ApprovalRequired.HasValue)
+        {
+>>>>>>> main
             existing.ApprovalRequired = existing.ChangeTypeId != 2 || request.ApprovalRequired.Value;
         }
         existing.ApprovalStrategy = string.IsNullOrWhiteSpace(request.ApprovalStrategy) ? existing.ApprovalStrategy : request.ApprovalStrategy;

@@ -38,6 +38,11 @@ const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
       throw new Error("Unauthorized. Please sign in again.");
     }
 
+    if (response.status === 500) {
+      window.dispatchEvent(new CustomEvent("app:error", { detail: "Something went wrong. Please try again." }));
+      throw new Error("Something went wrong. Please try again.");
+    }
+
     throw new Error(`Request failed: ${response.status}`);
   }
 
@@ -143,11 +148,20 @@ export const apiClient = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     }),
-  createChange: async (payload: ChangeCreateDto) => normalizeChange(await request<any>("/changes", {
+  createChange: async (payload: ChangeCreateDto) => {
+    const created = await request<any>("/changes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
-    })),
+    });
+
+    const createdId = created?.changeRequestId ?? created?.id;
+    if (isValidId(createdId)) {
+      return normalizeChange(await request<any>(`/changes/${createdId}`));
+    }
+
+    return normalizeChange(created);
+  },
 
   createApproval: (changeId: string, payload: { approver: string; comment?: string }) =>
     request<Approval>(`/changes/${changeId}/approvals`, {
@@ -194,7 +208,12 @@ export const apiClient = {
     });
 
     if (!response.ok) {
-      throw new Error(`Request failed: ${response.status}`);
+      if (response.status === 500) {
+      window.dispatchEvent(new CustomEvent("app:error", { detail: "Something went wrong. Please try again." }));
+      throw new Error("Something went wrong. Please try again.");
+    }
+
+    throw new Error(`Request failed: ${response.status}`);
     }
 
     return normalizeAttachment(await response.json());
@@ -207,7 +226,12 @@ export const apiClient = {
     });
 
     if (!response.ok) {
-      throw new Error(`Request failed: ${response.status}`);
+      if (response.status === 500) {
+      window.dispatchEvent(new CustomEvent("app:error", { detail: "Something went wrong. Please try again." }));
+      throw new Error("Something went wrong. Please try again.");
+    }
+
+    throw new Error(`Request failed: ${response.status}`);
     }
 
     const blob = await response.blob();

@@ -4,6 +4,7 @@ namespace ChangeManagement.Api.DTOs;
 
 public class ChangeCreateDto
 {
+    public Guid? ChangeRequestId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? ImplementationSteps { get; set; }
