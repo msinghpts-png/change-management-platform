@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.Repositories;
+using ChangeManagement.Api.Data; // ← ADD THIS LINE
 
 namespace ChangeManagement.Api.Services;
 
@@ -23,8 +24,9 @@ public class AttachmentService : IAttachmentService
     private readonly IWebHostEnvironment _environment;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IConfiguration _configuration;
+    private readonly ChangeManagementDbContext _context; // ← ADD THIS FIELD
 
-    public AttachmentService(IChangeAttachmentRepository attachmentRepository, IChangeRepository changeRepository, IAuditService audit, IWebHostEnvironment environment, IHttpContextAccessor httpContextAccessor, IConfiguration configuration)
+    public AttachmentService(IChangeAttachmentRepository attachmentRepository, IChangeRepository changeRepository, IAuditService audit, IWebHostEnvironment environment, IHttpContextAccessor httpContextAccessor, IConfiguration configuration,ChangeManagementDbContext context)
     {
         _attachmentRepository = attachmentRepository;
         _changeRepository = changeRepository;
@@ -32,6 +34,7 @@ public class AttachmentService : IAttachmentService
         _environment = environment;
         _httpContextAccessor = httpContextAccessor;
         _configuration = configuration;
+        _context = context;   // ← ADD THIS LINE
     }
 
     public Task<List<ChangeAttachment>> GetForChangeAsync(Guid changeId, CancellationToken cancellationToken) => _attachmentRepository.GetByChangeIdAsync(changeId, cancellationToken);
