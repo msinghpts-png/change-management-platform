@@ -604,7 +604,7 @@ Emergency: urgent; CAB approval required" style={{ cursor: "help" }}>ⓘ</span><
 
                 <div style={{ gridColumn: "1 / -1" }}>
                   <div className="label">Business Justification *</div>
-                  <textarea className="textarea" value={businessJustification} onChange={(e) => setBusinessJustification(e.target.value)} placeholder="Why is this change needed? What business value does it provide?" />
+                  <textarea className="textarea" value={implementationWindowNotes} onChange={(e) => setImplementationWindowNotes(e.target.value)} placeholder="Why is this change needed? What business value does it provide?" />
                 </div>
               </div>
             ) : null}
