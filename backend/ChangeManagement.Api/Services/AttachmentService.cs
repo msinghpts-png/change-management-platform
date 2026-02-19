@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.Repositories;
+using Microsoft.EntityFrameworkCore;
 
 namespace ChangeManagement.Api.Services;
 
@@ -59,11 +60,8 @@ public class AttachmentService : IAttachmentService
 
         var fileId = Guid.NewGuid();
         var safeName = Path.GetFileName(file.FileName);
-        var storedPath = Path.Combine(rootPath, safeName);
-        if (File.Exists(storedPath))
-        {
-            storedPath = Path.Combine(rootPath, $"{fileId:N}_{safeName}");
-        }
+        var storedFileName = $"{fileId}_{safeName}";
+        var storedPath = Path.Combine(rootPath, storedFileName);
 
         await using var stream = File.Create(storedPath);
         await file.CopyToAsync(stream, cancellationToken);
@@ -106,7 +104,7 @@ public class AttachmentService : IAttachmentService
             return envPath;
         }
 
-        var dockerVolumePath = "/app/uploads";
+        var dockerVolumePath = "/data/attachments";
         if (Directory.Exists(dockerVolumePath))
         {
             return dockerVolumePath;
