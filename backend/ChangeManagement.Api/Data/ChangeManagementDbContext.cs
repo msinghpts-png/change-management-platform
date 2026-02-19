@@ -103,6 +103,7 @@ public class ChangeManagementDbContext : DbContext
             entity.HasKey(e => e.ChangeAttachmentId);
             entity.Property(e => e.FileName).HasMaxLength(255);
             entity.Property(e => e.FileUrl).HasMaxLength(500);
+            entity.Property(e => e.FilePath).HasMaxLength(500);
             entity.HasOne(e => e.ChangeRequest).WithMany(e => e.ChangeAttachments).HasForeignKey(e => e.ChangeRequestId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(e => e.UploadedByUser).WithMany(e => e.UploadedAttachments).HasForeignKey(e => e.UploadedBy).OnDelete(DeleteBehavior.Restrict);
         });
