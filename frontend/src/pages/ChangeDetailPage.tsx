@@ -134,6 +134,7 @@ const ChangeDetailPage = () => {
   const [businessJustification, setBusinessJustification] = useState("");
   const [implementationSteps, setImplementationSteps] = useState("");
   const [backoutPlan, setBackoutPlan] = useState("");
+  const [implementationWindowNotes, setImplementationWindowNotes] = useState("");
 
   const [changeTypeIdValue, setChangeTypeIdValue] = useState(2);
   const [priority, setPriority] = useState("P3");
@@ -143,6 +144,7 @@ const ChangeDetailPage = () => {
   const [plannedStart, setPlannedStart] = useState("");
   const [plannedEnd, setPlannedEnd] = useState("");
   const [downtimeRequired, setDowntimeRequired] = useState(false);
+  const [stakeholdersNotified, setStakeholdersNotified] = useState(false);
 
   const [templateId, setTemplateId] = useState("");
   const [templates, setTemplates] = useState<ChangeTemplate[]>(fallbackTemplates);
@@ -602,7 +604,7 @@ Emergency: urgent; CAB approval required" style={{ cursor: "help" }}>ⓘ</span><
 
                 <div style={{ gridColumn: "1 / -1" }}>
                   <div className="label">Business Justification *</div>
-                  <textarea className="textarea" value={businessJustification} onChange={(e) => setBusinessJustification(e.target.value)} placeholder="Why is this change needed? What business value does it provide?" />
+                  <textarea className="textarea" value={implementationWindowNotes} onChange={(e) => setImplementationWindowNotes(e.target.value)} placeholder="Why is this change needed? What business value does it provide?" />
                 </div>
               </div>
             ) : null}
@@ -610,21 +612,43 @@ Emergency: urgent; CAB approval required" style={{ cursor: "help" }}>ⓘ</span><
             {formTab === "Schedule" ? (
               <div className="form-grid">
                 <div>
+                  <div className="label">Change Owner</div>
+                  <input className="input" value={item?.owner ?? item?.requestedBy ?? ""} readOnly />
+                </div>
+                <div>
                   <div className="label">Implementation Group</div>
                   <input className="input" value={implementationGroup} onChange={(e) => setImplementationGroup(e.target.value)} placeholder="Team or group name" />
                 </div>
                 <div>
-                  <div className="label">Planned Start</div>
+                  <div className="label">Planned Start *</div>
                   <input className="input" type="datetime-local" value={plannedStart} onChange={(e) => setPlannedStart(e.target.value)} />
                 </div>
                 <div>
-                  <div className="label">Planned End</div>
+                  <div className="label">Planned End *</div>
                   <input className="input" type="datetime-local" value={plannedEnd} onChange={(e) => setPlannedEnd(e.target.value)} />
                 </div>
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 700 }}>
+                  <div className="label">Implementation Window Notes</div>
+                  <textarea className="textarea" value={implementationWindowNotes} onChange={(e) => setImplementationWindowNotes(e.target.value)} placeholder="Any specific timing requirements, maintenance windows, etc." />
+                </div>
+                <div className="switch-card">
+                  <div>
+                    <div className="h3">Downtime Required</div>
+                    <div className="small">Will this change cause service interruption?</div>
+                  </div>
+                  <label className="switch">
                     <input type="checkbox" checked={downtimeRequired} onChange={(e) => setDowntimeRequired(e.target.checked)} />
-                    Downtime required
+                    <span className="switch-slider" />
+                  </label>
+                </div>
+                <div className="switch-card">
+                  <div>
+                    <div className="h3">Stakeholders Notified</div>
+                    <div className="small">Have affected parties been informed?</div>
+                  </div>
+                  <label className="switch">
+                    <input type="checkbox" checked={stakeholdersNotified} onChange={(e) => setStakeholdersNotified(e.target.checked)} />
+                    <span className="switch-slider" />
                   </label>
                 </div>
               </div>
@@ -648,10 +672,10 @@ Emergency: urgent; CAB approval required" style={{ cursor: "help" }}>ⓘ</span><
                 <div>
                   <div className="label">Priority</div>
                   <select className="select" value={priority} onChange={(e) => setPriority(e.target.value)}>
-                    <option>P1</option>
-                    <option>P2</option>
-                    <option>P3</option>
-                    <option>P4</option>
+                    <option value="P1">P1 - Critical</option>
+                    <option value="P2">P2 - High</option>
+                    <option value="P3">P3 - Medium</option>
+                    <option value="P4">P4 - Low</option>
                   </select>
                 </div>
                 <div>
