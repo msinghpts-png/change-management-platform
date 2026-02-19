@@ -194,6 +194,10 @@ public class ChangesController : ControllerBase
             var actorId = ResolveActorUserId();
             var approverIds = (IReadOnlyCollection<Guid>)(request?.ApproverUserIds ?? new List<Guid>());
             var updated = await _workflow.SubmitAsync(changeId, actorId, approverIds, request?.ApprovalStrategy, request?.Reason, cancellationToken);
+            if (updated is null)
+            {
+                return BadRequest(new { message = "Submit action is not allowed." });
+            }
             return Ok(ToDto(updated));
         }
         catch (KeyNotFoundException)
