@@ -308,6 +308,7 @@ const ChangeDetailPage = () => {
         };
         const created = await apiClient.createChange(payload);
         if (options?.navigateOnCreate ?? true) {
+          alert("Draft saved.");
           nav("/changes?mine=true");
         }
         return created.id;
@@ -338,7 +339,8 @@ const ChangeDetailPage = () => {
         setItem(updated);
         await refreshRelatedData(id);
         if (options?.navigateOnCreate ?? true) {
-          nav(`/changes/${updated.id}`);
+          alert("Draft saved.");
+          nav("/changes?mine=true");
         }
         return updated.id;
       }
