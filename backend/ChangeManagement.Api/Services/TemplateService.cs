@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using ChangeManagement.Api.Data;
 using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.DTOs;
@@ -16,6 +17,8 @@ public interface ITemplateService
 
 public class TemplateService : ITemplateService
 {
+    private static readonly Guid DefaultActorUserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
     private readonly ChangeManagementDbContext _context;
     private readonly IActorResolver _actorResolver;
 

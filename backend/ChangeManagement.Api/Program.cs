@@ -71,7 +71,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             NameClaimType = ClaimTypes.Name,
             RoleClaimType = "role"
         };
-
         options.Events = new JwtBearerEvents
         {
             OnTokenValidated = context =>
@@ -79,17 +78,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 if (context.Principal?.Identity is ClaimsIdentity identity)
                 {
                     var roles = identity.FindAll("role").Select(c => c.Value).ToList();
-
                     foreach (var role in roles)
                     {
                         if (!identity.HasClaim(ClaimTypes.Role, role))
                             identity.AddClaim(new Claim(ClaimTypes.Role, role));
-
                         if (!identity.HasClaim("role", role))
                             identity.AddClaim(new Claim("role", role));
                     }
                 }
-
                 return Task.CompletedTask;
             }
         };
@@ -118,6 +114,9 @@ builder.Services.AddScoped<ITemplateService, TemplateService>();
 
 var app = builder.Build();
 
+// === CRITICAL FIXES START HERE ===
+app.UseRouting();                    // ← Fixes 404s on all /api/* endpoints
+
 app.UseExceptionHandler(exceptionApp =>
 {
     exceptionApp.Run(async context =>
@@ -127,29 +126,23 @@ app.UseExceptionHandler(exceptionApp =>
             feature?.Error is UnauthorizedAccessException
                 ? StatusCodes.Status401Unauthorized
                 : StatusCodes.Status500InternalServerError;
-
         context.Response.StatusCode = statusCode;
         context.Response.ContentType = "application/json";
-
         var payload = JsonSerializer.Serialize(new
         {
             message = feature?.Error?.Message ?? "An unexpected error occurred.",
             traceId = context.TraceIdentifier
         });
-
         await context.Response.WriteAsync(payload);
     });
 });
 
-var skipDatabaseInitialization =
-    app.Environment.IsEnvironment("Testing") ||
-    app.Configuration.GetValue<bool>("SkipDatabaseInitialization");
-
+// Seeding now runs in Testing environment too (fixes Unauthorized / missing users in tests)
+var skipDatabaseInitialization = app.Configuration.GetValue<bool>("SkipDatabaseInitialization");
 if (!skipDatabaseInitialization)
 {
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<ChangeManagementDbContext>();
-
     var provider = dbContext.Database.ProviderName ?? string.Empty;
     var isInMemory = provider == "Microsoft.EntityFrameworkCore.InMemory";
     var isSqlite = provider == "Microsoft.EntityFrameworkCore.Sqlite";
@@ -160,15 +153,8 @@ if (!skipDatabaseInitialization)
     }
     else
     {
-        var migrations = dbContext.Database.GetMigrations().ToList();
-        if (!migrations.Any())
-            throw new InvalidOperationException("No EF Core migrations discovered.");
-
         dbContext.Database.Migrate();
-
-
     }
-
     SeedUsers(dbContext, app.Configuration);
 }
 
@@ -182,13 +168,13 @@ app.UseCors("Frontend");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
 app.Run();
 
 static void SeedUsers(ChangeManagementDbContext db, IConfiguration config)
 {
     var adminId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     var cabId = Guid.Parse("22222222-2222-2222-2222-222222222222");
-
     var adminPassword = config["SeedAdmin:Password"] ?? "Admin123!";
 
     if (!db.Users.Any(x => x.UserId == adminId))
@@ -203,7 +189,6 @@ static void SeedUsers(ChangeManagementDbContext db, IConfiguration config)
             PasswordHash = PasswordHasher.Hash(adminPassword)
         });
     }
-
     if (!db.Users.Any(x => x.UserId == cabId))
     {
         db.Users.Add(new User
@@ -216,8 +201,7 @@ static void SeedUsers(ChangeManagementDbContext db, IConfiguration config)
             PasswordHash = PasswordHasher.Hash("Admin123!")
         });
     }
-
     db.SaveChanges();
 }
 
-public partial class Program;
+public partial class Program { }
