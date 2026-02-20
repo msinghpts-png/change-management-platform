@@ -8,8 +8,8 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace ChangeManagement.Api.Migrations
 {
     [DbContext(typeof(ChangeManagementDbContext))]
-    [Migration("20260216000000_DbmlAlignedSchema")]
-    public partial class DbmlAlignedSchema : Migration
+    [Migration("20260222050000_InitialCreate")]
+    public partial class InitialCreate : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -278,10 +278,79 @@ BEGIN
     (6, 'TemplateCreated', 'Template created'),
     (7, 'TemplateUpdated', 'Template updated');
 END;");
+
+
+            migrationBuilder.Sql(@"
+IF OBJECT_ID('[cm].[ChangeApprover]', 'U') IS NULL
+BEGIN
+    CREATE TABLE [cm].[ChangeApprover]
+    (
+        [ChangeApproverId] UNIQUEIDENTIFIER NOT NULL,
+        [ChangeRequestId] UNIQUEIDENTIFIER NOT NULL,
+        [ApproverUserId] UNIQUEIDENTIFIER NOT NULL,
+        [CreatedAt] DATETIME2 NOT NULL CONSTRAINT [DF_ChangeApprover_CreatedAt] DEFAULT (SYSUTCDATETIME()),
+        CONSTRAINT [PK_ChangeApprover] PRIMARY KEY ([ChangeApproverId]),
+        CONSTRAINT [FK_ChangeApprover_ChangeRequest_ChangeRequestId]
+            FOREIGN KEY ([ChangeRequestId]) REFERENCES [cm].[ChangeRequest]([ChangeRequestId]) ON DELETE CASCADE,
+        CONSTRAINT [FK_ChangeApprover_User_ApproverUserId]
+            FOREIGN KEY ([ApproverUserId]) REFERENCES [cm].[User]([UserId])
+    );
+
+    CREATE INDEX [IX_ChangeApprover_ChangeRequestId] ON [cm].[ChangeApprover]([ChangeRequestId]);
+    CREATE INDEX [IX_ChangeApprover_ApproverUserId] ON [cm].[ChangeApprover]([ApproverUserId]);
+    CREATE UNIQUE INDEX [IX_ChangeApprover_ChangeRequestId_ApproverUserId]
+        ON [cm].[ChangeApprover]([ChangeRequestId], [ApproverUserId]);
+END
+
+IF COL_LENGTH('cm.User', 'PasswordHash') IS NULL
+BEGIN
+    ALTER TABLE [cm].[User] ADD [PasswordHash] NVARCHAR(MAX) NOT NULL CONSTRAINT [DF_User_PasswordHash] DEFAULT('');
+END
+
+IF COL_LENGTH('cm.ChangeAttachment', 'FilePath') IS NULL
+BEGIN
+    ALTER TABLE [cm].[ChangeAttachment] ADD [FilePath] NVARCHAR(500) NOT NULL CONSTRAINT [DF_ChangeAttachment_FilePath] DEFAULT('');
+END
+IF COL_LENGTH('cm.ChangeAttachment', 'FileSizeBytes') IS NULL
+BEGIN
+    ALTER TABLE [cm].[ChangeAttachment] ADD [FileSizeBytes] BIGINT NOT NULL CONSTRAINT [DF_ChangeAttachment_FileSizeBytes] DEFAULT(0);
+END
+IF COL_LENGTH('cm.ChangeAttachment', 'UploadedBy') IS NOT NULL
+BEGIN
+    BEGIN TRY
+        ALTER TABLE [cm].[ChangeAttachment] ALTER COLUMN [UploadedBy] UNIQUEIDENTIFIER NULL;
+    END TRY
+    BEGIN CATCH
+    END CATCH
+END
+
+IF OBJECT_ID('[cm].[ChangeTemplate]', 'U') IS NULL
+BEGIN
+    CREATE TABLE [cm].[ChangeTemplate](
+        [TemplateId] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+        [Name] NVARCHAR(200) NOT NULL,
+        [Description] NVARCHAR(MAX) NULL,
+        [ImplementationSteps] NVARCHAR(MAX) NULL,
+        [BackoutPlan] NVARCHAR(MAX) NULL,
+        [ServiceSystem] NVARCHAR(200) NULL,
+        [Category] NVARCHAR(200) NULL,
+        [Environment] NVARCHAR(200) NULL,
+        [BusinessJustification] NVARCHAR(MAX) NULL,
+        [ChangeTypeId] INT NULL,
+        [RiskLevelId] INT NULL,
+        [CreatedAt] DATETIME2 NOT NULL DEFAULT(GETUTCDATE()),
+        [CreatedBy] UNIQUEIDENTIFIER NOT NULL,
+        [IsActive] BIT NOT NULL DEFAULT(1)
+    );
+END
+");
+
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(name: "ChangeApprover", schema: "cm");
+            migrationBuilder.DropTable(name: "ChangeTemplate", schema: "cm");
             migrationBuilder.DropTable(name: "ChangeAttachment", schema: "cm");
             migrationBuilder.DropTable(name: "ChangeApproval", schema: "cm");
             migrationBuilder.DropTable(name: "ChangeTask", schema: "cm");
