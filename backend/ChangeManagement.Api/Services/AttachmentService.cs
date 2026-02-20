@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using ChangeManagement.Api.Data;
 using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -17,16 +18,27 @@ public interface IAttachmentService
 public class AttachmentService : IAttachmentService
 {
     private const long MaxFileBytes = 5 * 1024 * 1024;
-    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase) { ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".txt" };
+    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".txt"
+    };
+
     private readonly IChangeAttachmentRepository _attachmentRepository;
     private readonly IChangeRepository _changeRepository;
     private readonly IAuditService _audit;
     private readonly IWebHostEnvironment _environment;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IConfiguration _configuration;
-    private readonly ChangeManagement.Api.Data.ChangeManagementDbContext _context;
+    private readonly ChangeManagementDbContext _context;
 
-    public AttachmentService(IChangeAttachmentRepository attachmentRepository, IChangeRepository changeRepository, IAuditService audit, IWebHostEnvironment environment, IHttpContextAccessor httpContextAccessor, IConfiguration configuration, ChangeManagement.Api.Data.ChangeManagementDbContext context)
+    public AttachmentService(
+        IChangeAttachmentRepository attachmentRepository,
+        IChangeRepository changeRepository,
+        IAuditService audit,
+        IWebHostEnvironment environment,
+        IHttpContextAccessor httpContextAccessor,
+        IConfiguration configuration,
+        ChangeManagementDbContext context)
     {
         _attachmentRepository = attachmentRepository;
         _changeRepository = changeRepository;
@@ -37,8 +49,11 @@ public class AttachmentService : IAttachmentService
         _context = context;
     }
 
-    public Task<List<ChangeAttachment>> GetForChangeAsync(Guid changeId, CancellationToken cancellationToken) => _attachmentRepository.GetByChangeIdAsync(changeId, cancellationToken);
-    public Task<ChangeAttachment?> GetAsync(Guid attachmentId, CancellationToken cancellationToken) => _attachmentRepository.GetByIdAsync(attachmentId, cancellationToken);
+    public Task<List<ChangeAttachment>> GetForChangeAsync(Guid changeId, CancellationToken cancellationToken)
+        => _attachmentRepository.GetByChangeIdAsync(changeId, cancellationToken);
+
+    public Task<ChangeAttachment?> GetAsync(Guid attachmentId, CancellationToken cancellationToken)
+        => _attachmentRepository.GetByIdAsync(attachmentId, cancellationToken);
 
     public async Task<(ChangeAttachment? Attachment, string? Error)> UploadAsync(
         Guid changeId,
@@ -46,7 +61,6 @@ public class AttachmentService : IAttachmentService
         Guid? uploadedBy,
         CancellationToken cancellationToken)
     {
-        // LIGHTWEIGHT existence check – only 1 table, no joins, no ChangeApprover reference
         var changeInfo = await _context.ChangeRequests
             .Where(c => c.ChangeRequestId == changeId && c.DeletedAt == null)
             .Select(c => new
@@ -93,7 +107,7 @@ public class AttachmentService : IAttachmentService
         {
             ChangeAttachmentId = fileId,
             ChangeRequestId = changeId,
-            FileName = Path.GetFileName(file.FileName),
+            FileName = safeName,
             FileUrl = storedPath,
             FilePath = storedPath,
             UploadedAt = DateTime.UtcNow,
@@ -104,35 +118,20 @@ public class AttachmentService : IAttachmentService
         var created = await _attachmentRepository.CreateAsync(entity, cancellationToken);
 
         var actor = created.UploadedBy ?? changeInfo.CreatedBy;
-        await _audit.LogAsync(5, actor, ResolveActorUpn(), "cm", "ChangeAttachment",
-            created.ChangeAttachmentId, changeInfo.ChangeNumber.ToString(),
-            "AttachmentUpload", created.FileName, cancellationToken);
+        await _audit.LogAsync(
+            5,
+            actor,
+            ResolveActorUpn(),
+            "cm",
+            "ChangeAttachment",
+            created.ChangeAttachmentId,
+            changeInfo.ChangeNumber.ToString(),
+            "AttachmentUpload",
+            created.FileName,
+            cancellationToken);
 
         return (created, null);
     }
-
-    var entity = new ChangeAttachment
-    {
-        ChangeAttachmentId = fileId,
-        ChangeRequestId = changeId,
-        FileName = Path.GetFileName(file.FileName),
-        FileUrl = storedPath,
-        FilePath = storedPath,
-        UploadedAt = DateTime.UtcNow,
-        UploadedBy = resolvedUploader,
-        FileSizeBytes = file.Length
-    };
-
-    var created = await _attachmentRepository.CreateAsync(entity, cancellationToken);
-
-    var actor = created.UploadedBy ?? changeInfo.CreatedBy;
-    await _audit.LogAsync(5, actor, ResolveActorUpn(), "cm", "ChangeAttachment", 
-        created.ChangeAttachmentId, changeInfo.ChangeNumber.ToString(), 
-        "AttachmentUpload", created.FileName, cancellationToken);
-
-    return (created, null);
-}
-
 
     private string ResolveAttachmentRoot()
     {
@@ -166,7 +165,8 @@ public class AttachmentService : IAttachmentService
                ?? "unknown@local";
     }
 
-    public Task<bool> DeleteAsync(Guid attachmentId, CancellationToken cancellationToken) => _attachmentRepository.DeleteAsync(attachmentId, cancellationToken);
+    public Task<bool> DeleteAsync(Guid attachmentId, CancellationToken cancellationToken)
+        => _attachmentRepository.DeleteAsync(attachmentId, cancellationToken);
 
     public async Task<byte[]?> ReadFileAsync(ChangeAttachment attachment, CancellationToken cancellationToken)
     {
