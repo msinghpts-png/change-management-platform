@@ -1,18 +1,21 @@
+using System;
+
 namespace ChangeManagement.Api.Domain.Entities;
 
 public class AuditEvent
 {
     public Guid AuditEventId { get; set; }
     public int EventTypeId { get; set; }
+
     public Guid? ActorUserId { get; set; }
     public string? ActorUpn { get; set; }
+
     public string? SchemaName { get; set; }
     public string? EntityName { get; set; }
     public Guid? EntityId { get; set; }
+
     public string? EntityNumber { get; set; }
     public string? Metadata { get; set; }
-    public DateTime CreatedAt { get; set; }
 
-    public EventType? EventType { get; set; }
-    public User? ActorUser { get; set; }
+    public DateTime CreatedAt { get; set; }   // ✅ rename usage to this
 }
