@@ -23,10 +23,18 @@ public class ChangeRequestDto
     public string? RiskLevel { get; set; }
     public string? ImpactLevel { get; set; }
     public string? RequestedBy { get; set; }
+
     public bool ApprovalRequired { get; set; }
-    public string ApprovalStrategy { get; set; } = "Any";
+    public string ApprovalStrategy { get; set; } = "Single";
     public List<Guid> ApproverUserIds { get; set; } = new();
     public List<ApprovalDecisionItemDto> Approvals { get; set; } = new();
+    public int ApprovalsTotal { get; set; }
+    public int ApprovalsApproved { get; set; }
+    public int ApprovalsRejected { get; set; }
+    public int ApprovalsPending { get; set; }
+
+    public List<AttachmentDto> Attachments { get; set; } = new();
+
     public string? Owner { get; set; }
     public string? RequestedByDisplay { get; set; }
     public string? Executor { get; set; }

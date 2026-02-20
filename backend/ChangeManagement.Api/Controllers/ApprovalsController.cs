@@ -47,19 +47,13 @@ public class ApprovalsController : ControllerBase
             return BadRequest(new { message = "Approver user could not be resolved." });
         }
 
-        var approverExists = await _dbContext.Users.AnyAsync(x => x.UserId == approverUserId, cancellationToken);
-        if (!approverExists)
+        var approval = new ChangeApprover
         {
-            return BadRequest(new { message = "Approver user does not exist." });
-        }
-
-        var approval = new ChangeApproval
-        {
-            ChangeApprovalId = Guid.NewGuid(),
+            ChangeApproverId = Guid.NewGuid(),
             ChangeRequestId = changeId,
             ApproverUserId = approverUserId,
-            ApprovalStatusId = 1,
-            Comments = request.Comments
+            ApprovalStatus = "Pending",
+            DecisionComments = request.Comments
         };
 
         var created = await _approvalService.CreateApprovalAsync(approval, cancellationToken);
@@ -69,23 +63,17 @@ public class ApprovalsController : ControllerBase
     [HttpPost("{approvalId:guid}/decision")]
     public async Task<ActionResult<object>> DecideApproval(Guid changeId, Guid approvalId, [FromBody] ApprovalDecisionDto request, CancellationToken cancellationToken)
     {
-        var changeExists = await _dbContext.ChangeRequests.AnyAsync(x => x.ChangeRequestId == changeId, cancellationToken);
-        if (!changeExists)
-        {
-            return NotFound(new { message = "Change request not found." });
-        }
-
         var approval = await _approvalService.RecordDecisionAsync(changeId, approvalId, request.ApprovalStatusId, request.Comments, cancellationToken);
         return approval is null ? NotFound(new { message = "Approval record not found." }) : Ok(ToResponse(approval));
     }
 
-    private static object ToResponse(ChangeApproval approval) => new
+    private static object ToResponse(ChangeApprover approval) => new
     {
-        id = approval.ChangeApprovalId,
+        id = approval.ChangeApproverId,
         changeRequestId = approval.ChangeRequestId,
         approver = approval.ApproverUser?.DisplayName ?? approval.ApproverUser?.Upn ?? string.Empty,
-        status = approval.ApprovalStatus?.Name ?? "Pending",
-        comment = approval.Comments,
-        decisionAt = approval.ApprovedAt
+        status = approval.ApprovalStatus,
+        comment = approval.DecisionComments,
+        decisionAt = approval.DecisionAt
     };
 }

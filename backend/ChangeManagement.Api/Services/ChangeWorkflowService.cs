@@ -41,8 +41,7 @@ public class ChangeWorkflowService : IChangeWorkflowService
         var validationError = ValidateSubmitRequirements(change);
         if (!string.IsNullOrWhiteSpace(validationError)) throw new InvalidOperationException(validationError);
 
-        var approvalRequired = change.ChangeTypeId != 2 || change.ApprovalRequired;
-        change.ApprovalRequired = approvalRequired;
+        change.ApprovalRequired = change.ApprovalRequired;
         change.ApprovalStrategy = NormalizeStrategy(approvalStrategy ?? change.ApprovalStrategy);
         change.ApprovalRequesterUserId = actorUserId;
         change.SubmittedAt = DateTime.UtcNow;
@@ -50,42 +49,32 @@ public class ChangeWorkflowService : IChangeWorkflowService
         change.UpdatedAt = DateTime.UtcNow;
         change.UpdatedBy = actorUserId;
 
-        if (approvalRequired)
+        if (change.ApprovalRequired)
         {
             var selectedApprovers = approverUserIds.Where(x => x != Guid.Empty).Distinct().ToList();
             if (!selectedApprovers.Any())
             {
-                selectedApprovers = change.ChangeApprovers.Select(x => x.ApproverUserId).Distinct().ToList();
+                selectedApprovers = change.ChangeApprovers.Select(x => x.ApproverUserId).Where(x => x != Guid.Empty).Distinct().ToList();
             }
 
             if (!selectedApprovers.Any()) throw new InvalidOperationException("At least one approver is required when ApprovalRequired is true.");
 
             change.StatusId = PendingApproval;
-            change.ChangeApprovers.Clear();
-            change.ChangeApprovals.Clear();
-            foreach (var approverId in selectedApprovers)
-            {
-                change.ChangeApprovers.Add(new ChangeApprover
+            change.ChangeApprovers = selectedApprovers
+                .Select(approverId => new ChangeApprover
                 {
                     ChangeApproverId = Guid.NewGuid(),
                     ChangeRequestId = change.ChangeRequestId,
                     ApproverUserId = approverId,
+                    ApprovalStatus = "Pending",
                     CreatedAt = DateTime.UtcNow
-                });
-
-                change.ChangeApprovals.Add(new ChangeApproval
-                {
-                    ChangeApprovalId = Guid.NewGuid(),
-                    ChangeRequestId = change.ChangeRequestId,
-                    ApproverUserId = approverId,
-                    ApprovalStatusId = 1,
-                    Comments = string.Empty
-                });
-            }
+                })
+                .ToList();
         }
         else
         {
             change.StatusId = Approved;
+            change.ChangeApprovers.Clear();
         }
 
         var updated = await _changeRepository.UpdateAsync(change, cancellationToken);
@@ -108,12 +97,12 @@ public class ChangeWorkflowService : IChangeWorkflowService
         var change = await _changeRepository.GetByIdAsync(changeId, cancellationToken);
         if (change is null || change.DeletedAt.HasValue || change.StatusId != PendingApproval) return null;
 
-        var approval = change.ChangeApprovals.FirstOrDefault(x => x.ApproverUserId == actorUserId);
+        var approval = change.ChangeApprovers.FirstOrDefault(x => x.ApproverUserId == actorUserId);
         if (approval is null) return null;
 
-        approval.ApprovalStatusId = 2;
-        approval.ApprovedAt = DateTime.UtcNow;
-        approval.Comments = comments ?? string.Empty;
+        approval.ApprovalStatus = "Approved";
+        approval.DecisionAt = DateTime.UtcNow;
+        approval.DecisionComments = comments ?? string.Empty;
 
         change.StatusId = EvaluateStatus(change);
         change.UpdatedAt = DateTime.UtcNow;
@@ -131,12 +120,12 @@ public class ChangeWorkflowService : IChangeWorkflowService
         var change = await _changeRepository.GetByIdAsync(changeId, cancellationToken);
         if (change is null || change.DeletedAt.HasValue || change.StatusId != PendingApproval) return null;
 
-        var approval = change.ChangeApprovals.FirstOrDefault(x => x.ApproverUserId == actorUserId);
+        var approval = change.ChangeApprovers.FirstOrDefault(x => x.ApproverUserId == actorUserId);
         if (approval is null) return null;
 
-        approval.ApprovalStatusId = 3;
-        approval.ApprovedAt = DateTime.UtcNow;
-        approval.Comments = comments ?? string.Empty;
+        approval.ApprovalStatus = "Rejected";
+        approval.DecisionAt = DateTime.UtcNow;
+        approval.DecisionComments = comments ?? string.Empty;
 
         change.StatusId = EvaluateStatus(change);
         change.UpdatedAt = DateTime.UtcNow;
@@ -239,7 +228,9 @@ public class ChangeWorkflowService : IChangeWorkflowService
     {
         if (string.Equals(strategy, ApprovalStrategies.All, StringComparison.OrdinalIgnoreCase)) return ApprovalStrategies.All;
         if (string.Equals(strategy, ApprovalStrategies.Majority, StringComparison.OrdinalIgnoreCase)) return ApprovalStrategies.Majority;
-        return ApprovalStrategies.Any;
+        if (string.Equals(strategy, "Single", StringComparison.OrdinalIgnoreCase)) return "Single";
+        if (string.Equals(strategy, ApprovalStrategies.Any, StringComparison.OrdinalIgnoreCase)) return "Single";
+        return "Single";
     }
 
     private static string? ValidateSubmitRequirements(ChangeRequest change)
@@ -255,30 +246,29 @@ public class ChangeWorkflowService : IChangeWorkflowService
 
     private static int EvaluateStatus(ChangeRequest change)
     {
-        var approvals = change.ChangeApprovals.ToList();
+        var approvals = change.ChangeApprovers.ToList();
         var total = approvals.Count;
-        var approved = approvals.Count(x => x.ApprovalStatusId == 2);
-        var rejected = approvals.Count(x => x.ApprovalStatusId == 3);
+        var approved = approvals.Count(x => string.Equals(x.ApprovalStatus, "Approved", StringComparison.OrdinalIgnoreCase));
+        var rejected = approvals.Count(x => string.Equals(x.ApprovalStatus, "Rejected", StringComparison.OrdinalIgnoreCase));
         if (total == 0) return PendingApproval;
 
         var strategy = NormalizeStrategy(change.ApprovalStrategy);
-        if (strategy == ApprovalStrategies.All)
-        {
-            if (approved == total) return Approved;
-            if (rejected == total) return Rejected;
-            return PendingApproval;
-        }
 
         if (strategy == ApprovalStrategies.Majority)
         {
-            if (rejected > total / 2.0) return Rejected;
             if (approved > total / 2.0) return Approved;
+            if (rejected > total / 2.0) return Rejected;
             return PendingApproval;
         }
 
         if (rejected > 0) return Rejected;
-        if (approved > 0) return Approved;
-        return PendingApproval;
+
+        if (strategy == ApprovalStrategies.All)
+        {
+            return approved == total ? Approved : PendingApproval;
+        }
+
+        return approved > 0 ? Approved : PendingApproval;
     }
 
     private async Task LogTransitionAsync(ChangeRequest change, Guid actorUserId, string reason, string details, object transitionDetails, CancellationToken cancellationToken)

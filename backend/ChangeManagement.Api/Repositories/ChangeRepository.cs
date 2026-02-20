@@ -12,8 +12,7 @@ public class ChangeRepository : IChangeRepository
 
     public Task<List<ChangeRequest>> GetAllAsync(CancellationToken cancellationToken) =>
         _dbContext.ChangeRequests
-            .Where(c => c.DeletedAt == null)
-            .Include(c => c.ChangeType)
+                        .Include(c => c.ChangeType)
             .Include(c => c.Priority)
             .Include(c => c.Status)
             .Include(c => c.RiskLevel)
@@ -23,7 +22,7 @@ public class ChangeRepository : IChangeRepository
             .ToListAsync(cancellationToken);
 
     public Task<ChangeRequest?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
-        BaseQuery().FirstOrDefaultAsync(c => c.ChangeRequestId == id && c.DeletedAt == null, cancellationToken);
+        BaseQuery().FirstOrDefaultAsync(c => c.ChangeRequestId == id, cancellationToken);
 
     public async Task<ChangeRequest> CreateAsync(ChangeRequest changeRequest, CancellationToken cancellationToken)
     {
@@ -36,14 +35,11 @@ public class ChangeRepository : IChangeRepository
     {
         var existing = await _dbContext.ChangeRequests
             .Include(c => c.ChangeApprovers)
-            .Include(c => c.ChangeApprovals)
-            .FirstOrDefaultAsync(c => c.ChangeRequestId == changeRequest.ChangeRequestId && c.DeletedAt == null, cancellationToken);
+            .FirstOrDefaultAsync(c => c.ChangeRequestId == changeRequest.ChangeRequestId, cancellationToken);
         if (existing is null) return null;
 
         _dbContext.Entry(existing).CurrentValues.SetValues(changeRequest);
-
         ReconcileApprovers(existing, changeRequest);
-        ReconcileApprovals(existing, changeRequest);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return await GetByIdAsync(changeRequest.ChangeRequestId, cancellationToken);
@@ -68,45 +64,17 @@ public class ChangeRepository : IChangeRepository
                     ChangeApproverId = inc.ChangeApproverId == Guid.Empty ? Guid.NewGuid() : inc.ChangeApproverId,
                     ChangeRequestId = existing.ChangeRequestId,
                     ApproverUserId = inc.ApproverUserId,
+                    ApprovalStatus = string.IsNullOrWhiteSpace(inc.ApprovalStatus) ? "Pending" : inc.ApprovalStatus,
+                    DecisionAt = inc.DecisionAt,
+                    DecisionComments = inc.DecisionComments,
                     CreatedAt = inc.CreatedAt == default ? DateTime.UtcNow : inc.CreatedAt
                 });
             }
             else
             {
-                match.CreatedAt = inc.CreatedAt == default ? match.CreatedAt : inc.CreatedAt;
-            }
-        }
-    }
-
-    private void ReconcileApprovals(ChangeRequest existing, ChangeRequest incoming)
-    {
-        var incomingByUser = incoming.ChangeApprovals
-            .GroupBy(a => a.ApproverUserId)
-            .ToDictionary(g => g.Key, g => g.Last());
-
-        var toRemove = existing.ChangeApprovals.Where(a => !incomingByUser.ContainsKey(a.ApproverUserId)).ToList();
-        foreach (var item in toRemove) _dbContext.ChangeApprovals.Remove(item);
-
-        foreach (var inc in incoming.ChangeApprovals)
-        {
-            var match = existing.ChangeApprovals.FirstOrDefault(a => a.ApproverUserId == inc.ApproverUserId);
-            if (match is null)
-            {
-                existing.ChangeApprovals.Add(new ChangeApproval
-                {
-                    ChangeApprovalId = inc.ChangeApprovalId == Guid.Empty ? Guid.NewGuid() : inc.ChangeApprovalId,
-                    ChangeRequestId = existing.ChangeRequestId,
-                    ApproverUserId = inc.ApproverUserId,
-                    ApprovalStatusId = inc.ApprovalStatusId,
-                    ApprovedAt = inc.ApprovedAt,
-                    Comments = inc.Comments
-                });
-            }
-            else
-            {
-                match.ApprovalStatusId = inc.ApprovalStatusId;
-                match.ApprovedAt = inc.ApprovedAt;
-                match.Comments = inc.Comments;
+                match.ApprovalStatus = string.IsNullOrWhiteSpace(inc.ApprovalStatus) ? match.ApprovalStatus : inc.ApprovalStatus;
+                match.DecisionAt = inc.DecisionAt;
+                match.DecisionComments = inc.DecisionComments;
             }
         }
     }
@@ -118,8 +86,6 @@ public class ChangeRepository : IChangeRepository
         .Include(c => c.RiskLevel)
         .Include(c => c.RequestedByUser)
         .Include(c => c.AssignedToUser)
-        .Include(c => c.ChangeApprovals).ThenInclude(a => a.ApprovalStatus)
-        .Include(c => c.ChangeApprovals).ThenInclude(a => a.ApproverUser)
         .Include(c => c.ChangeApprovers).ThenInclude(a => a.ApproverUser)
         .Include(c => c.ChangeAttachments)
         .Include(c => c.ChangeTasks);

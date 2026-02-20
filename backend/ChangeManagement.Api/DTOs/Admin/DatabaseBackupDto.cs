@@ -5,7 +5,7 @@ namespace ChangeManagement.Api.DTOs.Admin;
 public class DatabaseBackupDto
 {
     public List<ChangeRequest> ChangeRequests { get; set; } = [];
-    public List<ChangeApproval> ChangeApprovals { get; set; } = [];
+    public List<ChangeApprover> ChangeApprovals { get; set; } = [];
     public List<AttachmentBackupItemDto> ChangeAttachments { get; set; } = [];
 }
 

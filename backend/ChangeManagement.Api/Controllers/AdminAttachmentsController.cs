@@ -63,9 +63,9 @@ public class AdminAttachmentsController : ControllerBase
             .FirstOrDefaultAsync(x => x.ChangeAttachmentId == id, cancellationToken);
         if (attachment is null) return NotFound();
 
-        if (System.IO.File.Exists(attachment.FileUrl))
+        if (System.IO.File.Exists(attachment.FilePath))
         {
-            System.IO.File.Delete(attachment.FileUrl);
+            System.IO.File.Delete(attachment.FilePath);
         }
 
         _dbContext.ChangeAttachments.Remove(attachment);
@@ -83,7 +83,7 @@ public class AdminAttachmentsController : ControllerBase
     {
         var filePathProperty = attachment.GetType().GetProperty("FilePath");
         var filePathValue = filePathProperty?.GetValue(attachment) as string;
-        return string.IsNullOrWhiteSpace(filePathValue) ? attachment.FileUrl : filePathValue;
+        return string.IsNullOrWhiteSpace(filePathValue) ? attachment.FilePath : filePathValue;
     }
 
     private Guid ResolveActorUserId()

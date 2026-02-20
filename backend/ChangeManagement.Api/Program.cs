@@ -165,45 +165,7 @@ if (!skipDatabaseInitialization)
 
         dbContext.Database.Migrate();
 
-dbContext.Database.ExecuteSqlRaw(@"
-IF COL_LENGTH('cm.ChangeAttachment', 'FileSizeBytes') IS NULL
-    ALTER TABLE [cm].[ChangeAttachment] ADD [FileSizeBytes] BIGINT NOT NULL DEFAULT(0);
 
--- ===== ChangeRequest missing columns =====
-
-IF COL_LENGTH('cm.ChangeRequest', 'ApprovalRequesterUserId') IS NULL
-    ALTER TABLE [cm].[ChangeRequest] ADD [ApprovalRequesterUserId] UNIQUEIDENTIFIER NULL;
-
-IF COL_LENGTH('cm.ChangeRequest', 'BackoutPlan') IS NULL
-    ALTER TABLE [cm].[ChangeRequest] ADD [BackoutPlan] NVARCHAR(MAX) NULL;
-
-IF COL_LENGTH('cm.ChangeRequest', 'BusinessJustification') IS NULL
-    ALTER TABLE [cm].[ChangeRequest] ADD [BusinessJustification] NVARCHAR(MAX) NULL;
-
-IF COL_LENGTH('cm.ChangeRequest', 'Category') IS NULL
-    ALTER TABLE [cm].[ChangeRequest] ADD [Category] NVARCHAR(200) NULL;
-
-IF COL_LENGTH('cm.ChangeRequest', 'Environment') IS NULL
-    ALTER TABLE [cm].[ChangeRequest] ADD [Environment] NVARCHAR(200) NULL;
-
-IF COL_LENGTH('cm.ChangeRequest', 'ImpactLevelId') IS NULL
-    ALTER TABLE [cm].[ChangeRequest] ADD [ImpactLevelId] INT NULL;
-
-IF COL_LENGTH('cm.ChangeRequest', 'ImplementationGroup') IS NULL
-    ALTER TABLE [cm].[ChangeRequest] ADD [ImplementationGroup] NVARCHAR(200) NULL;
-
-IF COL_LENGTH('cm.ChangeRequest', 'ImplementationSteps') IS NULL
-    ALTER TABLE [cm].[ChangeRequest] ADD [ImplementationSteps] NVARCHAR(MAX) NULL;
-
-IF COL_LENGTH('cm.ChangeRequest', 'ServiceSystem') IS NULL
-    ALTER TABLE [cm].[ChangeRequest] ADD [ServiceSystem] NVARCHAR(200) NULL;
-
-IF COL_LENGTH('cm.ChangeRequest', 'SubmittedAt') IS NULL
-    ALTER TABLE [cm].[ChangeRequest] ADD [SubmittedAt] DATETIME2 NULL;
-
-IF COL_LENGTH('cm.ChangeRequest', 'SubmittedByUserId') IS NULL
-    ALTER TABLE [cm].[ChangeRequest] ADD [SubmittedByUserId] UNIQUEIDENTIFIER NULL;
-");
     }
 
     SeedUsers(dbContext, app.Configuration);

@@ -21,28 +21,25 @@ public class AuditService : IAuditService
 
     public async Task LogAsync(int eventTypeId, Guid actorUserId, string actorUpn, string entitySchema, string entityName, Guid entityId, string changeNumber, string reason, string details, CancellationToken cancellationToken)
     {
-        var resolvedActorUpn = actorUpn;
-        if (string.IsNullOrWhiteSpace(resolvedActorUpn))
-        {
-            resolvedActorUpn = _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.Upn)
+        var resolvedActorUpn = string.IsNullOrWhiteSpace(actorUpn)
+            ? _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.Upn)
                 ?? _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.Email)
                 ?? _httpContextAccessor.HttpContext?.User.Identity?.Name
-                ?? "unknown@local";
-        }
+                ?? "unknown@local"
+            : actorUpn;
 
         _dbContext.AuditEvents.Add(new AuditEvent
         {
             AuditEventId = Guid.NewGuid(),
             EventTypeId = eventTypeId,
-            EventAt = DateTime.UtcNow,
             ActorUserId = actorUserId,
             ActorUpn = resolvedActorUpn,
-            EntitySchema = entitySchema,
+            SchemaName = entitySchema,
             EntityName = entityName,
             EntityId = entityId,
-            ChangeNumber = changeNumber,
-            Reason = reason,
-            Details = details
+            EntityNumber = changeNumber,
+            Metadata = $"{reason}:{details}",
+            CreatedAt = DateTime.UtcNow
         });
 
         await _dbContext.SaveChangesAsync(cancellationToken);
