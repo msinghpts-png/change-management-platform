@@ -24,7 +24,6 @@ public class AttachmentService : IAttachmentService
     };
 
     private readonly IChangeAttachmentRepository _attachmentRepository;
-    private readonly IChangeRepository _changeRepository;
     private readonly IAuditService _audit;
     private readonly IWebHostEnvironment _environment;
     private readonly IHttpContextAccessor _httpContextAccessor;
@@ -41,7 +40,6 @@ public class AttachmentService : IAttachmentService
         ChangeManagementDbContext context)
     {
         _attachmentRepository = attachmentRepository;
-        _changeRepository = changeRepository;
         _audit = audit;
         _environment = environment;
         _httpContextAccessor = httpContextAccessor;
@@ -76,24 +74,31 @@ public class AttachmentService : IAttachmentService
             return (null, "Change request not found.");
         }
 
-    if (file is null || file.Length == 0) return (null, "No file uploaded.");
-    if (file.Length > MaxFileBytes) return (null, "File exceeds 5MB limit.");
+        if (file is null || file.Length == 0) return (null, "No file uploaded.");
+        if (file.Length > MaxFileBytes) return (null, "File exceeds 5MB limit.");
 
-    var extension = Path.GetExtension(file.FileName);
-    if (string.IsNullOrWhiteSpace(extension) || !AllowedExtensions.Contains(extension))
-    {
-        return (null, "File type is not allowed.");
-    }
+        var extension = Path.GetExtension(file.FileName);
+        if (string.IsNullOrWhiteSpace(extension) || !AllowedExtensions.Contains(extension))
+        {
+            return (null, "File type is not allowed.");
+        }
 
+        var rootPath = ResolveAttachmentRoot();
         var fileId = Guid.NewGuid();
         var safeName = Path.GetFileName(file.FileName);
         var storedFileName = $"{fileId}_{safeName}";
-        var storedPath = Path.Combine(rootPath, storedFileName);
 
-    var fileId = Guid.NewGuid();
-    var safeName = Path.GetFileName(file.FileName);
-    var storedFileName = $"{fileId}_{safeName}";
-    var storedPath = Path.Combine(rootPath, storedFileName);
+        var changeFolder = Path.Combine(rootPath, changeId.ToString());
+        Directory.CreateDirectory(changeFolder);
+
+        var storedPath = Path.Combine(changeFolder, storedFileName);
+        await using (var stream = new FileStream(storedPath, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            await file.CopyToAsync(stream, cancellationToken);
+        }
+
+        var relativeToken = $"{changeId}/{storedFileName}";
+        var downloadUrl = $"/api/changes/{changeId}/attachments/{fileId}/download";
 
         var resolvedUploader = uploadedBy;
         if (!resolvedUploader.HasValue || resolvedUploader == Guid.Empty)
@@ -108,8 +113,8 @@ public class AttachmentService : IAttachmentService
             ChangeAttachmentId = fileId,
             ChangeRequestId = changeId,
             FileName = safeName,
-            FileUrl = storedPath,
-            FilePath = storedPath,
+            FileUrl = downloadUrl,
+            FilePath = relativeToken,
             UploadedAt = DateTime.UtcNow,
             UploadedBy = resolvedUploader,
             FileSizeBytes = file.Length
@@ -135,25 +140,25 @@ public class AttachmentService : IAttachmentService
 
     private string ResolveAttachmentRoot()
     {
-        var configured = _configuration["AttachmentStorage:RootPath"];
+        var configured = NormalizePath(_configuration["AttachmentStorage:RootPath"]);
         if (!string.IsNullOrWhiteSpace(configured))
         {
             return configured;
         }
 
-        var envPath = Environment.GetEnvironmentVariable("ATTACHMENT_STORAGE_ROOT");
+        var envPath = NormalizePath(Environment.GetEnvironmentVariable("ATTACHMENT_STORAGE_ROOT"));
         if (!string.IsNullOrWhiteSpace(envPath))
         {
             return envPath;
         }
 
-        var dockerVolumePath = "/data/attachments";
-        if (Directory.Exists(dockerVolumePath))
-        {
-            return dockerVolumePath;
-        }
+        return NormalizePath(Path.Combine(_environment.ContentRootPath, "data", "attachments"));
+    }
 
-        return Path.Combine(_environment.ContentRootPath, "attachments");
+    private static string NormalizePath(string? path)
+    {
+        var value = (path ?? string.Empty).Trim();
+        return value.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     }
 
     private string ResolveActorUpn()
@@ -170,8 +175,15 @@ public class AttachmentService : IAttachmentService
 
     public async Task<byte[]?> ReadFileAsync(ChangeAttachment attachment, CancellationToken cancellationToken)
     {
-        var path = string.IsNullOrWhiteSpace(attachment.FilePath) ? attachment.FileUrl : attachment.FilePath;
-        if (!File.Exists(path)) return null;
-        return await File.ReadAllBytesAsync(path, cancellationToken);
+        var rootPath = ResolveAttachmentRoot();
+        var relativePath = string.IsNullOrWhiteSpace(attachment.FilePath) ? attachment.FileUrl : attachment.FilePath;
+        if (string.IsNullOrWhiteSpace(relativePath)) return null;
+
+        var fullPath = Path.GetFullPath(Path.Combine(rootPath, relativePath));
+        var fullRoot = Path.GetFullPath(rootPath + Path.DirectorySeparatorChar);
+        if (!fullPath.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase)) return null;
+
+        if (!File.Exists(fullPath)) return null;
+        return await File.ReadAllBytesAsync(fullPath, cancellationToken);
     }
 }

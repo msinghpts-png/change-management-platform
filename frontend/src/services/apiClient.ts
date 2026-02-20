@@ -82,6 +82,7 @@ const normalizeChange = (item: any): ChangeRequest => ({
   approvals: item.approvals ?? [],
   priority: item.priority ?? "P3",
   riskLevel: item.riskLevel,
+  impactLevel: item.impactLevel,
   impactTypeId: item.impactTypeId,
   requestedBy: item.requestedBy,
   requestedByUserId: item.requestedByUserId,

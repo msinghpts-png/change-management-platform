@@ -4,16 +4,9 @@ import { apiClient } from "../services/apiClient";
 import type { ChangeRequest } from "../types/change";
 import { labelForChangeType, pillForChangeType, pillForImpactLevel, pillForRiskLevel } from "../utils/trafficColors";
 import { getStatusPillClass } from "../ui/pills";
+import PriorityBadge from "../components/PriorityBadge";
 
 type FilterKey = "All" | "Draft" | "Pending" | "Approved" | "In Progress" | "Closed";
-
-const pillForPriority = (priority?: string) => {
-  const p = (priority ?? "").toLowerCase();
-  if (p.includes("p1") || p.includes("emergency")) return "pill pill-red";
-  if (p.includes("p2")) return "pill pill-amber";
-  if (p.includes("p3")) return "pill pill-blue";
-  return "pill";
-};
 
 const fmtDate = (value?: string) => {
   if (!value) return "—";
@@ -142,7 +135,7 @@ const ChangeListPage = () => {
                 <div className="row-left">
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span className="mono">{c.changeNumber ?? "CHG-000000"}</span>
-                    <span className={pillForPriority(c.priority)}>{c.priority ?? "P3"}</span>
+                    <PriorityBadge priority={c.priority} />
                     <span className={pillForChangeType(c.changeTypeId)}>{labelForChangeType(c.changeTypeId)}</span>
                   </div>
                   <div className="h3" style={{ marginTop: 4 }}>{c.title}</div>
