@@ -59,7 +59,7 @@ public class TemplateService : ITemplateService
             ChangeTypeId = request.ChangeTypeId,
             RiskLevelId = request.RiskLevelId,
             CreatedAt = DateTime.UtcNow,
-            CreatedBy = actorId,
+            CreatedBy = userId ?? Guid.Empty,
             IsActive = request.IsActive ?? true
         };
 
