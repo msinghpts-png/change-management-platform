@@ -1,14 +1,18 @@
+using System;
+
 namespace ChangeManagement.Api.Domain.Entities;
 
 public class ChangeTemplate
 {
     public Guid TemplateId { get; set; }
 
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; set; } = default!;
     public string? Description { get; set; }
 
     public string? ImplementationSteps { get; set; }
     public string? BackoutPlan { get; set; }
+
+    public string? BusinessJustification { get; set; }   // ✅ ADD THIS
 
     public string? ServiceSystem { get; set; }
     public string? Category { get; set; }
@@ -21,6 +25,4 @@ public class ChangeTemplate
 
     public DateTime CreatedAt { get; set; }
     public Guid CreatedBy { get; set; }
-
-    public User? CreatedByUser { get; set; }
 }
