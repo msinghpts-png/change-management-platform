@@ -17,5 +17,9 @@ public class AuditEvent
     public string? EntityNumber { get; set; }
     public string? Metadata { get; set; }
 
-    public DateTime CreatedAt { get; set; }   // ✅ rename usage to this
+    public DateTime CreatedAt { get; set; }
+
+    // ✅ RESTORE NAVIGATION PROPERTIES
+    public EventType EventType { get; set; } = default!;
+    public User? ActorUser { get; set; }
 }
