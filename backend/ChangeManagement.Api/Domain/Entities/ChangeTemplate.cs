@@ -11,8 +11,7 @@ public class ChangeTemplate
 
     public string? ImplementationSteps { get; set; }
     public string? BackoutPlan { get; set; }
-
-    public string? BusinessJustification { get; set; }   // ✅ ADD THIS
+    public string? BusinessJustification { get; set; }
 
     public string? ServiceSystem { get; set; }
     public string? Category { get; set; }
@@ -25,4 +24,7 @@ public class ChangeTemplate
 
     public DateTime CreatedAt { get; set; }
     public Guid CreatedBy { get; set; }
+
+    // ✅ RESTORE NAVIGATION
+    public User CreatedByUser { get; set; } = default!;
 }
