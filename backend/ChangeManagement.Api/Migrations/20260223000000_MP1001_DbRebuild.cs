@@ -19,6 +19,9 @@ public partial class MP1001_DbRebuild : Migration
         migrationBuilder.EnsureSchema(name: "audit");
 
         // Section 1: REFERENCE (LOOKUP) TABLES + SEED DATA
+        // =============================================
+        // 1. REFERENCE (LOOKUP) TABLES + SEED DATA
+        // =============================================
         migrationBuilder.CreateTable(
             name: "ChangeType",
             schema: "ref",
@@ -406,19 +409,18 @@ public partial class MP1001_DbRebuild : Migration
         migrationBuilder.CreateIndex(name: "IX_ChangeTask_ChangeRequestId", schema: "cm", table: "ChangeTask", column: "ChangeRequestId");
         migrationBuilder.CreateIndex(name: "IX_ChangeTask_AssignedToUserId", schema: "cm", table: "ChangeTask", column: "AssignedToUserId");
         migrationBuilder.CreateIndex(name: "IX_AuditEvent_EventTypeId", schema: "audit", table: "AuditEvent", column: "EventTypeId");
+
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
     {
         migrationBuilder.DropSequence(name: "ChangeNumberSeq", schema: "cm");
-
         migrationBuilder.DropTable(name: "AuditEvent", schema: "audit");
         migrationBuilder.DropTable(name: "ChangeApprover", schema: "cm");
         migrationBuilder.DropTable(name: "ChangeAttachment", schema: "cm");
         migrationBuilder.DropTable(name: "ChangeTask", schema: "cm");
         migrationBuilder.DropTable(name: "ChangeTemplate", schema: "cm");
         migrationBuilder.DropTable(name: "ChangeRequest", schema: "cm");
-
         migrationBuilder.DropTable(name: "ImpactType", schema: "ref");
         migrationBuilder.DropTable(name: "ImpactLevel", schema: "ref");
         migrationBuilder.DropTable(name: "EventType", schema: "audit");
