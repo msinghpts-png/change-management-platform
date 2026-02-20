@@ -17,7 +17,7 @@ public class AdminAuditController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAudit([FromQuery] int? eventTypeId, [FromQuery] Guid? actorUserId, CancellationToken cancellationToken)
     {
-        var query = _dbContext.AuditEvents.AsNoTracking().Include(x => x.EventType).OrderByDescending(x => x.EventAt).AsQueryable();
+        var query = _dbContext.AuditEvents.AsNoTracking().Include(x => x.EventType).OrderByDescending(x => x.CreatedAt).AsQueryable();
         if (eventTypeId.HasValue) query = query.Where(x => x.EventTypeId == eventTypeId.Value);
         if (actorUserId.HasValue && actorUserId.Value != Guid.Empty) query = query.Where(x => x.ActorUserId == actorUserId.Value);
 
@@ -27,7 +27,7 @@ public class AdminAuditController : ControllerBase
             x.AuditEventId,
             x.EventTypeId,
             eventType = x.EventType != null ? x.EventType.Name : string.Empty,
-            x.EventAt,
+            x.CreatedAt,
             x.ActorUserId,
             x.ActorUpn,
             x.EntitySchema,
