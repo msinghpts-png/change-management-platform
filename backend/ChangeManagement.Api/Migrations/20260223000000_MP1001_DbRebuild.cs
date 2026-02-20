@@ -1,10 +1,15 @@
 using System;
+using ChangeManagement.Api.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace ChangeManagement.Api.Migrations;
 
+[DbContext(typeof(ChangeManagementDbContext))]
+[Migration("20260223000000_MP1001_DbRebuild")]
 public partial class MP1001_DbRebuild : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
@@ -88,17 +93,17 @@ public partial class MP1001_DbRebuild : Migration
             constraints: table =>
             {
                 table.PrimaryKey("PK_ChangeRequest", x => x.ChangeRequestId);
-                table.ForeignKey("FK_ChangeRequest_AssignedToUser", x => x.AssignedToUserId, "User", "UserId", "cm", onDelete: ReferentialAction.Restrict);
-                table.ForeignKey("FK_ChangeRequest_RequestedByUser", x => x.RequestedByUserId, "User", "UserId", "cm", onDelete: ReferentialAction.Restrict);
-                table.ForeignKey("FK_ChangeRequest_ApprovalRequesterUser", x => x.ApprovalRequesterUserId, "User", "UserId", "cm", onDelete: ReferentialAction.Restrict);
-                table.ForeignKey("FK_ChangeRequest_SubmittedByUser", x => x.SubmittedByUserId, "User", "UserId", "cm", onDelete: ReferentialAction.Restrict);
-                table.ForeignKey("FK_ChangeRequest_DeletedByUser", x => x.DeletedByUserId, "User", "UserId", "cm", onDelete: ReferentialAction.Restrict);
-                table.ForeignKey("FK_ChangeRequest_CreatedByUser", x => x.CreatedBy, "User", "UserId", "cm", onDelete: ReferentialAction.Restrict);
-                table.ForeignKey("FK_ChangeRequest_UpdatedByUser", x => x.UpdatedBy, "User", "UserId", "cm", onDelete: ReferentialAction.Restrict);
                 table.ForeignKey("FK_ChangeRequest_ChangeType", x => x.ChangeTypeId, "ChangeType", "ChangeTypeId", "ref", onDelete: ReferentialAction.Restrict);
                 table.ForeignKey("FK_ChangeRequest_ChangePriority", x => x.PriorityId, "ChangePriority", "PriorityId", "ref", onDelete: ReferentialAction.Restrict);
                 table.ForeignKey("FK_ChangeRequest_ChangeStatus", x => x.StatusId, "ChangeStatus", "StatusId", "ref", onDelete: ReferentialAction.Restrict);
                 table.ForeignKey("FK_ChangeRequest_RiskLevel", x => x.RiskLevelId, "RiskLevel", "RiskLevelId", "ref", onDelete: ReferentialAction.Restrict);
+                table.ForeignKey("FK_ChangeRequest_RequestedBy", x => x.RequestedByUserId, "User", "UserId", "cm", onDelete: ReferentialAction.Restrict);
+                table.ForeignKey("FK_ChangeRequest_AssignedTo", x => x.AssignedToUserId, "User", "UserId", "cm", onDelete: ReferentialAction.Restrict);
+                table.ForeignKey("FK_ChangeRequest_SubmittedBy", x => x.SubmittedByUserId, "User", "UserId", "cm", onDelete: ReferentialAction.Restrict);
+                table.ForeignKey("FK_ChangeRequest_ApprovalRequester", x => x.ApprovalRequesterUserId, "User", "UserId", "cm", onDelete: ReferentialAction.Restrict);
+                table.ForeignKey("FK_ChangeRequest_DeletedBy", x => x.DeletedByUserId, "User", "UserId", "cm", onDelete: ReferentialAction.Restrict);
+                table.ForeignKey("FK_ChangeRequest_CreatedBy", x => x.CreatedBy, "User", "UserId", "cm", onDelete: ReferentialAction.Restrict);
+                table.ForeignKey("FK_ChangeRequest_UpdatedBy", x => x.UpdatedBy, "User", "UserId", "cm", onDelete: ReferentialAction.Restrict);
             });
 
         migrationBuilder.CreateTable(name: "ChangeApprover", schema: "cm", columns: table => new { ChangeApproverId = table.Column<Guid>(type: "uniqueidentifier", nullable: false), ChangeRequestId = table.Column<Guid>(type: "uniqueidentifier", nullable: false), ApproverUserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false), ApprovalStatus = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false), DecisionAt = table.Column<DateTime>(type: "datetime2", nullable: true), DecisionComments = table.Column<string>(type: "nvarchar(max)", nullable: true), CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()") }, constraints: table => { table.PrimaryKey("PK_ChangeApprover", x => x.ChangeApproverId); table.ForeignKey("FK_ChangeApprover_ChangeRequest", x => x.ChangeRequestId, "ChangeRequest", "ChangeRequestId", "cm", onDelete: ReferentialAction.Cascade); table.ForeignKey("FK_ChangeApprover_User", x => x.ApproverUserId, "User", "UserId", "cm", onDelete: ReferentialAction.Restrict); });
@@ -109,6 +114,31 @@ public partial class MP1001_DbRebuild : Migration
 
         migrationBuilder.CreateIndex(name: "IX_User_Upn", schema: "cm", table: "User", column: "Upn", unique: true);
         migrationBuilder.CreateIndex(name: "IX_ChangeRequest_ChangeNumber", schema: "cm", table: "ChangeRequest", column: "ChangeNumber", unique: true);
+        migrationBuilder.CreateIndex(name: "IX_ChangeRequest_ChangeTypeId", schema: "cm", table: "ChangeRequest", column: "ChangeTypeId");
+        migrationBuilder.CreateIndex(name: "IX_ChangeRequest_PriorityId", schema: "cm", table: "ChangeRequest", column: "PriorityId");
+        migrationBuilder.CreateIndex(name: "IX_ChangeRequest_StatusId", schema: "cm", table: "ChangeRequest", column: "StatusId");
+        migrationBuilder.CreateIndex(name: "IX_ChangeRequest_RiskLevelId", schema: "cm", table: "ChangeRequest", column: "RiskLevelId");
+        migrationBuilder.CreateIndex(name: "IX_ChangeRequest_RequestedByUserId", schema: "cm", table: "ChangeRequest", column: "RequestedByUserId");
+        migrationBuilder.CreateIndex(name: "IX_ChangeRequest_AssignedToUserId", schema: "cm", table: "ChangeRequest", column: "AssignedToUserId");
+        migrationBuilder.CreateIndex(name: "IX_ChangeRequest_SubmittedByUserId", schema: "cm", table: "ChangeRequest", column: "SubmittedByUserId");
+        migrationBuilder.CreateIndex(name: "IX_ChangeRequest_ApprovalRequesterUserId", schema: "cm", table: "ChangeRequest", column: "ApprovalRequesterUserId");
+        migrationBuilder.CreateIndex(name: "IX_ChangeRequest_DeletedByUserId", schema: "cm", table: "ChangeRequest", column: "DeletedByUserId");
+        migrationBuilder.CreateIndex(name: "IX_ChangeRequest_CreatedBy", schema: "cm", table: "ChangeRequest", column: "CreatedBy");
+        migrationBuilder.CreateIndex(name: "IX_ChangeRequest_UpdatedBy", schema: "cm", table: "ChangeRequest", column: "UpdatedBy");
+
+        migrationBuilder.CreateIndex(name: "IX_ChangeApprover_ChangeRequestId", schema: "cm", table: "ChangeApprover", column: "ChangeRequestId");
+        migrationBuilder.CreateIndex(name: "IX_ChangeApprover_ApproverUserId", schema: "cm", table: "ChangeApprover", column: "ApproverUserId");
+
+        migrationBuilder.CreateIndex(name: "IX_ChangeAttachment_ChangeRequestId", schema: "cm", table: "ChangeAttachment", column: "ChangeRequestId");
+        migrationBuilder.CreateIndex(name: "IX_ChangeAttachment_UploadedBy", schema: "cm", table: "ChangeAttachment", column: "UploadedBy");
+
+        migrationBuilder.CreateIndex(name: "IX_ChangeTask_ChangeRequestId", schema: "cm", table: "ChangeTask", column: "ChangeRequestId");
+        migrationBuilder.CreateIndex(name: "IX_ChangeTask_AssignedToUserId", schema: "cm", table: "ChangeTask", column: "AssignedToUserId");
+
+        migrationBuilder.CreateIndex(name: "IX_ChangeTemplate_CreatedBy", schema: "cm", table: "ChangeTemplate", column: "CreatedBy");
+
+        migrationBuilder.CreateIndex(name: "IX_AuditEvent_EventTypeId", schema: "audit", table: "AuditEvent", column: "EventTypeId");
+        migrationBuilder.CreateIndex(name: "IX_AuditEvent_ActorUserId", schema: "audit", table: "AuditEvent", column: "ActorUserId");
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)

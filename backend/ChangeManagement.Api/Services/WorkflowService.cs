@@ -183,6 +183,12 @@ public class WorkflowService : IWorkflowService
     {
         if (request.ChangeTypeId.HasValue && request.ChangeTypeId.Value > 0)
         {
+            var anyReferenceData = await _dbContext.ChangeTypes.AnyAsync(cancellationToken);
+            if (!anyReferenceData)
+            {
+                return request.ChangeTypeId.Value;
+            }
+
             var exists = await _dbContext.ChangeTypes.AnyAsync(x => x.ChangeTypeId == request.ChangeTypeId.Value, cancellationToken);
             return exists ? request.ChangeTypeId.Value : 0;
         }
@@ -201,6 +207,12 @@ public class WorkflowService : IWorkflowService
     {
         if (request.PriorityId.HasValue && request.PriorityId.Value > 0)
         {
+            var anyReferenceData = await _dbContext.ChangePriorities.AnyAsync(cancellationToken);
+            if (!anyReferenceData)
+            {
+                return request.PriorityId.Value;
+            }
+
             var exists = await _dbContext.ChangePriorities.AnyAsync(x => x.PriorityId == request.PriorityId.Value, cancellationToken);
             return exists ? request.PriorityId.Value : 0;
         }
@@ -219,6 +231,12 @@ public class WorkflowService : IWorkflowService
     {
         if (request.RiskLevelId.HasValue && request.RiskLevelId.Value > 0)
         {
+            var anyReferenceData = await _dbContext.RiskLevels.AnyAsync(cancellationToken);
+            if (!anyReferenceData)
+            {
+                return request.RiskLevelId.Value;
+            }
+
             var exists = await _dbContext.RiskLevels.AnyAsync(x => x.RiskLevelId == request.RiskLevelId.Value, cancellationToken);
             return exists ? request.RiskLevelId.Value : 0;
         }

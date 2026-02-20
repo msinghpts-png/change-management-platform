@@ -113,6 +113,7 @@ builder.Services.AddScoped<IAttachmentService, AttachmentService>();
 builder.Services.AddScoped<IChangeTaskRepository, ChangeTaskRepository>();
 builder.Services.AddScoped<IChangeTaskService, ChangeTaskService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IActorResolver, ActorResolver>();
 builder.Services.AddScoped<ITemplateService, TemplateService>();
 
 var app = builder.Build();
