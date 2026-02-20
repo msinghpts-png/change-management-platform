@@ -24,9 +24,9 @@ public class AttachmentService : IAttachmentService
     private readonly IWebHostEnvironment _environment;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IConfiguration _configuration;
-    private readonly ChangeManagementDbContext _context; // ← ADD THIS FIELD
+    private readonly ChangeManagement.Api.Data.ChangeManagementDbContext _context;
 
-    public AttachmentService(IChangeAttachmentRepository attachmentRepository, IChangeRepository changeRepository, IAuditService audit, IWebHostEnvironment environment, IHttpContextAccessor httpContextAccessor, IConfiguration configuration,ChangeManagementDbContext context)
+    public AttachmentService(IChangeAttachmentRepository attachmentRepository, IChangeRepository changeRepository, IAuditService audit, IWebHostEnvironment environment, IHttpContextAccessor httpContextAccessor, IConfiguration configuration, ChangeManagement.Api.Data.ChangeManagementDbContext context)
     {
         _attachmentRepository = attachmentRepository;
         _changeRepository = changeRepository;
@@ -34,33 +34,33 @@ public class AttachmentService : IAttachmentService
         _environment = environment;
         _httpContextAccessor = httpContextAccessor;
         _configuration = configuration;
-        _context = context;   // ← ADD THIS LINE
+        _context = context;
     }
 
     public Task<List<ChangeAttachment>> GetForChangeAsync(Guid changeId, CancellationToken cancellationToken) => _attachmentRepository.GetByChangeIdAsync(changeId, cancellationToken);
     public Task<ChangeAttachment?> GetAsync(Guid attachmentId, CancellationToken cancellationToken) => _attachmentRepository.GetByIdAsync(attachmentId, cancellationToken);
 
     public async Task<(ChangeAttachment? Attachment, string? Error)> UploadAsync(
-    Guid changeId, 
-    IFormFile file, 
-    Guid? uploadedBy, 
-    CancellationToken cancellationToken)
-{
-    // LIGHTWEIGHT existence check – only 1 table, no joins, no ChangeApprover reference
-    var changeInfo = await _context.ChangeRequests
-        .Where(c => c.ChangeRequestId == changeId && c.DeletedAt == null)
-        .Select(c => new 
-        { 
-            c.RequestedByUserId, 
-            c.CreatedBy, 
-            c.ChangeNumber 
-        })
-        .FirstOrDefaultAsync(cancellationToken);
-
-    if (changeInfo is null)
+        Guid changeId,
+        IFormFile file,
+        Guid? uploadedBy,
+        CancellationToken cancellationToken)
     {
-        return (null, "Change request not found.");
-    }
+        // LIGHTWEIGHT existence check – only 1 table, no joins, no ChangeApprover reference
+        var changeInfo = await _context.ChangeRequests
+            .Where(c => c.ChangeRequestId == changeId && c.DeletedAt == null)
+            .Select(c => new
+            {
+                c.RequestedByUserId,
+                c.CreatedBy,
+                c.ChangeNumber
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (changeInfo is null)
+        {
+            return (null, "Change request not found.");
+        }
 
     if (file is null || file.Length == 0) return (null, "No file uploaded.");
     if (file.Length > MaxFileBytes) return (null, "File exceeds 5MB limit.");
@@ -81,15 +81,34 @@ public class AttachmentService : IAttachmentService
     var storedFileName = $"{fileId}_{safeName}";
     var storedPath = Path.Combine(rootPath, storedFileName);
 
-    await using var stream = File.Create(storedPath);
-    await file.CopyToAsync(stream, cancellationToken);
+        var resolvedUploader = uploadedBy;
+        if (!resolvedUploader.HasValue || resolvedUploader == Guid.Empty)
+        {
+            resolvedUploader = changeInfo.RequestedByUserId != Guid.Empty
+                ? changeInfo.RequestedByUserId
+                : changeInfo.CreatedBy;
+        }
 
-    var resolvedUploader = uploadedBy;
-    if (!resolvedUploader.HasValue || resolvedUploader == Guid.Empty)
-    {
-        resolvedUploader = changeInfo.RequestedByUserId != Guid.Empty 
-            ? changeInfo.RequestedByUserId 
-            : changeInfo.CreatedBy;
+        var entity = new ChangeAttachment
+        {
+            ChangeAttachmentId = fileId,
+            ChangeRequestId = changeId,
+            FileName = Path.GetFileName(file.FileName),
+            FileUrl = storedPath,
+            FilePath = storedPath,
+            UploadedAt = DateTime.UtcNow,
+            UploadedBy = resolvedUploader,
+            FileSizeBytes = file.Length
+        };
+
+        var created = await _attachmentRepository.CreateAsync(entity, cancellationToken);
+
+        var actor = created.UploadedBy ?? changeInfo.CreatedBy;
+        await _audit.LogAsync(5, actor, ResolveActorUpn(), "cm", "ChangeAttachment",
+            created.ChangeAttachmentId, changeInfo.ChangeNumber.ToString(),
+            "AttachmentUpload", created.FileName, cancellationToken);
+
+        return (created, null);
     }
 
     var entity = new ChangeAttachment
