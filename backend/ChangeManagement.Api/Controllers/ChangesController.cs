@@ -233,7 +233,7 @@ public class ChangesController : ControllerBase
     }
 
 
-    private static bool TryParseId(string id, out Guid changeId, out ActionResult badRequest)
+    private bool TryParseId(string id, out Guid changeId, out ActionResult badRequest)
     {
         if (!Guid.TryParse(id, out changeId))
         {

@@ -15,11 +15,13 @@ public class AdminAttachmentsController : ControllerBase
 {
     private readonly ChangeManagementDbContext _dbContext;
     private readonly IAuditService _audit;
+    private readonly IActorResolver _actorResolver;
 
-    public AdminAttachmentsController(ChangeManagementDbContext dbContext, IAuditService audit)
+    public AdminAttachmentsController(ChangeManagementDbContext dbContext, IAuditService audit, IActorResolver actorResolver)
     {
         _dbContext = dbContext;
         _audit = audit;
+        _actorResolver = actorResolver;
     }
 
     [HttpGet]
@@ -71,7 +73,7 @@ public class AdminAttachmentsController : ControllerBase
         _dbContext.ChangeAttachments.Remove(attachment);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        var actorId = ResolveActorUserId();
+        var actorId = _actorResolver.ResolveActorUserId();
         var actorUpn = ResolveActorUpn();
         await _audit.LogAsync(5, actorId, actorUpn, "cm", "ChangeAttachment", attachment.ChangeAttachmentId, attachment.ChangeRequest?.ChangeNumber.ToString() ?? string.Empty, "AttachmentDelete", attachment.FileName, cancellationToken);
 
@@ -84,12 +86,6 @@ public class AdminAttachmentsController : ControllerBase
         var filePathProperty = attachment.GetType().GetProperty("FilePath");
         var filePathValue = filePathProperty?.GetValue(attachment) as string;
         return string.IsNullOrWhiteSpace(filePathValue) ? attachment.FilePath : filePathValue;
-    }
-
-    private Guid ResolveActorUserId()
-    {
-        var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.TryParse(claim, out var parsed) && parsed != Guid.Empty ? parsed : Guid.Parse("11111111-1111-1111-1111-111111111111");
     }
 
     private string ResolveActorUpn()
