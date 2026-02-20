@@ -20,17 +20,17 @@ public class TemplateService : ITemplateService
     private static readonly Guid DefaultActorUserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
     private readonly ChangeManagementDbContext _context;
-    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IActorResolver _actorResolver;
 
-    public TemplateService(ChangeManagementDbContext context, IHttpContextAccessor httpContextAccessor)
+    public TemplateService(ChangeManagementDbContext context, IActorResolver actorResolver)
     {
         _context = context;
-        _httpContextAccessor = httpContextAccessor;
+        _actorResolver = actorResolver;
     }
 
     public async Task<IReadOnlyList<ChangeTemplate>> ListAsync(bool includeInactive, CancellationToken ct)
     {
-        var query = _context.ChangeTemplates.AsQueryable();
+        var query = _context.ChangeTemplates.AsNoTracking().AsQueryable();
         if (!includeInactive)
         {
             query = query.Where(t => t.IsActive);
@@ -42,7 +42,9 @@ public class TemplateService : ITemplateService
     }
 
     public Task<ChangeTemplate?> GetAsync(Guid id, CancellationToken ct)
-        => _context.ChangeTemplates.FirstOrDefaultAsync(t => t.TemplateId == id, ct);
+        => _context.ChangeTemplates
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.TemplateId == id, ct);
 
     public async Task<ChangeTemplate> CreateAsync(ChangeTemplateUpsertDto request, CancellationToken ct)
     {
@@ -61,7 +63,7 @@ public class TemplateService : ITemplateService
             RiskLevelId = request.RiskLevelId,
             IsActive = request.IsActive ?? true,
             CreatedAt = DateTime.UtcNow,
-            CreatedBy = ResolveActorUserId()
+            CreatedBy = _actorResolver.ResolveActorUserId()
         };
 
         _context.ChangeTemplates.Add(template);
@@ -104,16 +106,5 @@ public class TemplateService : ITemplateService
         template.IsActive = false;
         await _context.SaveChangesAsync(ct);
         return true;
-    }
-
-    private Guid ResolveActorUserId()
-    {
-        var actorClaim = _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (Guid.TryParse(actorClaim, out var actorUserId) && actorUserId != Guid.Empty)
-        {
-            return actorUserId;
-        }
-
-        return DefaultActorUserId;
     }
 }
