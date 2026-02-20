@@ -1,62 +1,56 @@
-using ChangeManagement.Api.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace ChangeManagement.Api.Migrations;
-
-[DbContext(typeof(ChangeManagementDbContext))]
-[Migration("20260223010000_MP1001_AddPerformanceIndexes")]
-public partial class MP1001_AddPerformanceIndexes : Migration
+namespace ChangeManagement.Api.Migrations
 {
-    protected override void Up(MigrationBuilder migrationBuilder)
+    [DbContext(typeof(ChangeManagementDbContext))]
+    [Migration("20260223010000_MP1001_AddPerformanceIndexes")]
+    public partial class MP1001_AddPerformanceIndexes : Migration
     {
-        migrationBuilder.Sql("""
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ChangeRequest_StatusId' AND object_id = OBJECT_ID('[cm].[ChangeRequest]'))
-    CREATE INDEX [IX_ChangeRequest_StatusId] ON [cm].[ChangeRequest] ([StatusId]);
-""");
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.CreateIndex(
+                name: "IX_ChangeRequest_StatusId",
+                schema: "cm",
+                table: "ChangeRequest",
+                column: "StatusId");
 
-        migrationBuilder.Sql("""
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ChangeRequest_RequestedByUserId' AND object_id = OBJECT_ID('[cm].[ChangeRequest]'))
-    CREATE INDEX [IX_ChangeRequest_RequestedByUserId] ON [cm].[ChangeRequest] ([RequestedByUserId]);
-""");
+            migrationBuilder.CreateIndex(
+                name: "IX_ChangeRequest_ChangeNumber",
+                schema: "cm",
+                table: "ChangeRequest",
+                column: "ChangeNumber",
+                unique: true);
 
-        migrationBuilder.Sql("""
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ChangeRequest_ChangeNumber' AND object_id = OBJECT_ID('[cm].[ChangeRequest]'))
-    CREATE UNIQUE INDEX [IX_ChangeRequest_ChangeNumber] ON [cm].[ChangeRequest] ([ChangeNumber]);
-""");
+            migrationBuilder.CreateIndex(
+                name: "IX_ChangeRequest_RequestedByUserId",
+                schema: "cm",
+                table: "ChangeRequest",
+                column: "RequestedByUserId");
 
-        migrationBuilder.Sql("""
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ChangeApprover_ChangeRequestId' AND object_id = OBJECT_ID('[cm].[ChangeApprover]'))
-    CREATE INDEX [IX_ChangeApprover_ChangeRequestId] ON [cm].[ChangeApprover] ([ChangeRequestId]);
-""");
+            migrationBuilder.CreateIndex(
+                name: "IX_ChangeApprover_ChangeRequestId",
+                schema: "cm",
+                table: "ChangeApprover",
+                column: "ChangeRequestId");
 
-        migrationBuilder.Sql("""
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ChangeAttachment_ChangeRequestId' AND object_id = OBJECT_ID('[cm].[ChangeAttachment]'))
-    CREATE INDEX [IX_ChangeAttachment_ChangeRequestId] ON [cm].[ChangeAttachment] ([ChangeRequestId]);
-""");
-    }
+            migrationBuilder.CreateIndex(
+                name: "IX_ChangeAttachment_ChangeRequestId",
+                schema: "cm",
+                table: "ChangeAttachment",
+                column: "ChangeRequestId");
+        }
 
-    protected override void Down(MigrationBuilder migrationBuilder)
-    {
-        migrationBuilder.Sql("""
-IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ChangeAttachment_ChangeRequestId' AND object_id = OBJECT_ID('[cm].[ChangeAttachment]'))
-    DROP INDEX [IX_ChangeAttachment_ChangeRequestId] ON [cm].[ChangeAttachment];
-""");
-
-        migrationBuilder.Sql("""
-IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ChangeApprover_ChangeRequestId' AND object_id = OBJECT_ID('[cm].[ChangeApprover]'))
-    DROP INDEX [IX_ChangeApprover_ChangeRequestId] ON [cm].[ChangeApprover];
-""");
-
-        migrationBuilder.Sql("""
-IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ChangeRequest_RequestedByUserId' AND object_id = OBJECT_ID('[cm].[ChangeRequest]'))
-    DROP INDEX [IX_ChangeRequest_RequestedByUserId] ON [cm].[ChangeRequest];
-""");
-
-        migrationBuilder.Sql("""
-IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ChangeRequest_StatusId' AND object_id = OBJECT_ID('[cm].[ChangeRequest]'))
-    DROP INDEX [IX_ChangeRequest_StatusId] ON [cm].[ChangeRequest];
-""");
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropIndex("IX_ChangeRequest_StatusId", "cm", "ChangeRequest");
+            migrationBuilder.DropIndex("IX_ChangeRequest_ChangeNumber", "cm", "ChangeRequest");
+            migrationBuilder.DropIndex("IX_ChangeRequest_RequestedByUserId", "cm", "ChangeRequest");
+            migrationBuilder.DropIndex("IX_ChangeApprover_ChangeRequestId", "cm", "ChangeApprover");
+            migrationBuilder.DropIndex("IX_ChangeAttachment_ChangeRequestId", "cm", "ChangeAttachment");
+        }
     }
 }
