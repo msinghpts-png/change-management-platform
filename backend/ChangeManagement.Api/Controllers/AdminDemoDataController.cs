@@ -90,9 +90,9 @@ public class AdminDemoDataController : ControllerBase
                 CreatedAt = DateTime.UtcNow
             };
             _dbContext.ChangeRequests.AddRange(draft, submitted);
-            _dbContext.ChangeApprovals.Add(new ChangeApproval { ChangeApprovalId = Guid.NewGuid(), ChangeRequestId = submitted.ChangeRequestId, ApproverUserId = cab1, ApprovalStatusId = 1 });
-            _dbContext.ChangeTasks.Add(new ChangeTask { ChangeTaskId = Guid.NewGuid(), ChangeRequestId = submitted.ChangeRequestId, Title = "Review implementation plan", Description = "CAB checklist", StatusId = 1 });
-            _dbContext.ChangeAttachments.Add(new ChangeAttachment { ChangeAttachmentId = Guid.NewGuid(), ChangeRequestId = draft.ChangeRequestId, FileName = "demo.txt", FileUrl = "data/attachments/demo.txt", UploadedAt = DateTime.UtcNow, UploadedBy = adminId, FileSizeBytes = 0 });
+            _dbContext.ChangeApprovers.Add(new ChangeApprover { ChangeApproverId = Guid.NewGuid(), ChangeRequestId = submitted.ChangeRequestId, ApproverUserId = cab1, ApprovalStatus = "Pending", CreatedAt = DateTime.UtcNow });
+            _dbContext.ChangeTasks.Add(new ChangeTask { ChangeTaskId = Guid.NewGuid(), ChangeRequestId = submitted.ChangeRequestId, Title = "Review implementation plan", Description = "CAB checklist", Status = "Open", CreatedAt = DateTime.UtcNow });
+            _dbContext.ChangeAttachments.Add(new ChangeAttachment { ChangeAttachmentId = Guid.NewGuid(), ChangeRequestId = draft.ChangeRequestId, FileName = "demo.txt", UploadedAt = DateTime.UtcNow, UploadedBy = adminId, FileSizeBytes = 0 });
             addedChanges += 2;
         }
 

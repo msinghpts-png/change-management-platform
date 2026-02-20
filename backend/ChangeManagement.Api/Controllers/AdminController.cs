@@ -27,7 +27,7 @@ public class AdminController : ControllerBase
         {
             DatabaseName = dbName,
             TotalChanges = await _dbContext.ChangeRequests.CountAsync(cancellationToken),
-            TotalApprovals = await _dbContext.ChangeApprovals.CountAsync(cancellationToken),
+            TotalApprovals = await _dbContext.ChangeApprovers.CountAsync(cancellationToken),
             TotalAttachments = await _dbContext.ChangeAttachments.CountAsync(cancellationToken),
             HasPendingMigrations = pending.Count > 0,
             PendingMigrations = pending

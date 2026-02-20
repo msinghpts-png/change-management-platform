@@ -24,9 +24,9 @@ public class ChangeTasksController : ControllerBase
             ChangeRequestId = changeId,
             Title = request.Title,
             Description = request.Description,
-            StatusId = request.StatusId,
+            Status = request.Status,
             AssignedToUserId = request.AssignedToUserId,
-            DueAt = request.DueAt
+            DueDate = request.DueDate
         };
 
         var created = await _service.CreateAsync(task, cancellationToken);
@@ -42,9 +42,9 @@ public class ChangeTasksController : ControllerBase
             ChangeRequestId = changeId,
             Title = request.Title,
             Description = request.Description,
-            StatusId = request.StatusId,
+            Status = request.Status,
             AssignedToUserId = request.AssignedToUserId,
-            DueAt = request.DueAt,
+            DueDate = request.DueDate,
             CompletedAt = request.CompletedAt
         };
 

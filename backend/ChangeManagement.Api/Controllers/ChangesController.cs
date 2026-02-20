@@ -1,5 +1,6 @@
 using ChangeManagement.Api.Data;
 using ChangeManagement.Api.Domain.Entities;
+using ChangeManagement.Api.Extensions;
 using ChangeManagement.Api.DTOs;
 using ChangeManagement.Api.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -57,68 +58,25 @@ public class ChangesController : ControllerBase
 
         try
         {
-            var change = await _dbContext.ChangeRequests
+            var entity = await _dbContext.ChangeRequests
                 .AsNoTracking()
                 .AsSplitQuery()
-                .Where(x => x.ChangeRequestId == changeId && x.DeletedAt == null)
-                .Select(x => new ChangeRequestDto
-                {
-                    Id = x.ChangeRequestId,
-                    ChangeRequestId = x.ChangeRequestId,
-                    ChangeNumber = x.ChangeNumber,
-                    Title = x.Title,
-                    Description = x.Description,
-                    ImplementationSteps = x.ImplementationSteps,
-                    BackoutPlan = x.BackoutPlan,
-                    ServiceSystem = x.ServiceSystem,
-                    Category = x.Category,
-                    Environment = x.Environment,
-                    BusinessJustification = x.BusinessJustification,
-                    ChangeTypeId = x.ChangeTypeId,
-                    PriorityId = x.PriorityId,
-                    StatusId = x.StatusId,
-                    RiskLevelId = x.RiskLevelId,
-                    ImpactTypeId = x.ImpactTypeId,
-                    Status = x.Status != null ? x.Status.Name : null,
-                    Priority = x.Priority != null ? x.Priority.Name : null,
-                    RiskLevel = x.RiskLevel != null ? x.RiskLevel.Name : null,
-                    ImpactLevel = x.ImpactLevel != null ? x.ImpactLevel.Name : null,
-                    RequestedBy = x.RequestedByUser != null ? x.RequestedByUser.Upn : null,
-                    RequestedByUserId = x.RequestedByUserId == Guid.Empty ? null : x.RequestedByUserId,
-                    AssignedToUserId = x.AssignedToUserId,
-                    Owner = x.RequestedByUser != null ? (x.RequestedByUser.DisplayName ?? x.RequestedByUser.Upn) : null,
-                    RequestedByDisplay = x.RequestedByUser != null ? (x.RequestedByUser.DisplayName ?? x.RequestedByUser.Upn) : null,
-                    Executor = x.AssignedToUser != null ? (x.AssignedToUser.DisplayName ?? x.AssignedToUser.Upn) : null,
-                    ImplementationGroup = x.ImplementationGroup,
-                    ApprovalRequired = x.ApprovalRequired,
-                    ApprovalStrategy = x.ApprovalStrategy ?? ApprovalStrategies.Any,
-                    Approvals = x.ChangeApprovals.Select(a => new ApprovalDecisionItemDto
-                    {
-                        ApproverUserId = a.ApproverUserId,
-                        Approver = a.ApproverUser != null ? (a.ApproverUser.DisplayName ?? a.ApproverUser.Upn ?? string.Empty) : string.Empty,
-                        Status = a.ApprovalStatus != null ? a.ApprovalStatus.Name : "Pending",
-                        Comments = a.Comments,
-                        DecisionAt = a.ApprovedAt
-                    }).ToList(),
-                    PlannedStart = x.PlannedStart,
-                    PlannedEnd = x.PlannedEnd,
-                    CreatedAt = x.CreatedAt,
-                    UpdatedAt = x.UpdatedAt
-                })
-                .SingleOrDefaultAsync(cancellationToken);
+                .Include(x => x.ChangeType)
+                .Include(x => x.Priority)
+                .Include(x => x.Status)
+                .Include(x => x.RiskLevel)
+                .Include(x => x.RequestedByUser)
+                .Include(x => x.AssignedToUser)
+                .Include(x => x.ChangeApprovers)
+                    .ThenInclude(x => x.ApproverUser)
+                .Include(x => x.ChangeAttachments)
+                .FirstOrDefaultAsync(x => x.ChangeRequestId == changeId, cancellationToken);
+
+            var change = entity?.ToDto();
 
             if (change is null)
             {
                 return NotFound();
-            }
-
-            if (await HasChangeApproverTableAsync(cancellationToken))
-            {
-                change.ApproverUserIds = await _dbContext.ChangeApprovers
-                    .AsNoTracking()
-                    .Where(x => x.ChangeRequestId == changeId)
-                    .Select(x => x.ApproverUserId)
-                    .ToListAsync(cancellationToken);
             }
 
             return Ok(change);
@@ -274,30 +232,11 @@ public class ChangesController : ControllerBase
         return updated is null ? NotFound() : Ok(ToDto(updated));
     }
 
-    private async Task<bool> HasChangeApproverTableAsync(CancellationToken cancellationToken)
+
+    private static bool TryParseId(string id, out Guid changeId, out ActionResult badRequest)
     {
-        if (_dbContext.Database.ProviderName != "Microsoft.EntityFrameworkCore.SqlServer")
+        if (!Guid.TryParse(id, out changeId))
         {
-            return true;
-        }
-
-        await using var connection = _dbContext.Database.GetDbConnection();
-        if (connection.State != System.Data.ConnectionState.Open)
-        {
-            await connection.OpenAsync(cancellationToken);
-        }
-
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT CASE WHEN OBJECT_ID('cm.ChangeApprover', 'U') IS NULL THEN 0 ELSE 1 END";
-        var result = await command.ExecuteScalarAsync(cancellationToken);
-        return Convert.ToInt32(result) == 1;
-    }
-
-    private bool TryParseId(string id, out Guid guidResult, out BadRequestObjectResult badRequest)
-    {
-        if (!Guid.TryParse(id, out guidResult))
-        {
-            _logger.LogWarning("Invalid change id received: {Id}", id);
             badRequest = BadRequest(new { message = "Invalid change request id." });
             return false;
         }
@@ -317,49 +256,5 @@ public class ChangesController : ControllerBase
         throw new UnauthorizedAccessException("Authenticated actor is required.");
     }
 
-    private static ChangeRequestDto ToDto(ChangeRequest change) => new()
-    {
-        Id = change.ChangeRequestId,
-        ChangeRequestId = change.ChangeRequestId,
-        ChangeNumber = change.ChangeNumber,
-        Title = change.Title,
-        Description = change.Description,
-        ImplementationSteps = change.ImplementationSteps,
-        BackoutPlan = change.BackoutPlan,
-        ServiceSystem = change.ServiceSystem,
-        Category = change.Category,
-        Environment = change.Environment,
-        BusinessJustification = change.BusinessJustification,
-        ChangeTypeId = change.ChangeTypeId,
-        PriorityId = change.PriorityId,
-        StatusId = change.StatusId,
-        RiskLevelId = change.RiskLevelId,
-        ImpactTypeId = change.ImpactTypeId,
-        Status = change.Status?.Name,
-        Priority = change.Priority?.Name,
-        RiskLevel = change.RiskLevel?.Name,
-        ImpactLevel = change.ImpactLevel?.Name,
-        RequestedBy = change.RequestedByUser?.Upn,
-        RequestedByUserId = change.RequestedByUserId == Guid.Empty ? null : change.RequestedByUserId,
-        AssignedToUserId = change.AssignedToUserId,
-        Owner = change.RequestedByUser?.DisplayName ?? change.RequestedByUser?.Upn,
-        RequestedByDisplay = change.RequestedByUser?.DisplayName ?? change.RequestedByUser?.Upn,
-        Executor = change.AssignedToUser?.DisplayName ?? change.AssignedToUser?.Upn,
-        ImplementationGroup = change.ImplementationGroup,
-        ApprovalRequired = change.ApprovalRequired,
-        ApprovalStrategy = change.ApprovalStrategy ?? ApprovalStrategies.Any,
-        ApproverUserIds = change.ChangeApprovers?.Select(x => x.ApproverUserId).ToList() ?? new List<Guid>(),
-        Approvals = change.ChangeApprovals?.Select(a => new ApprovalDecisionItemDto
-        {
-            ApproverUserId = a.ApproverUserId,
-            Approver = a.ApproverUser?.DisplayName ?? a.ApproverUser?.Upn ?? string.Empty,
-            Status = a.ApprovalStatus?.Name ?? "Pending",
-            Comments = a.Comments,
-            DecisionAt = a.ApprovedAt
-        }).ToList() ?? new List<ApprovalDecisionItemDto>(),
-        PlannedStart = change.PlannedStart,
-        PlannedEnd = change.PlannedEnd,
-        CreatedAt = change.CreatedAt,
-        UpdatedAt = change.UpdatedAt
-    };
+    private static ChangeRequestDto ToDto(ChangeRequest change) => change.ToDto();
 }

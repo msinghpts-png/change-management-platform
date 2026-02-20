@@ -4,8 +4,8 @@ namespace ChangeManagement.Api.Repositories;
 
 public interface IApprovalRepository
 {
-    Task<ChangeApproval> CreateAsync(ChangeApproval approval, CancellationToken cancellationToken);
-    Task<List<ChangeApproval>> GetByChangeAsync(Guid changeRequestId, CancellationToken cancellationToken);
-    Task<ChangeApproval?> GetByIdAsync(Guid approvalId, CancellationToken cancellationToken);
+    Task<ChangeApprover> CreateAsync(ChangeApprover approval, CancellationToken cancellationToken);
+    Task<List<ChangeApprover>> GetByChangeAsync(Guid changeRequestId, CancellationToken cancellationToken);
+    Task<ChangeApprover?> GetByIdAsync(Guid approvalId, CancellationToken cancellationToken);
     Task SaveAsync(CancellationToken cancellationToken);
 }
