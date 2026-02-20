@@ -13,8 +13,8 @@ public static class AttachmentMappings
             ChangeAttachmentId = attachment.ChangeAttachmentId,
             ChangeRequestId = attachment.ChangeRequestId,
             FileName = attachment.FileName,
-            FileUrl = attachment.FileUrl,
-            FilePath = string.IsNullOrWhiteSpace(attachment.FilePath) ? attachment.FileUrl : attachment.FilePath,
+            FileUrl = $"/api/changes/{attachment.ChangeRequestId}/attachments/{attachment.ChangeAttachmentId}/download",
+            FilePath = string.IsNullOrWhiteSpace(attachment.FilePath) ? string.Empty : attachment.FilePath,
             FileSizeBytes = attachment.FileSizeBytes,
             UploadedAt = attachment.UploadedAt,
             UploadedBy = attachment.UploadedBy

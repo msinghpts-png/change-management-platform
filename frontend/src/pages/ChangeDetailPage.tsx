@@ -4,17 +4,10 @@ import { apiClient } from "../services/apiClient";
 import type { Approval, ApprovalStatus, Attachment, ChangeCreateDto, ChangeRequest, ChangeTask, ChangeTemplate, ChangeUpdateDto } from "../types/change";
 import { labelForChangeType, pillForChangeType, pillForImpactLevel, pillForRiskLevel } from "../utils/trafficColors";
 import { getStatusPillClass } from "../ui/pills";
+import PriorityBadge from "../components/PriorityBadge";
 
 type ViewTab = "Overview" | "Approvals" | "Tasks" | "Attachments";
 type FormTab = "Basic Info" | "Schedule" | "Plans" | "Risk & Impact" | "Approvals" | "Attachments";
-
-const pillForPriority = (priority?: string) => {
-  const p = (priority ?? "").toLowerCase();
-  if (p.includes("p1") || p.includes("emergency")) return "pill pill-red";
-  if (p.includes("p2")) return "pill pill-amber";
-  if (p.includes("p3")) return "pill pill-blue";
-  return "pill";
-};
 
 const fmtDT = (value?: string) => {
   if (!value) return "—";
@@ -76,10 +69,27 @@ const priorityToId = (priority: string) => {
   return 2;
 };
 
+const priorityToCode = (priority?: string, priorityId?: number) => {
+  if (priorityId === 4) return "P1";
+  if (priorityId === 3) return "P2";
+  if (priorityId === 1) return "P4";
+
+  const normalized = (priority ?? "").trim().toLowerCase();
+  if (normalized === "critical" || normalized === "p1") return "P1";
+  if (normalized === "high" || normalized === "p2") return "P2";
+  if (normalized === "low" || normalized === "p4") return "P4";
+  return "P3";
+};
+
 const riskIdToLabel = (riskLevelId?: number) => {
   if (riskLevelId === 1) return "Low";
   if (riskLevelId === 3) return "High";
   return "Medium";
+};
+
+const normalizeGuid = (value?: string | null) => {
+  const trimmed = (value ?? "").trim().toLowerCase();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(trimmed) ? trimmed : "";
 };
 
 const impactIdToLabel = (impactTypeId?: number) => {
@@ -127,6 +137,17 @@ const ChangeDetailPage = () => {
       return "";
     }
   })();
+
+  const authUserId = (() => {
+    try {
+      const raw = localStorage.getItem("authUser");
+      const parsed = raw ? JSON.parse(raw) : null;
+      return normalizeGuid(typeof parsed?.id === "string" ? parsed.id : "");
+    } catch {
+      return "";
+    }
+  })();
+  const [forceEditMode, setForceEditMode] = useState(false);
 
   // Form fields (kept in UI; backend DTO is smaller)
   const [title, setTitle] = useState("");
@@ -213,7 +234,7 @@ const ChangeDetailPage = () => {
         setEnvironment(data.environment ?? "Non-Production");
         setDowntimeRequired(Boolean((data as any).downtimeRequired));
         setChangeTypeIdValue(data.changeTypeId ?? 2);
-        setPriority(data.priority ?? "P3");
+        setPriority(priorityToCode(data.priority, data.priorityId));
         setRiskLevelIdValue(data.riskLevelId ?? (data.riskLevel?.toLowerCase() === "low" ? 1 : data.riskLevel?.toLowerCase() === "high" ? 3 : 2));
         setImpactTypeIdValue(data.impactTypeId ?? (data.impactLevel?.toLowerCase() === "low" ? 1 : data.impactLevel?.toLowerCase() === "high" ? 3 : 2));
         setPlannedStart(data.plannedStart ? data.plannedStart.slice(0, 16) : "");
@@ -526,7 +547,16 @@ const ChangeDetailPage = () => {
   }
 
   // ---------- NEW / EDIT FORM ----------
-  if (isNew || (!isNew && item && (item.status ?? "").toLowerCase().includes("draft"))) {
+  const statusLower = (item?.status ?? "").toLowerCase();
+  const isDraftStatus = statusLower.includes("draft");
+  const isSubmittedStatus = statusLower.includes("submitted");
+  const isApprovedOrClosedStatus = statusLower.includes("approved") || statusLower.includes("closed");
+  const isAdmin = authUserRole === "admin";
+  const isOwner = Boolean(normalizeGuid(item?.requestedByUserId) && authUserId && normalizeGuid(item?.requestedByUserId) === authUserId);
+  const canModify = isDraftStatus || (isSubmittedStatus && (isOwner || isAdmin)) || (isApprovedOrClosedStatus && isAdmin);
+  const isEditableMode = isNew || isDraftStatus || forceEditMode;
+
+  if (isEditableMode) {
     return (
       <div>
         <button className="btn" onClick={() => nav("/dashboard")} style={{ marginBottom: 12 }}>
@@ -773,6 +803,11 @@ Emergency: urgent; CAB approval required" style={{ cursor: "help" }}>ⓘ</span><
             <button className="btn" onClick={() => { void saveDraft(); }} disabled={loading || isSaving}>
               💾 Save Draft
             </button>
+            {!isNew && !isDraftStatus && forceEditMode ? (
+              <button className="btn" type="button" onClick={() => setForceEditMode(false)} disabled={loading || isSaving}>
+                Cancel Modify
+              </button>
+            ) : null}
             <button type="button" className="btn btn-primary" onClick={submitForApproval} disabled={isSubmitDisabled}>
               ✈ Submit for Approval
             </button>
@@ -806,16 +841,23 @@ Emergency: urgent; CAB approval required" style={{ cursor: "help" }}>ⓘ</span><
           <h1 className="page-title" style={{ marginTop: 10 }}>{item?.title}</h1>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-            <span className={pillForPriority(item?.priority)}>{item?.priority ?? "P3"}</span>
+            <PriorityBadge priority={item?.priority} />
             <span className={pillForChangeType(item?.changeTypeId)}>{labelForChangeType(item?.changeTypeId)}</span>
             {item?.riskLevel ? <span className={pillForRiskLevel(item.riskLevel)}>Risk: {item.riskLevel}</span> : null}
             {item?.impactLevel ? <span className={pillForImpactLevel(item.impactLevel)}>Impact: {item.impactLevel}</span> : null}
           </div>
         </div>
 
-        <button className="btn" onClick={() => alert("Implementation workflow can be wired next (status transition + audit).")}>
-          ▶ Start Implementation
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {canModify ? (
+            <button className="btn" type="button" onClick={() => setForceEditMode(true)}>
+              Modify
+            </button>
+          ) : null}
+          <button className="btn" onClick={() => alert("Implementation workflow can be wired next (status transition + audit).")}>
+            ▶ Start Implementation
+          </button>
+        </div>
       </div>
 
 

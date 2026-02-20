@@ -1,5 +1,7 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using ChangeManagement.Api.DTOs;
 using ChangeManagement.Api.Tests.Infrastructure;
 using Xunit;
 
@@ -11,7 +13,7 @@ public class AttachmentUploadTests : IClassFixture<CustomWebApplicationFactory>
     public AttachmentUploadTests(CustomWebApplicationFactory factory) => _client = factory.CreateClient();
 
     [Fact]
-    public async Task UploadAttachment_ReturnsCreated()
+    public async Task UploadAttachment_ReturnsCreated_And_DownloadsContent()
     {
         await AuthTestHelper.AuthenticateAsAdminAsync(_client);
 
@@ -33,7 +35,15 @@ public class AttachmentUploadTests : IClassFixture<CustomWebApplicationFactory>
         file.Headers.ContentType = MediaTypeHeaderValue.Parse("text/plain");
         form.Add(file, "file", "note.txt");
 
-        var response = await _client.PostAsync($"/api/changes/{changeId}/attachments", form);
-        response.EnsureSuccessStatusCode();
+        var uploadResponse = await _client.PostAsync($"/api/changes/{changeId}/attachments", form);
+        Assert.Equal(HttpStatusCode.Created, uploadResponse.StatusCode);
+        var uploaded = await uploadResponse.Content.ReadFromJsonAsync<AttachmentDto>();
+        Assert.NotNull(uploaded);
+        Assert.Equal(changeId, uploaded!.ChangeRequestId);
+        Assert.Contains(changeId.ToString(), uploaded.FilePath, StringComparison.OrdinalIgnoreCase);
+
+        var downloadResponse = await _client.GetAsync($"/api/changes/{changeId}/attachments/{uploaded.Id}/download");
+        Assert.Equal(HttpStatusCode.OK, downloadResponse.StatusCode);
+        Assert.True(downloadResponse.Content.Headers.ContentLength > 0);
     }
 }

@@ -55,7 +55,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - uploads_data:/app/uploads
+      - change_data:/data
     depends_on:
       sqlserver:
         condition: service_healthy
@@ -71,4 +71,4 @@ services:
 
 volumes:
   sql_data:
-  uploads_data:
+  change_data:
