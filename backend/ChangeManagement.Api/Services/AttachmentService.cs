@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using ChangeManagement.Api.Data;
 using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -25,9 +24,9 @@ public class AttachmentService : IAttachmentService
     private readonly IWebHostEnvironment _environment;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IConfiguration _configuration;
-    private readonly ChangeManagementDbContext _context;
+    private readonly ChangeManagement.Api.Data.ChangeManagementDbContext _context;
 
-    public AttachmentService(IChangeAttachmentRepository attachmentRepository, IChangeRepository changeRepository, IAuditService audit, IWebHostEnvironment environment, IHttpContextAccessor httpContextAccessor, IConfiguration configuration, ChangeManagementDbContext context)
+    public AttachmentService(IChangeAttachmentRepository attachmentRepository, IChangeRepository changeRepository, IAuditService audit, IWebHostEnvironment environment, IHttpContextAccessor httpContextAccessor, IConfiguration configuration, ChangeManagement.Api.Data.ChangeManagementDbContext context)
     {
         _attachmentRepository = attachmentRepository;
         _changeRepository = changeRepository;
