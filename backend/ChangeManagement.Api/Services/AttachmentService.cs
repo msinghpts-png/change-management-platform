@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.Repositories;
-using ChangeManagement.Api.Data; // ← ADD THIS LINE
+using Microsoft.EntityFrameworkCore;
 
 namespace ChangeManagement.Api.Services;
 
@@ -71,8 +71,10 @@ public class AttachmentService : IAttachmentService
         return (null, "File type is not allowed.");
     }
 
-    var rootPath = Path.Combine(ResolveAttachmentRoot(), changeId.ToString());
-    Directory.CreateDirectory(rootPath);
+        var fileId = Guid.NewGuid();
+        var safeName = Path.GetFileName(file.FileName);
+        var storedFileName = $"{fileId}_{safeName}";
+        var storedPath = Path.Combine(rootPath, storedFileName);
 
     var fileId = Guid.NewGuid();
     var safeName = Path.GetFileName(file.FileName);

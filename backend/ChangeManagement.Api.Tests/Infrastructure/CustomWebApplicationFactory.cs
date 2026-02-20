@@ -1,6 +1,8 @@
 using ChangeManagement.Api.Data;
 using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.Security;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -41,6 +43,24 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
             services.AddDbContext<ChangeManagementDbContext>(options =>
                 options.UseInMemoryDatabase(_databaseName, _databaseRoot));
+
+            services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
+                options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
+                options.DefaultScheme = TestAuthHandler.SchemeName;
+            }).AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
+
+            services.AddAuthorization(options =>
+            {
+                options.DefaultPolicy = new AuthorizationPolicyBuilder(TestAuthHandler.SchemeName)
+                    .RequireAuthenticatedUser()
+                    .Build();
+
+                options.AddPolicy("AdminOnly", policy => policy
+                    .AddAuthenticationSchemes(TestAuthHandler.SchemeName)
+                    .RequireRole("Admin"));
+            });
 
             using var scope = services.BuildServiceProvider().CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ChangeManagementDbContext>();
