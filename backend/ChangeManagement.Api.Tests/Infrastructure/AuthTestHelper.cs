@@ -1,19 +1,21 @@
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using ChangeManagement.Api.DTOs.Auth;
 
 namespace ChangeManagement.Api.Tests.Infrastructure;
 
 internal static class AuthTestHelper
 {
     public static Task AuthenticateAsAdminAsync(HttpClient client) =>
-        AuthenticateAsync(client, "11111111-1111-1111-1111-111111111111", "admin@local", "Admin");
+        AuthenticateAsync(client, "admin@local", "Admin123!");
 
     public static Task AuthenticateAsCabAsync(HttpClient client) =>
-        AuthenticateAsync(client, "22222222-2222-2222-2222-222222222222", "cab@local", "CAB");
+        AuthenticateAsync(client, "cab@local", "Admin123!");
 
     public static Task AuthenticateAsExecutorAsync(HttpClient client) =>
-        AuthenticateAsync(client, "33333333-3333-3333-3333-333333333333", "executor@local", "Executor");
+        AuthenticateAsync(client, "executor@local", "Admin123!");
 
-    private static Task AuthenticateAsync(HttpClient client, string userId, string userName, string role)
+    private static async Task AuthenticateAsync(HttpClient client, string upn, string password)
     {
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthHandler.SchemeName, "enabled");
 

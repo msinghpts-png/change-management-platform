@@ -76,25 +76,24 @@ public class AttachmentService : IAttachmentService
             return (null, "Change request not found.");
         }
 
-        if (file is null || file.Length == 0) return (null, "No file uploaded.");
-        if (file.Length > MaxFileBytes) return (null, "File exceeds 5MB limit.");
+    if (file is null || file.Length == 0) return (null, "No file uploaded.");
+    if (file.Length > MaxFileBytes) return (null, "File exceeds 5MB limit.");
 
-        var extension = Path.GetExtension(file.FileName);
-        if (string.IsNullOrWhiteSpace(extension) || !AllowedExtensions.Contains(extension))
-        {
-            return (null, "File type is not allowed.");
-        }
-
-        var rootPath = Path.Combine(ResolveAttachmentRoot(), changeId.ToString());
-        Directory.CreateDirectory(rootPath);
+    var extension = Path.GetExtension(file.FileName);
+    if (string.IsNullOrWhiteSpace(extension) || !AllowedExtensions.Contains(extension))
+    {
+        return (null, "File type is not allowed.");
+    }
 
         var fileId = Guid.NewGuid();
         var safeName = Path.GetFileName(file.FileName);
         var storedFileName = $"{fileId}_{safeName}";
         var storedPath = Path.Combine(rootPath, storedFileName);
 
-        await using var stream = File.Create(storedPath);
-        await file.CopyToAsync(stream, cancellationToken);
+    var fileId = Guid.NewGuid();
+    var safeName = Path.GetFileName(file.FileName);
+    var storedFileName = $"{fileId}_{safeName}";
+    var storedPath = Path.Combine(rootPath, storedFileName);
 
         var resolvedUploader = uploadedBy;
         if (!resolvedUploader.HasValue || resolvedUploader == Guid.Empty)
@@ -171,7 +170,8 @@ public class AttachmentService : IAttachmentService
 
     public async Task<byte[]?> ReadFileAsync(ChangeAttachment attachment, CancellationToken cancellationToken)
     {
-        if (!File.Exists(attachment.FileUrl)) return null;
-        return await File.ReadAllBytesAsync(attachment.FileUrl, cancellationToken);
+        var path = string.IsNullOrWhiteSpace(attachment.FilePath) ? attachment.FileUrl : attachment.FilePath;
+        if (!File.Exists(path)) return null;
+        return await File.ReadAllBytesAsync(path, cancellationToken);
     }
 }
