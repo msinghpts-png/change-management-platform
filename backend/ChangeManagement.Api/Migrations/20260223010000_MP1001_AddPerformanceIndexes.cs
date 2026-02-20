@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using ChangeManagement.Api.Data;   // ✅ THIS FIXES THE ERROR
 
 #nullable disable
 
