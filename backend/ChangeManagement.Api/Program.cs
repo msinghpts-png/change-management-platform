@@ -16,18 +16,17 @@ var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Server=localhost;Database=ChangeManagementDB;Trusted_Connection=true;TrustServerCertificate=true;";
-var useInMemoryDatabase = builder.Environment.IsEnvironment("Testing") || builder.Configuration.GetValue<bool>("UseInMemoryDatabase");
+
+var useInMemoryDatabase =
+    builder.Environment.IsEnvironment("Testing") ||
+    builder.Configuration.GetValue<bool>("UseInMemoryDatabase");
 
 builder.Services.AddDbContext<ChangeManagementDbContext>(options =>
 {
     if (useInMemoryDatabase)
-    {
         options.UseInMemoryDatabase("ChangeManagement.Testing");
-    }
     else
-    {
         options.UseSqlServer(connectionString);
-    }
 });
 
 builder.Services.AddControllers();
@@ -43,6 +42,7 @@ builder.Services.AddCors(options =>
             .AllowAnyHeader();
     });
 });
+
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
@@ -78,22 +78,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             {
                 if (context.Principal?.Identity is ClaimsIdentity identity)
                 {
-                    var roleValues = identity.FindAll("role").Select(c => c.Value).ToList();
-                    foreach (var role in roleValues)
+                    var roles = identity.FindAll("role").Select(c => c.Value).ToList();
+
+                    foreach (var role in roles)
                     {
                         if (!identity.HasClaim(ClaimTypes.Role, role))
-                        {
                             identity.AddClaim(new Claim(ClaimTypes.Role, role));
-                        }
-                    }
 
-                    var claimTypeRoles = identity.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
-                    foreach (var role in claimTypeRoles)
-                    {
                         if (!identity.HasClaim("role", role))
-                        {
                             identity.AddClaim(new Claim("role", role));
-                        }
                     }
                 }
 
@@ -106,6 +99,7 @@ builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
 });
+
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<IChangeRepository, ChangeRepository>();
@@ -128,14 +122,17 @@ app.UseExceptionHandler(exceptionApp =>
     exceptionApp.Run(async context =>
     {
         var feature = context.Features.Get<IExceptionHandlerFeature>();
-        var statusCode = feature?.Error is UnauthorizedAccessException ? StatusCodes.Status401Unauthorized : StatusCodes.Status500InternalServerError;
+        var statusCode =
+            feature?.Error is UnauthorizedAccessException
+                ? StatusCodes.Status401Unauthorized
+                : StatusCodes.Status500InternalServerError;
+
         context.Response.StatusCode = statusCode;
         context.Response.ContentType = "application/json";
-        var errorMessage = feature?.Error?.Message ?? "An unexpected error occurred.";
 
         var payload = JsonSerializer.Serialize(new
         {
-            message = errorMessage,
+            message = feature?.Error?.Message ?? "An unexpected error occurred.",
             traceId = context.TraceIdentifier
         });
 
@@ -143,15 +140,18 @@ app.UseExceptionHandler(exceptionApp =>
     });
 });
 
-var skipDatabaseInitialization = app.Environment.IsEnvironment("Testing") || app.Configuration.GetValue<bool>("SkipDatabaseInitialization");
+var skipDatabaseInitialization =
+    app.Environment.IsEnvironment("Testing") ||
+    app.Configuration.GetValue<bool>("SkipDatabaseInitialization");
+
 if (!skipDatabaseInitialization)
 {
-    using (var scope = app.Services.CreateScope())
-    {
-        var dbContext = scope.ServiceProvider.GetRequiredService<ChangeManagementDbContext>();
-    var providerName = dbContext.Database.ProviderName ?? string.Empty;
-    var isInMemory = string.Equals(providerName, "Microsoft.EntityFrameworkCore.InMemory", StringComparison.Ordinal);
-    var isSqlite = string.Equals(providerName, "Microsoft.EntityFrameworkCore.Sqlite", StringComparison.Ordinal);
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<ChangeManagementDbContext>();
+
+    var provider = dbContext.Database.ProviderName ?? string.Empty;
+    var isInMemory = provider == "Microsoft.EntityFrameworkCore.InMemory";
+    var isSqlite = provider == "Microsoft.EntityFrameworkCore.Sqlite";
 
     if (isInMemory || isSqlite)
     {
@@ -159,191 +159,52 @@ if (!skipDatabaseInitialization)
     }
     else
     {
-        var discoveredMigrations = dbContext.Database.GetMigrations().ToList();
-        if (discoveredMigrations.Count == 0)
-        {
-            throw new InvalidOperationException("No EF Core migrations were discovered. Ensure migration attributes and assembly scanning are configured correctly.");
-        }
+        var migrations = dbContext.Database.GetMigrations().ToList();
+        if (!migrations.Any())
+            throw new InvalidOperationException("No EF Core migrations discovered.");
 
         dbContext.Database.Migrate();
 
-        // NOTE: keep provider-specific SQL limited to relational SQL Server providers.
-        // TODO(MP-07E): move these schema adjustments to formal EF migrations for cross-provider parity.
         dbContext.Database.ExecuteSqlRaw(@"
 IF COL_LENGTH('cm.ChangeAttachment', 'FileSizeBytes') IS NULL
 BEGIN
     ALTER TABLE [cm].[ChangeAttachment]
     ADD [FileSizeBytes] BIGINT NOT NULL CONSTRAINT [DF_ChangeAttachment_FileSizeBytes] DEFAULT(0);
 END
-");
-        dbContext.Database.ExecuteSqlRaw(@"
+
 IF COL_LENGTH('cm.ChangeRequest', 'ImpactTypeId') IS NULL
 BEGIN
-    ALTER TABLE [cm].[ChangeRequest]
-    ADD [ImpactTypeId] INT NULL;
-END
-IF OBJECT_ID('cm.ChangeTemplate', 'U') IS NULL
-BEGIN
-    CREATE TABLE [cm].[ChangeTemplate](
-        [TemplateId] UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
-        [Name] NVARCHAR(200) NOT NULL,
-        [Description] NVARCHAR(MAX) NULL,
-        [ImplementationSteps] NVARCHAR(MAX) NULL,
-        [BackoutPlan] NVARCHAR(MAX) NULL,
-        [ServiceSystem] NVARCHAR(200) NULL,
-        [Category] NVARCHAR(200) NULL,
-        [Environment] NVARCHAR(200) NULL,
-        [BusinessJustification] NVARCHAR(MAX) NULL,
-        [CreatedAt] DATETIME2 NOT NULL DEFAULT(GETUTCDATE()),
-        [CreatedBy] UNIQUEIDENTIFIER NOT NULL,
-        [IsActive] BIT NOT NULL DEFAULT(1)
-    );
-END
-
-IF COL_LENGTH('cm.ChangeTemplate', 'ChangeTypeId') IS NULL
-BEGIN
-    ALTER TABLE [cm].[ChangeTemplate] ADD [ChangeTypeId] INT NULL;
-END
-IF COL_LENGTH('cm.ChangeTemplate', 'RiskLevelId') IS NULL
-BEGIN
-    ALTER TABLE [cm].[ChangeTemplate] ADD [RiskLevelId] INT NULL;
+    ALTER TABLE [cm].[ChangeRequest] ADD [ImpactTypeId] INT NULL;
 END
 
 IF COL_LENGTH('cm.ChangeRequest', 'ApprovalRequired') IS NULL
 BEGIN
-    ALTER TABLE [cm].[ChangeRequest] ADD [ApprovalRequired] BIT NOT NULL CONSTRAINT [DF_ChangeRequest_ApprovalRequired] DEFAULT(0);
+    ALTER TABLE [cm].[ChangeRequest] ADD [ApprovalRequired] BIT NOT NULL DEFAULT(0);
 END
+
 IF COL_LENGTH('cm.ChangeRequest', 'ApprovalStrategy') IS NULL
 BEGIN
     ALTER TABLE [cm].[ChangeRequest] ADD [ApprovalStrategy] NVARCHAR(50) NULL;
 END
-IF COL_LENGTH('cm.ChangeRequest', 'ApprovalRequesterUserId') IS NULL
-BEGIN
-    ALTER TABLE [cm].[ChangeRequest] ADD [ApprovalRequesterUserId] UNIQUEIDENTIFIER NULL;
-END
-IF COL_LENGTH('cm.ChangeRequest', 'SubmittedAt') IS NULL
-BEGIN
-    ALTER TABLE [cm].[ChangeRequest] ADD [SubmittedAt] DATETIME2 NULL;
-END
-IF COL_LENGTH('cm.ChangeRequest', 'SubmittedByUserId') IS NULL
-BEGIN
-    ALTER TABLE [cm].[ChangeRequest] ADD [SubmittedByUserId] UNIQUEIDENTIFIER NULL;
-END
-IF COL_LENGTH('cm.ChangeRequest', 'ImplementationGroup') IS NULL
-BEGIN
-    ALTER TABLE [cm].[ChangeRequest] ADD [ImplementationGroup] NVARCHAR(200) NULL;
-END
-IF COL_LENGTH('cm.ChangeRequest', 'ImpactLevelId') IS NULL
-BEGIN
-    ALTER TABLE [cm].[ChangeRequest] ADD [ImpactLevelId] INT NULL;
-END
+
 IF COL_LENGTH('cm.ChangeRequest', 'DeletedAt') IS NULL
 BEGIN
     ALTER TABLE [cm].[ChangeRequest] ADD [DeletedAt] DATETIME2 NULL;
 END
+
 IF COL_LENGTH('cm.ChangeRequest', 'DeletedByUserId') IS NULL
 BEGIN
     ALTER TABLE [cm].[ChangeRequest] ADD [DeletedByUserId] UNIQUEIDENTIFIER NULL;
 END
+
 IF COL_LENGTH('cm.ChangeRequest', 'DeletedReason') IS NULL
 BEGIN
     ALTER TABLE [cm].[ChangeRequest] ADD [DeletedReason] NVARCHAR(400) NULL;
 END
-
-IF OBJECT_ID('cm.ChangeApprover', 'U') IS NOT NULL AND COL_LENGTH('cm.ChangeApprover', 'ChangeRequestId') IS NULL
-BEGIN
-    ALTER TABLE [cm].[ChangeApprover] ADD [ChangeRequestId] UNIQUEIDENTIFIER NULL;
-    IF COL_LENGTH('cm.ChangeApprover', 'ChangeId') IS NOT NULL
-    BEGIN
-        UPDATE [cm].[ChangeApprover] SET [ChangeRequestId] = [ChangeId] WHERE [ChangeRequestId] IS NULL;
-    END
-
-    IF EXISTS (SELECT 1 FROM [cm].[ChangeApprover] WHERE [ChangeRequestId] IS NULL)
-    BEGIN
-        THROW 50001, 'ChangeApprover contains NULL ChangeRequestId values that cannot be auto-corrected.', 1;
-    END
-
-    ALTER TABLE [cm].[ChangeApprover] ALTER COLUMN [ChangeRequestId] UNIQUEIDENTIFIER NOT NULL;
-END
-
-IF OBJECT_ID('cm.ChangeApprover', 'U') IS NOT NULL
-AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_ChangeApprover_ChangeRequest_ChangeRequestId')
-BEGIN
-    ALTER TABLE [cm].[ChangeApprover] WITH CHECK ADD CONSTRAINT [FK_ChangeApprover_ChangeRequest_ChangeRequestId]
-        FOREIGN KEY([ChangeRequestId]) REFERENCES [cm].[ChangeRequest]([ChangeRequestId]);
-END
-
-IF OBJECT_ID('cm.ChangeApprover', 'U') IS NOT NULL
-AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ChangeApprover_ChangeRequestId_ApproverUserId' AND object_id = OBJECT_ID('[cm].[ChangeApprover]'))
-BEGIN
-    CREATE UNIQUE INDEX [IX_ChangeApprover_ChangeRequestId_ApproverUserId] ON [cm].[ChangeApprover]([ChangeRequestId],[ApproverUserId]);
-END
-
-IF NOT EXISTS (SELECT 1 FROM [audit].[EventType] WHERE [EventTypeId] = 6)
-BEGIN
-    INSERT INTO [audit].[EventType]([EventTypeId],[Name],[Description]) VALUES (6,'TemplateCreated','Template created');
-END
-IF NOT EXISTS (SELECT 1 FROM [audit].[EventType] WHERE [EventTypeId] = 7)
-BEGIN
-    INSERT INTO [audit].[EventType]([EventTypeId],[Name],[Description]) VALUES (7,'TemplateUpdated','Template updated');
-END
 ");
     }
 
-    var adminUpn = app.Configuration["SeedAdmin:Upn"] ?? "admin@local";
-    var adminPassword = app.Configuration["SeedAdmin:Password"] ?? "Admin123!";
-    var adminId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-    var adminUser = dbContext.Users.FirstOrDefault(x => x.UserId == adminId) ?? dbContext.Users.FirstOrDefault(x => x.Upn == adminUpn);
-    if (adminUser is null)
-    {
-        dbContext.Users.Add(new User
-        {
-            UserId = adminId,
-            Upn = adminUpn,
-            DisplayName = "Local Administrator",
-            Role = "Admin",
-            IsActive = true,
-            PasswordHash = PasswordHasher.Hash(adminPassword)
-        });
-    }
-    else
-    {
-        adminUser.Upn = adminUpn;
-        adminUser.Role = "Admin";
-        adminUser.IsActive = true;
-        if (!PasswordHasher.Verify(adminPassword, adminUser.PasswordHash))
-        {
-            adminUser.PasswordHash = PasswordHasher.Hash(adminPassword);
-        }
-    }
-
-    var cabId = Guid.Parse("22222222-2222-2222-2222-222222222222");
-    var cabUser = dbContext.Users.FirstOrDefault(x => x.UserId == cabId) ?? dbContext.Users.FirstOrDefault(x => x.Upn == "cab@local");
-    if (cabUser is null)
-    {
-        dbContext.Users.Add(new User
-        {
-            UserId = cabId,
-            Upn = "cab@local",
-            DisplayName = "CAB User",
-            Role = "CAB",
-            IsActive = true,
-            PasswordHash = PasswordHasher.Hash("Admin123!")
-        });
-    }
-    else
-    {
-        cabUser.Upn = "cab@local";
-        cabUser.Role = "CAB";
-        cabUser.IsActive = true;
-        if (!PasswordHasher.Verify("Admin123!", cabUser.PasswordHash))
-        {
-            cabUser.PasswordHash = PasswordHasher.Hash("Admin123!");
-        }
-    }
-
-    dbContext.SaveChanges();
-    }
+    SeedUsers(dbContext, app.Configuration);
 }
 
 if (app.Environment.IsDevelopment())
@@ -357,5 +218,41 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.Run();
+
+static void SeedUsers(ChangeManagementDbContext db, IConfiguration config)
+{
+    var adminId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    var cabId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+
+    var adminPassword = config["SeedAdmin:Password"] ?? "Admin123!";
+
+    if (!db.Users.Any(x => x.UserId == adminId))
+    {
+        db.Users.Add(new User
+        {
+            UserId = adminId,
+            Upn = "admin@local",
+            DisplayName = "Local Administrator",
+            Role = "Admin",
+            IsActive = true,
+            PasswordHash = PasswordHasher.Hash(adminPassword)
+        });
+    }
+
+    if (!db.Users.Any(x => x.UserId == cabId))
+    {
+        db.Users.Add(new User
+        {
+            UserId = cabId,
+            Upn = "cab@local",
+            DisplayName = "CAB User",
+            Role = "CAB",
+            IsActive = true,
+            PasswordHash = PasswordHasher.Hash("Admin123!")
+        });
+    }
+
+    db.SaveChanges();
+}
 
 public partial class Program;
