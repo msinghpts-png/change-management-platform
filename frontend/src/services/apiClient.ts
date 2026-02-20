@@ -22,6 +22,47 @@ const withAuth = (headers?: HeadersInit): HeadersInit => {
   return token ? { ...headers, Authorization: `Bearer ${token}` } : headers ?? {};
 };
 
+
+const parseErrorMessage = async (response: Response): Promise<string> => {
+  const fallback = `Request failed: ${response.status}`;
+
+  try {
+    const text = await response.text();
+    if (!text) return fallback;
+
+    try {
+      const payload = JSON.parse(text) as {
+        message?: string;
+        title?: string;
+        detail?: string;
+        errors?: Record<string, string[] | string>;
+      };
+
+      if (payload.message && payload.message.trim()) return payload.message;
+      if (payload.title && payload.title.trim()) return payload.title;
+      if (payload.detail && payload.detail.trim()) return payload.detail;
+
+      if (payload.errors) {
+        const flattened = Object.values(payload.errors)
+          .flatMap((entry) => Array.isArray(entry) ? entry : [entry])
+          .map((entry) => String(entry).trim())
+          .filter(Boolean);
+
+        if (flattened.length > 0) {
+          return flattened.join(" | ");
+        }
+      }
+    } catch {
+      const raw = text.trim();
+      if (raw) return raw;
+    }
+  } catch {
+    // fall back to status message
+  }
+
+  return fallback;
+};
+
 const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
@@ -43,7 +84,7 @@ const request = async <T>(path: string, options?: RequestInit): Promise<T> => {
       throw new Error("Something went wrong. Please try again.");
     }
 
-    throw new Error(`Request failed: ${response.status}`);
+    throw new Error(await parseErrorMessage(response));
   }
 
   if (response.status === 204) return undefined as T;
@@ -214,7 +255,7 @@ export const apiClient = {
       throw new Error("Something went wrong. Please try again.");
     }
 
-    throw new Error(`Request failed: ${response.status}`);
+    throw new Error(await parseErrorMessage(response));
     }
 
     return normalizeAttachment(await response.json());
@@ -232,7 +273,7 @@ export const apiClient = {
       throw new Error("Something went wrong. Please try again.");
     }
 
-    throw new Error(`Request failed: ${response.status}`);
+    throw new Error(await parseErrorMessage(response));
     }
 
     const blob = await response.blob();

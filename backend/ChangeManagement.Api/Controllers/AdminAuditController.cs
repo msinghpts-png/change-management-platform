@@ -30,12 +30,11 @@ public class AdminAuditController : ControllerBase
             x.CreatedAt,
             x.ActorUserId,
             x.ActorUpn,
-            x.EntitySchema,
+            x.SchemaName,
             x.EntityName,
             x.EntityId,
-            x.ChangeNumber,
-            x.Reason,
-            x.Details
+            x.EntityNumber,
+            x.Metadata
         }));
     }
 }

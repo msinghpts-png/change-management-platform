@@ -18,12 +18,14 @@ public class ChangeService : IChangeService
     private readonly IChangeRepository _repository;
     private readonly IAuditService _audit;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly IActorResolver _actorResolver;
 
-    public ChangeService(IChangeRepository repository, IAuditService audit, IHttpContextAccessor httpContextAccessor)
+    public ChangeService(IChangeRepository repository, IAuditService audit, IHttpContextAccessor httpContextAccessor, IActorResolver actorResolver)
     {
         _repository = repository;
         _audit = audit;
         _httpContextAccessor = httpContextAccessor;
+        _actorResolver = actorResolver;
     }
 
     public Task<List<ChangeRequest>> GetAllAsync(CancellationToken cancellationToken) => _repository.GetAllAsync(cancellationToken);
@@ -83,16 +85,5 @@ public class ChangeService : IChangeService
                ?? "unknown@local";
     }
 
-    private Guid ResolveActorUserId()
-    {
-        var user = _httpContextAccessor.HttpContext?.User;
-        var rawValue = user?.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        if (Guid.TryParse(rawValue, out var userId) && userId != Guid.Empty)
-        {
-            return userId;
-        }
-
-        return Guid.Parse("11111111-1111-1111-1111-111111111111");
-    }
+    private Guid ResolveActorUserId() => _actorResolver.ResolveActorUserId();
 }
