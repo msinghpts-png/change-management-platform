@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
-import { routes } from "../routes";
+import { getNavigationRoutes } from "../routes";
 
 type MainLayoutProps = {
   title: string;
@@ -13,6 +13,7 @@ const MainLayout = ({ title, children }: MainLayoutProps) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
+  const routes = getNavigationRoutes(user?.role);
   const current = routes.find((r) => location.pathname.startsWith(r.path)) ?? routes[0];
 
   return (

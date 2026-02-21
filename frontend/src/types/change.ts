@@ -34,6 +34,7 @@ export type AppUser = {
   displayName: string;
   role: string;
   isActive: boolean;
+  createdAt?: string;
 };
 
 
@@ -193,4 +194,47 @@ export type ChangeTemplate = {
   createdAt?: string;
   createdBy?: string;
   isActive: boolean;
+};
+
+export type AdminTemplate = {
+  templateId: string;
+  name: string;
+  description?: string;
+  implementationSteps?: string;
+  backoutPlan?: string;
+  serviceSystem?: string;
+  category?: string;
+  environment?: string;
+  changeTypeId?: number;
+  changeTypeName?: string;
+  riskLevelId?: number;
+  riskLevelName?: string;
+  isActive: boolean;
+  createdAt?: string;
+  createdBy?: string;
+  createdByUpn?: string;
+  createdByDisplayName?: string;
+};
+
+export type AdminAttachment = {
+  changeAttachmentId: string;
+  changeRequestId: string;
+  fileName: string;
+  fileSizeBytes: number;
+  uploadedAt?: string;
+  uploadedBy?: string;
+  changeNumber?: string;
+};
+
+export type AdminAuditEvent = {
+  auditEventId: string;
+  eventTypeId: number;
+  eventType?: string;
+  actorUserId?: string;
+  actorUpn?: string;
+  schemaName?: string;
+  entityName?: string;
+  entityId?: string;
+  entityNumber?: string;
+  createdAt?: string;
 };

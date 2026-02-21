@@ -10,7 +10,10 @@ import type {
   DashboardStats,
   DatabaseBackup,
   DatabaseStatus,
-  ChangeTemplate
+  ChangeTemplate,
+  AdminTemplate,
+  AdminAttachment,
+  AdminAuditEvent
 } from "../types/change";
 
 const API_BASE_URL = "/api";
@@ -298,10 +301,11 @@ export const apiClient = {
   runMigrations: () => request<{ message: string }>("/admin/database/migrate", { method: "POST" }),
   seedDatabase: () => request<{ message: string }>("/admin/demo-data", { method: "POST" }),
 
-  getAuditEvents: () => request<any[]>("/admin/audit"),
+  getAuditEvents: () => request<AdminAuditEvent[]>("/admin/audit"),
 
-  getAllAttachments: (changeNumber?: string) => request<any[]>(`/admin/attachments${changeNumber ? `?changeNumber=${encodeURIComponent(changeNumber)}` : ""}`),
-  deleteAdminAttachment: (attachmentId: string) => request<void>(`/admin/attachments/${attachmentId}`, { method: "DELETE" }),
+  getAdminTemplates: () => request<AdminTemplate[]>("/admin/templates"),
+
+  getAllAttachments: (changeNumber?: string) => request<AdminAttachment[]>(`/admin/attachments${changeNumber ? `?changeNumber=${encodeURIComponent(changeNumber)}` : ""}`),
 
   resetUserPassword: (id: string, newPassword: string) => request<{ message: string }>(`/admin/users/${id}/reset-password`, {
       method: "POST",
