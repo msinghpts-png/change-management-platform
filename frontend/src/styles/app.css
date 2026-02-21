@@ -345,3 +345,30 @@ a:hover{ text-decoration: none; }
 .switch input:checked + .switch-slider{ background: var(--primary); }
 .switch input:focus-visible + .switch-slider{ box-shadow: 0 0 0 3px rgba(37,99,235,.35); }
 .switch input:checked + .switch-slider::before{ transform: translateX(16px); }
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.data-table thead th {
+  background: #e2e8f0;
+  font-weight: 800;
+}
+
+.data-table tbody tr:nth-child(odd) {
+  background: #f8fafc;
+}

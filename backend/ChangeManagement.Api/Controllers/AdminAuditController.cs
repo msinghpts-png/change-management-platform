@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ChangeManagement.Api.Controllers;
 
 [ApiController]
-[Authorize(Policy = "AdminOnly")]
+[Authorize(Roles = "Admin")]
 [Route("api/admin/audit")]
 public class AdminAuditController : ControllerBase
 {

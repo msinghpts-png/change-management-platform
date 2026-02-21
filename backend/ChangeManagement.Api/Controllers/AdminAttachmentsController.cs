@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using ChangeManagement.Api.Data;
-using ChangeManagement.Api.Domain.Entities;
 using ChangeManagement.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ChangeManagement.Api.Controllers;
 
 [ApiController]
-[Authorize(Policy = "AdminOnly")]
+[Authorize(Roles = "Admin")]
 [Route("api/admin/attachments")]
 public class AdminAttachmentsController : ControllerBase
 {
@@ -46,14 +45,13 @@ public class AdminAttachmentsController : ControllerBase
         var items = await query.Take(500).ToListAsync(cancellationToken);
         return Ok(items.Select(x => new
         {
-            id = x.ChangeAttachmentId,
-            changeRequestId = x.ChangeRequestId,
+            x.ChangeAttachmentId,
+            x.ChangeRequestId,
             changeNumber = x.ChangeRequest == null ? string.Empty : $"CHG-{x.ChangeRequest.ChangeNumber:D6}",
-            fileName = x.FileName,
-            filePath = ResolveAttachmentPath(x),
-            sizeBytes = x.FileSizeBytes,
-            uploadedAt = x.UploadedAt,
-            uploadedBy = x.UploadedByUser?.Upn
+            x.FileName,
+            x.FileSizeBytes,
+            x.UploadedAt,
+            uploadedBy = x.UploadedByUser == null ? null : (!string.IsNullOrWhiteSpace(x.UploadedByUser.DisplayName) ? x.UploadedByUser.DisplayName : x.UploadedByUser.Upn)
         }));
     }
 
@@ -80,13 +78,6 @@ public class AdminAttachmentsController : ControllerBase
         return NoContent();
     }
 
-
-    private static string ResolveAttachmentPath(ChangeAttachment attachment)
-    {
-        var filePathProperty = attachment.GetType().GetProperty("FilePath");
-        var filePathValue = filePathProperty?.GetValue(attachment) as string;
-        return string.IsNullOrWhiteSpace(filePathValue) ? attachment.FilePath : filePathValue;
-    }
 
     private string ResolveActorUpn()
         => User.FindFirstValue(ClaimTypes.Upn)

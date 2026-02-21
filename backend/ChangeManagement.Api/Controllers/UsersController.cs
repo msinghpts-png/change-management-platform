@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ChangeManagement.Api.Controllers;
 
 [ApiController]
-[Authorize(Policy = "AdminOnly")]
+[Authorize(Roles = "Admin")]
 [Route("api/admin/users")]
 public class UsersController : ControllerBase
 {
@@ -21,14 +21,7 @@ public class UsersController : ControllerBase
     public async Task<ActionResult<IEnumerable<UserAdminDto>>> List(CancellationToken cancellationToken)
     {
         var users = await _dbContext.Users.OrderBy(x => x.Upn).ToListAsync(cancellationToken);
-        return Ok(users.Select(x => new UserAdminDto
-        {
-            Id = x.UserId,
-            Upn = x.Upn,
-            DisplayName = x.DisplayName,
-            Role = x.Role,
-            IsActive = x.IsActive
-        }));
+        return Ok(users.Select(ToDto));
     }
 
     [HttpPost]
@@ -52,7 +45,7 @@ public class UsersController : ControllerBase
         _dbContext.Users.Add(user);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return Ok(new UserAdminDto { Id = user.UserId, Upn = user.Upn, DisplayName = user.DisplayName, Role = user.Role, IsActive = user.IsActive });
+        return Ok(ToDto(user));
     }
 
     [HttpPut("{id}")]
@@ -73,7 +66,7 @@ public class UsersController : ControllerBase
         user.IsActive = request.IsActive;
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return Ok(new UserAdminDto { Id = user.UserId, Upn = user.Upn, DisplayName = user.DisplayName, Role = user.Role, IsActive = user.IsActive });
+        return Ok(ToDto(user));
     }
 
     [HttpPost("{id}/reset-password")]
@@ -99,4 +92,14 @@ public class UsersController : ControllerBase
         await _dbContext.SaveChangesAsync(cancellationToken);
         return Ok(new { message = "Password reset successfully." });
     }
+
+    private static UserAdminDto ToDto(User user) => new()
+    {
+        Id = user.UserId,
+        Upn = user.Upn,
+        DisplayName = user.DisplayName,
+        Role = user.Role,
+        IsActive = user.IsActive,
+        CreatedAt = user.CreatedAt
+    };
 }

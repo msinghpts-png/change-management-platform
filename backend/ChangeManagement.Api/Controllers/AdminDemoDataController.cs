@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ChangeManagement.Api.Controllers;
 
 [ApiController]
-[Authorize(Policy = "AdminOnly")]
+[Authorize(Roles = "Admin")]
 [Route("api/admin/demo-data")]
 public class AdminDemoDataController : ControllerBase
 {
